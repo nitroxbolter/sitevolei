@@ -1,0 +1,11 @@
+# Proteger pasta de pagamentos
+<Files "*.php">
+    Order Allow,Deny
+    Allow from all
+</Files>
+
+# Bloquear acesso direto a arquivos de configuração
+<Files "config.php">
+    Order Deny,Allow
+    Deny from all
+</Files>
