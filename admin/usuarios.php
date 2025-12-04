@@ -85,7 +85,7 @@ if ($_POST) {
     exit();
 }
 
-// Obter todos os usuários
+// Obter todos os usuários (excluindo administradores)
 $sql = "SELECT u.*, 
                COUNT(g.id) as total_grupos,
                COUNT(j.id) as total_jogos
@@ -93,7 +93,7 @@ $sql = "SELECT u.*,
         LEFT JOIN grupo_membros gm ON u.id = gm.usuario_id AND gm.ativo = 1
         LEFT JOIN grupos g ON gm.grupo_id = g.id AND g.ativo = 1
         LEFT JOIN jogos j ON g.id = j.grupo_id
-        WHERE u.ativo = 1
+        WHERE u.ativo = 1 AND COALESCE(u.is_admin, 0) = 0
         GROUP BY u.id
         ORDER BY u.data_cadastro DESC";
 $stmt = executeQuery($pdo, $sql);
@@ -101,6 +101,7 @@ $usuarios = $stmt ? $stmt->fetchAll() : [];
 
 include '../includes/header.php';
 ?>
+
 
 <div class="row">
     <div class="col-12">
@@ -123,7 +124,7 @@ include '../includes/header.php';
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -167,9 +168,9 @@ include '../includes/header.php';
                             <td><?php echo formatarData($usuario['data_cadastro'], 'd/m/Y'); ?></td>
                             <td>
                                 <div class="btn-group" role="group">
-                                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editarUsuarioModal<?php echo $usuario['id']; ?>">
+                                    <a href="editar_usuario.php?id=<?php echo $usuario['id']; ?>" class="btn btn-sm btn-primary">
                                         <i class="fas fa-edit"></i>
-                                    </button>
+                                    </a>
                                     <?php if ($usuario['id'] != $_SESSION['user_id']): ?>
                                         <button class="btn btn-sm btn-danger" onclick="confirmarRemocao(<?php echo $usuario['id']; ?>, '<?php echo htmlspecialchars($usuario['nome']); ?>')">
                                             <i class="fas fa-trash"></i>
@@ -178,68 +179,6 @@ include '../includes/header.php';
                                 </div>
                             </td>
                         </tr>
-                        
-                        <!-- Modal Editar Usuário -->
-                        <div class="modal fade" id="editarUsuarioModal<?php echo $usuario['id']; ?>" tabindex="-1">
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Editar Usuário: <?php echo htmlspecialchars($usuario['nome']); ?></h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <form method="POST">
-                                        <div class="modal-body">
-                                            <input type="hidden" name="usuario_id" value="<?php echo $usuario['id']; ?>">
-                                            
-                                            <h6 class="mb-2">Planos e Permissões</h6>
-                                            <input type="hidden" name="acao" value="alterar_premium">
-                                            <div class="mb-3">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" id="is_premium_<?php echo $usuario['id']; ?>" 
-                                                           name="is_premium" <?php echo $usuario['is_premium'] ? 'checked' : ''; ?>>
-                                                    <label class="form-check-label" for="is_premium_<?php echo $usuario['id']; ?>">
-                                                        <i class="fas fa-crown me-1"></i>Usuário Premium
-                                                    </label>
-                                                </div>
-                                            </div>
-                                            
-                                            <div class="mb-3">
-                                                <label for="premium_expira_<?php echo $usuario['id']; ?>" class="form-label">Premium Expira em:</label>
-                                                <input type="datetime-local" class="form-control" id="premium_expira_<?php echo $usuario['id']; ?>" 
-                                                       name="premium_expira" value="<?php echo $usuario['premium_expira_em'] ? date('Y-m-d\TH:i', strtotime($usuario['premium_expira_em'])) : ''; ?>">
-                                            </div>
-                                            
-                                            <div class="mb-3">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" id="is_admin_<?php echo $usuario['id']; ?>" 
-                                                           name="is_admin" <?php echo $usuario['is_admin'] ? 'checked' : ''; ?>>
-                                                    <label class="form-check-label" for="is_admin_<?php echo $usuario['id']; ?>">
-                                                        <i class="fas fa-shield-alt me-1"></i>Administrador
-                                                    </label>
-                                                </div>
-                                            </div>
-                                            <hr>
-                                            <h6 class="mb-2"><i class="fas fa-key me-1"></i>Alterar Senha</h6>
-                                            <div class="mb-3">
-                                                <label class="form-label" for="nova_senha_<?php echo $usuario['id']; ?>">Nova Senha</label>
-                                                <input type="password" class="form-control" id="nova_senha_<?php echo $usuario['id']; ?>" name="nova_senha" minlength="6">
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label" for="confirmar_senha_<?php echo $usuario['id']; ?>">Confirmar Nova Senha</label>
-                                                <input type="password" class="form-control" id="confirmar_senha_<?php echo $usuario['id']; ?>" name="confirmar_senha" minlength="6">
-                                            </div>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                            <div class="btn-group">
-                                                <button type="submit" class="btn btn-primary" onclick="this.form.acao.value='alterar_premium'">Salvar Plano/Permissões</button>
-                                                <button type="submit" class="btn btn-outline-primary" onclick="this.form.acao.value='alterar_senha_usuario'">Salvar Nova Senha</button>
-                                            </div>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
                     <?php endforeach; ?>
                 </tbody>
             </table>
@@ -275,8 +214,7 @@ include '../includes/header.php';
 function confirmarRemocao(usuarioId, nomeUsuario) {
     document.getElementById('usuarioIdRemover').value = usuarioId;
     document.getElementById('nomeUsuario').textContent = nomeUsuario;
-    var modal = new bootstrap.Modal(document.getElementById('confirmarRemocaoModal'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('confirmarRemocaoModal')).show();
 }
 </script>
 

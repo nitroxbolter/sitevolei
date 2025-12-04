@@ -1,7 +1,7 @@
 <?php
 session_start();
-require_once '../includes/db_connect.php';
-require_once '../includes/functions.php';
+require_once '../../includes/db_connect.php';
+require_once '../../includes/functions.php';
 
 $titulo = 'Gerenciar Grupos e Jogos';
 requireAdmin($pdo);
@@ -86,6 +86,18 @@ if ($_POST) {
                 }
             }
             break;
+        case 'reativar_grupo':
+            $grupo_id = (int)($_POST['grupo_id'] ?? 0);
+            if ($grupo_id) {
+                if (executeQuery($pdo, "UPDATE grupos SET ativo = 1 WHERE id = ?", [$grupo_id])) {
+                    $_SESSION['mensagem'] = 'Grupo reativado com sucesso.';
+                    $_SESSION['tipo_mensagem'] = 'success';
+                } else {
+                    $_SESSION['mensagem'] = 'Erro ao reativar grupo.';
+                    $_SESSION['tipo_mensagem'] = 'danger';
+                }
+            }
+            break;
             
         case 'remover_jogo':
             $jogo_id = (int)($_POST['jogo_id'] ?? 0);
@@ -106,14 +118,13 @@ if ($_POST) {
     exit();
 }
 
-// Obter grupos
+// Obter grupos (ativos e inativos)
 $sql = "SELECT g.*, u.nome as admin_nome, COUNT(gm.id) as total_membros
         FROM grupos g
         LEFT JOIN usuarios u ON g.administrador_id = u.id
         LEFT JOIN grupo_membros gm ON g.id = gm.grupo_id AND gm.ativo = 1
-        WHERE g.ativo = 1
         GROUP BY g.id
-        ORDER BY g.data_criacao DESC";
+        ORDER BY g.ativo DESC, g.data_criacao DESC";
 $stmt = executeQuery($pdo, $sql);
 $grupos = $stmt ? $stmt->fetchAll() : [];
 
@@ -130,7 +141,7 @@ $sql = "SELECT j.*, g.nome as grupo_nome, u.nome as criado_por_nome,
 $stmt = executeQuery($pdo, $sql);
 $jogos = $stmt ? $stmt->fetchAll() : [];
 
-include '../includes/header.php';
+include '../../includes/header.php';
 ?>
 
 <div class="row">
@@ -139,9 +150,6 @@ include '../includes/header.php';
             <h2>
                 <i class="fas fa-cogs me-2"></i>Gerenciar Grupos e Jogos
             </h2>
-            <a href="dashboard.php" class="btn btn-outline-primary">
-                <i class="fas fa-arrow-left me-2"></i>Voltar ao Dashboard
-            </a>
         </div>
     </div>
 </div>
@@ -169,13 +177,14 @@ include '../includes/header.php';
                             <th>Administrador</th>
                             <th>Local</th>
                             <th>Membros</th>
+                            <th>Status</th>
                             <th>Criado em</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($grupos as $grupo): ?>
-                            <tr>
+                            <tr class="<?php echo $grupo['ativo'] == 0 ? 'table-secondary' : ''; ?>">
                                 <td><?php echo $grupo['id']; ?></td>
                                 <td><strong><?php echo htmlspecialchars($grupo['nome']); ?></strong></td>
                                 <td><?php echo htmlspecialchars($grupo['admin_nome']); ?></td>
@@ -183,12 +192,25 @@ include '../includes/header.php';
                                 <td>
                                     <span class="badge bg-info"><?php echo $grupo['total_membros']; ?> membros</span>
                                 </td>
+                                <td>
+                                    <?php if ($grupo['ativo'] == 1): ?>
+                                        <span class="badge bg-success">Ativo</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary">Inativo</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?php echo formatarData($grupo['data_criacao'], 'd/m/Y'); ?></td>
                                 <td>
                                     <div class="btn-group">
-                                        <button class="btn btn-sm btn-warning" onclick="confirmarInativacaoGrupo(<?php echo $grupo['id']; ?>, '<?php echo htmlspecialchars($grupo['nome']); ?>')">
-                                            <i class="fas fa-ban"></i> Inativar
-                                        </button>
+                                        <?php if ($grupo['ativo'] == 1): ?>
+                                            <button class="btn btn-sm btn-warning" onclick="confirmarInativacaoGrupo(<?php echo $grupo['id']; ?>, '<?php echo htmlspecialchars($grupo['nome']); ?>')">
+                                                <i class="fas fa-ban"></i> Inativar
+                                            </button>
+                                        <?php else: ?>
+                                            <button class="btn btn-sm btn-success" onclick="confirmarReativacaoGrupo(<?php echo $grupo['id']; ?>, '<?php echo htmlspecialchars($grupo['nome']); ?>')">
+                                                <i class="fas fa-check"></i> Reativar
+                                            </button>
+                                        <?php endif; ?>
                                         <button class="btn btn-sm btn-danger" onclick="confirmarRemocaoGrupo(<?php echo $grupo['id']; ?>, '<?php echo htmlspecialchars($grupo['nome']); ?>')">
                                             <i class="fas fa-trash"></i> Remover
                                         </button>
@@ -311,6 +333,30 @@ include '../includes/header.php';
     </div>
 </div>
 
+<!-- Modal de Confirmação de Reativação de Grupo -->
+<div class="modal fade" id="confirmarReativacaoGrupoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Reativação de Grupo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Reativar o grupo <strong id="nomeGrupoReativar"></strong>?</p>
+                <p class="text-muted"><small>O grupo voltará a aparecer para todos os usuários.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST" style="display: inline;">
+                    <input type="hidden" name="acao" value="reativar_grupo">
+                    <input type="hidden" name="grupo_id" id="grupoIdReativar">
+                    <button type="submit" class="btn btn-success">Reativar Grupo</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal de Confirmação de Remoção de Jogo -->
 <div class="modal fade" id="confirmarRemocaoJogoModal" tabindex="-1">
     <div class="modal-dialog">
@@ -350,6 +396,13 @@ function confirmarInativacaoGrupo(grupoId, nomeGrupo) {
     modal.show();
 }
 
+function confirmarReativacaoGrupo(grupoId, nomeGrupo) {
+    document.getElementById('grupoIdReativar').value = grupoId;
+    document.getElementById('nomeGrupoReativar').textContent = nomeGrupo;
+    var modal = new bootstrap.Modal(document.getElementById('confirmarReativacaoGrupoModal'));
+    modal.show();
+}
+
 function confirmarRemocaoJogo(jogoId, nomeJogo) {
     document.getElementById('jogoIdRemover').value = jogoId;
     document.getElementById('nomeJogo').textContent = nomeJogo;
@@ -358,4 +411,4 @@ function confirmarRemocaoJogo(jogoId, nomeJogo) {
 }
 </script>
 
-<?php include '../includes/footer.php'; ?>
+<?php include '../../includes/footer.php'; ?>

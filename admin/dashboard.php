@@ -6,19 +6,7 @@ require_once '../includes/functions.php';
 $titulo = 'Painel Administrativo';
 requireAdmin($pdo);
 
-// Estatísticas gerais
-$sql = "SELECT 
-            COUNT(DISTINCT u.id) as total_usuarios,
-            COUNT(DISTINCT g.id) as total_grupos,
-            COUNT(DISTINCT j.id) as total_jogos,
-            COUNT(DISTINCT t.id) as total_torneios
-        FROM usuarios u
-        LEFT JOIN grupos g ON 1=1
-        LEFT JOIN jogos j ON 1=1
-        LEFT JOIN torneios t ON 1=1
-        WHERE u.ativo = 1";
-$stmt = executeQuery($pdo, $sql);
-$estatisticas = $stmt ? $stmt->fetch() : [];
+// Estatísticas removidas - já existem na página de estatísticas
 
 // Jogos recentes (site)
 $sql = "SELECT j.*, g.nome as grupo_nome, u.nome as criado_por_nome
@@ -33,7 +21,7 @@ $jogos_recentes = $stmt ? $stmt->fetchAll() : [];
 // Torneios recentes (site)
 $sql = "SELECT t.*, g.nome as grupo_nome, u.nome as criado_por_nome
         FROM torneios t
-        JOIN grupos g ON t.grupo_id = g.id
+        LEFT JOIN grupos g ON t.grupo_id = g.id
         LEFT JOIN usuarios u ON t.criado_por = u.id
         ORDER BY t.data_criacao DESC
         LIMIT 5";
@@ -58,47 +46,7 @@ include '../includes/header.php';
     </div>
 </div>
 
-<!-- Estatísticas Gerais -->
-<div class="row mb-4">
-    <div class="col-md-3 mb-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body text-center">
-                <i class="fas fa-users fa-3x mb-3"></i>
-                <h3><?php echo $estatisticas['total_usuarios']; ?></h3>
-                <p class="mb-0">Usuários Ativos</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card bg-success text-white">
-            <div class="card-body text-center">
-                <i class="fas fa-users fa-3x mb-3"></i>
-                <h3><?php echo $estatisticas['total_grupos']; ?></h3>
-                <p class="mb-0">Grupos Ativos</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card bg-info text-white">
-            <div class="card-body text-center">
-                <i class="fas fa-calendar-alt fa-3x mb-3"></i>
-                <h3><?php echo $estatisticas['total_jogos']; ?></h3>
-                <p class="mb-0">Jogos Criados</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="card bg-warning text-white">
-            <div class="card-body text-center">
-                <i class="fas fa-trophy fa-3x mb-3"></i>
-                <h3><?php echo $estatisticas['total_torneios']; ?></h3>
-                <p class="mb-0">Torneios Criados</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- (Seção de Meus Grupos removida para o painel do site) -->
+<!-- Estatísticas removidas - já existem na página de estatísticas -->
 
 <!-- Ações Rápidas -->
 <div class="row mb-4">
@@ -114,7 +62,7 @@ include '../includes/header.php';
                 </a>
             </div>
             <div class="col-md-3 mb-3">
-                <a href="grupos_jogos.php" class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center py-4">
+                <a href="../grupos/admin/grupos_jogos.php" class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center py-4">
                     <i class="fas fa-calendar-alt fa-3x mb-3"></i>
                     <span>Grupos e Jogos</span>
                 </a>
@@ -143,7 +91,7 @@ include '../includes/header.php';
                 <h5 class="mb-0">
                     <i class="fas fa-calendar-alt me-2"></i>Jogos Recentes
                 </h5>
-                <a href="gerenciar_jogos.php" class="btn btn-sm btn-outline-primary">
+                <a href="../jogos/jogos.php" class="btn btn-sm btn-outline-primary">
                     Ver Todos
                 </a>
             </div>
@@ -177,8 +125,8 @@ include '../includes/header.php';
                                             </span>
                                         </td>
                                         <td>
-                                            <a href="jogo.php?id=<?php echo $jogo['id']; ?>" class="btn btn-sm btn-primary">
-                                                <i class="fas fa-eye"></i>
+                                            <a href="../jogos/jogo.php?id=<?php echo $jogo['id']; ?>" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-eye"></i> Ver
                                             </a>
                                         </td>
                                     </tr>
@@ -198,7 +146,7 @@ include '../includes/header.php';
                 <h5 class="mb-0">
                     <i class="fas fa-trophy me-2"></i>Torneios Recentes
                 </h5>
-                <a href="gerenciar_torneios.php" class="btn btn-sm btn-outline-primary">
+                <a href="../torneios/torneios.php" class="btn btn-sm btn-outline-primary">
                     Ver Todos
                 </a>
             </div>
@@ -210,14 +158,19 @@ include '../includes/header.php';
                     </div>
                 <?php else: ?>
                     <?php foreach ($torneios_recentes as $torneio): ?>
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div>
+                        <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                            <div class="flex-grow-1">
                                 <h6 class="mb-1"><?php echo htmlspecialchars($torneio['nome']); ?></h6>
-                                <small class="text-muted"><?php echo htmlspecialchars($torneio['grupo_nome']); ?></small>
+                                <small class="text-muted"><?php echo htmlspecialchars($torneio['grupo_nome'] ?: 'Torneio Avulso'); ?></small>
                             </div>
-                            <span class="badge bg-<?php echo $torneio['status'] === 'Inscrições Abertas' ? 'success' : 'warning'; ?>">
-                                <?php echo $torneio['status']; ?>
-                            </span>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-<?php echo $torneio['status'] === 'Inscrições Abertas' ? 'success' : ($torneio['status'] === 'Finalizado' ? 'dark' : 'warning'); ?>">
+                                    <?php echo $torneio['status']; ?>
+                                </span>
+                                <a href="../torneios/torneio.php?id=<?php echo $torneio['id']; ?>" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </div>
                         </div>
                     <?php endforeach; ?>
                 <?php endif; ?>

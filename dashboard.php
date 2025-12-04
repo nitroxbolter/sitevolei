@@ -102,31 +102,37 @@ include 'includes/header.php';
                 <h5><?php echo htmlspecialchars($usuario['nome']); ?></h5>
                 <p class="text-muted"><?php echo $usuario['email']; ?></p>
                 
-                <div class="d-flex justify-content-center align-items-center mb-2">
-                    <span class="badge bg-<?php echo $usuario['nivel'] === 'Profissional' ? 'danger' : ($usuario['nivel'] === 'Avançado' ? 'warning' : ($usuario['nivel'] === 'Intermediário' ? 'info' : 'secondary')); ?> me-2">
-                        <?php echo $usuario['nivel']; ?>
-                    </span>
-                    <?php if ($usuario['is_premium']): ?>
-                        <span class="badge bg-warning text-dark me-2">
-                            <i class="fas fa-crown me-1"></i>Premium
+                <div class="mb-2">
+                    <!-- Linha 1: Admin e Premium -->
+                    <div class="d-flex justify-content-center align-items-center mb-2">
+                        <?php if ($usuario['is_admin']): ?>
+                            <span class="badge bg-danger me-2">
+                                <i class="fas fa-shield-alt me-1"></i>Admin
+                            </span>
+                        <?php endif; ?>
+                        <?php if ($usuario['is_premium']): ?>
+                            <span class="badge bg-warning text-dark">
+                                <i class="fas fa-crown me-1"></i>Premium
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    <!-- Linha 2: Profissional e Pontos -->
+                    <div class="d-flex justify-content-center align-items-center">
+                        <span class="badge bg-<?php echo $usuario['nivel'] === 'Profissional' ? 'danger' : ($usuario['nivel'] === 'Avançado' ? 'warning' : ($usuario['nivel'] === 'Intermediário' ? 'info' : 'secondary')); ?> me-2">
+                            <?php echo $usuario['nivel']; ?>
                         </span>
-                    <?php endif; ?>
-                    <?php if ($usuario['is_admin']): ?>
-                        <span class="badge bg-danger me-2">
-                            <i class="fas fa-shield-alt me-1"></i>Admin
+                        <?php 
+                            $repDash = (int)($usuario['reputacao'] ?? 0); 
+                            $repDashClass = 'bg-danger';
+                            $repDashStyle = '';
+                            if ($repDash > 75) { $repDashClass = 'bg-success'; }
+                            elseif ($repDash > 50) { $repDashClass = 'bg-warning text-dark'; }
+                            elseif ($repDash > 25) { $repDashClass = 'text-dark'; $repDashStyle = 'background-color:#fd7e14;'; }
+                        ?>
+                        <span class="badge <?php echo $repDashClass; ?>" style="<?php echo $repDashStyle; ?>">
+                            <i class="fas fa-star me-1"></i><?php echo $repDash; ?> pts
                         </span>
-                    <?php endif; ?>
-                    <?php 
-                        $repDash = (int)($usuario['reputacao'] ?? 0); 
-                        $repDashClass = 'bg-danger';
-                        $repDashStyle = '';
-                        if ($repDash > 75) { $repDashClass = 'bg-success'; }
-                        elseif ($repDash > 50) { $repDashClass = 'bg-warning text-dark'; }
-                        elseif ($repDash > 25) { $repDashClass = 'text-dark'; $repDashStyle = 'background-color:#fd7e14;'; }
-                    ?>
-                    <span class="badge <?php echo $repDashClass; ?>" style="<?php echo $repDashStyle; ?>">
-                        <i class="fas fa-star me-1"></i><?php echo $repDash; ?> pts
-                    </span>
+                    </div>
                 </div>
                 
                 <a href="perfil.php" class="btn btn-outline-primary btn-sm">

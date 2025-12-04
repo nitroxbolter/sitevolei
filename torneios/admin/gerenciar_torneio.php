@@ -370,9 +370,6 @@ include '../../includes/header.php';
                 <div class="d-flex gap-2 align-items-center">
                     <?php if (!empty($participantes)): ?>
                         <span class="text-muted small me-2"><?php echo count($participantes); ?> participante(s)</span>
-                        <button class="btn btn-sm btn-danger" onclick="limparTodosParticipantes()" title="Remover todos os participantes">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
                     <?php endif; ?>
                     <button class="btn btn-sm btn-primary" onclick="abrirModalAdicionarParticipante()" title="Adicionar Participante">
                         <i class="fas fa-plus"></i>
@@ -383,6 +380,11 @@ include '../../includes/header.php';
                             title="<?php echo $inscricoes_abertas ? 'Inscrições Abertas - Clique para fechar' : 'Inscrições Fechadas - Clique para abrir'; ?>">
                         <i class="fas <?php echo $inscricoes_abertas ? 'fa-unlock' : 'fa-lock'; ?>"></i>
                     </button>
+                    <?php if (!empty($participantes)): ?>
+                        <button class="btn btn-sm btn-danger" onclick="limparTodosParticipantes()" title="Remover todos os participantes">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="card-body" id="corpoListaParticipantes" style="display: none;">

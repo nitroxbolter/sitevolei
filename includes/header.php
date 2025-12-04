@@ -116,9 +116,6 @@
                                         <span class="badge bg-danger"><?php echo $notifCount; ?></span>
                                     <?php endif; ?>
                                 </a></li>
-                                <li><a class="dropdown-item" href="/configuracoes.php">
-                                    <i class="fas fa-cog me-2"></i>Configurações
-                                </a></li>
                                 <?php if (isAdmin($pdo, $_SESSION['user_id'])): ?>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item" href="/admin/dashboard.php">

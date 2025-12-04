@@ -38,9 +38,8 @@ $stmt = executeQuery($pdo, $sql);
 $usuarios_por_nivel = $stmt ? $stmt->fetchAll() : [];
 
 // Usuários por posição
-$sql = "SELECT posicao_preferida, COUNT(*) as total FROM usuarios WHERE ativo = 1 GROUP BY posicao_preferida ORDER BY total DESC";
-$stmt = executeQuery($pdo, $sql);
-$usuarios_por_posicao = $stmt ? $stmt->fetchAll() : [];
+// Removido: posicao_preferida não existe na tabela usuarios
+$usuarios_por_posicao = [];
 
 // Jogos por status
 $sql = "SELECT status, COUNT(*) as total FROM jogos GROUP BY status ORDER BY total DESC";
@@ -52,14 +51,40 @@ $sql = "SELECT status, COUNT(*) as total FROM torneios GROUP BY status ORDER BY 
 $stmt = executeQuery($pdo, $sql);
 $torneios_por_status = $stmt ? $stmt->fetchAll() : [];
 
-// Top 10 usuários por reputação
-$sql = "SELECT nome, reputacao, posicao_preferida, nivel 
-        FROM usuarios 
-        WHERE ativo = 1 
-        ORDER BY reputacao DESC 
-        LIMIT 10";
-$stmt = executeQuery($pdo, $sql);
-$top_usuarios = $stmt ? $stmt->fetchAll() : [];
+// Top 10 usuários por reputação (ordenado por maior reputação primeiro)
+$top_usuarios = [];
+$debug_info = [];
+try {
+    // Debug: Verificar total de usuários na tabela
+    $sql_count = "SELECT COUNT(*) as total FROM usuarios";
+    $stmt_count = $pdo->prepare($sql_count);
+    $stmt_count->execute();
+    $total_usuarios = $stmt_count->fetch(PDO::FETCH_ASSOC);
+    $debug_info['total_usuarios'] = $total_usuarios['total'] ?? 0;
+    
+    // Debug: Verificar usuários ativos
+    $sql_count_ativo = "SELECT COUNT(*) as total FROM usuarios WHERE ativo = 1";
+    $stmt_count_ativo = $pdo->prepare($sql_count_ativo);
+    $stmt_count_ativo->execute();
+    $total_ativos = $stmt_count_ativo->fetch(PDO::FETCH_ASSOC);
+    $debug_info['total_ativos'] = $total_ativos['total'] ?? 0;
+    
+    // Query principal (excluindo administradores - is_admin > 0)
+    $sql = "SELECT nome, COALESCE(reputacao, 0) as reputacao, nivel 
+            FROM usuarios 
+            WHERE ativo = 1 AND COALESCE(is_admin, 0) = 0
+            ORDER BY COALESCE(reputacao, 0) DESC, nome ASC
+            LIMIT 10";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute();
+    $top_usuarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $debug_info['resultados_encontrados'] = count($top_usuarios);
+    $debug_info['primeiros_resultados'] = array_slice($top_usuarios, 0, 3);
+} catch (PDOException $e) {
+    error_log("Erro ao buscar top usuários por reputação: " . $e->getMessage());
+    $debug_info['erro'] = $e->getMessage();
+    $top_usuarios = [];
+}
 
 // Atividade mensal (últimos 12 meses)
 $sql = "SELECT 
@@ -261,34 +286,56 @@ include '../includes/header.php';
                                 <th>Posição</th>
                                 <th>Nome</th>
                                 <th>Reputação</th>
-                                <th>Posição</th>
                                 <th>Nível</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($top_usuarios as $index => $usuario): ?>
+                            <?php if (empty($top_usuarios)): ?>
                                 <tr>
-                                    <td>
-                                        <?php if ($index < 3): ?>
-                                            <i class="fas fa-medal text-<?php echo $index === 0 ? 'warning' : ($index === 1 ? 'secondary' : 'bronze'); ?>"></i>
-                                        <?php else: ?>
-                                            <?php echo $index + 1; ?>º
+                                    <td colspan="4" class="text-center text-muted">
+                                        <i class="fas fa-info-circle me-2"></i>Nenhum usuário encontrado.
+                                        <?php if (!empty($debug_info)): ?>
+                                            <br><small class="text-danger">
+                                                DEBUG: Total de usuários: <?php echo $debug_info['total_usuarios'] ?? 'N/A'; ?> | 
+                                                Ativos: <?php echo $debug_info['total_ativos'] ?? 'N/A'; ?> | 
+                                                Resultados: <?php echo $debug_info['resultados_encontrados'] ?? 'N/A'; ?>
+                                                <?php if (isset($debug_info['erro'])): ?>
+                                                    <br>Erro: <?php echo htmlspecialchars($debug_info['erro']); ?>
+                                                <?php endif; ?>
+                                            </small>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?php echo htmlspecialchars($usuario['nome']); ?></td>
-                                    <td>
-                                        <span class="badge bg-success"><?php echo $usuario['reputacao']; ?> pts</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-primary"><?php echo $usuario['posicao_preferida']; ?></span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-<?php echo $usuario['nivel'] === 'Profissional' ? 'danger' : ($usuario['nivel'] === 'Avançado' ? 'warning' : ($usuario['nivel'] === 'Intermediário' ? 'info' : 'secondary')); ?>">
-                                            <?php echo $usuario['nivel']; ?>
-                                        </span>
-                                    </td>
                                 </tr>
-                            <?php endforeach; ?>
+                            <?php else: ?>
+                                <?php foreach ($top_usuarios as $index => $usuario): ?>
+                                    <tr>
+                                        <td>
+                                            <?php if ($index < 3): ?>
+                                                <i class="fas fa-medal text-<?php echo $index === 0 ? 'warning' : ($index === 1 ? 'secondary' : 'danger'); ?>" style="color: <?php echo $index === 0 ? '#ffd700' : ($index === 1 ? '#c0c0c0' : '#cd7f32'); ?>;"></i>
+                                            <?php else: ?>
+                                                <?php echo $index + 1; ?>º
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($usuario['nome'] ?? 'N/A'); ?></td>
+                                        <td>
+                                            <?php 
+                                            $rep = (int)($usuario['reputacao'] ?? 0);
+                                            $repClass = 'bg-danger';
+                                            $repStyle = '';
+                                            if ($rep > 75) { $repClass = 'bg-success'; }
+                                            elseif ($rep > 50) { $repClass = 'bg-warning text-dark'; }
+                                            elseif ($rep > 25) { $repClass = 'text-dark'; $repStyle = 'background-color:#fd7e14;'; }
+                                            ?>
+                                            <span class="badge <?php echo $repClass; ?>" style="<?php echo $repStyle; ?>"><?php echo $rep; ?> pts</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-<?php echo ($usuario['nivel'] ?? '') === 'Profissional' ? 'danger' : (($usuario['nivel'] ?? '') === 'Avançado' ? 'warning' : (($usuario['nivel'] ?? '') === 'Intermediário' ? 'info' : 'secondary')); ?>">
+                                                <?php echo htmlspecialchars($usuario['nivel'] ?? 'N/A'); ?>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
