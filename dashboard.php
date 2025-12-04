@@ -21,9 +21,53 @@ if (!$usuario) {
 
 $grupos_usuario = getGruposUsuario($pdo, $_SESSION['user_id']);
 $proximos_jogos = getProximosJogos($pdo, 5);
-$torneios_ativos = getTorneiosAtivos($pdo, 3);
+// Buscar torneios ativos do usuário (onde é admin ou participante)
+$sql_torneios_ativos = "SELECT DISTINCT t.*, g.nome as grupo_nome 
+                        FROM torneios t 
+                        LEFT JOIN grupos g ON g.id = t.grupo_id
+                        LEFT JOIN torneio_participantes tp ON tp.torneio_id = t.id AND tp.usuario_id = ?
+                        WHERE t.status IN ('Inscrições Abertas', 'Em Andamento')
+                        AND (
+                            t.criado_por = ? 
+                            OR (g.id IS NOT NULL AND g.administrador_id = ?)
+                            OR tp.id IS NOT NULL
+                        )
+                        ORDER BY t.data_inicio ASC 
+                        LIMIT 3";
+$stmt_torneios_ativos = executeQuery($pdo, $sql_torneios_ativos, [$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
+$torneios_ativos = $stmt_torneios_ativos ? $stmt_torneios_ativos->fetchAll() : [];
 
-// Obter jogos confirmados do usuário
+// Contar total de grupos do usuário
+$sql_grupos_count = "SELECT COUNT(*) as total FROM grupo_membros gm 
+                     JOIN grupos g ON g.id = gm.grupo_id 
+                     WHERE gm.usuario_id = ? AND gm.ativo = 1 AND g.ativo = 1";
+$stmt_grupos = executeQuery($pdo, $sql_grupos_count, [$_SESSION['user_id']]);
+$total_grupos = $stmt_grupos ? (int)$stmt_grupos->fetch()['total'] : 0;
+
+// Contar total de próximos jogos (todos os jogos futuros, não apenas do usuário)
+$sql_jogos_count = "SELECT COUNT(*) as total FROM jogos j 
+                    JOIN grupos g ON j.grupo_id = g.id 
+                    WHERE j.data_jogo > NOW() AND j.status = 'Aberto'";
+$stmt_jogos = executeQuery($pdo, $sql_jogos_count);
+$total_jogos = $stmt_jogos ? (int)$stmt_jogos->fetch()['total'] : 0;
+
+// Contar total de torneios do usuário (incluindo finalizados):
+// 1. Torneios onde o usuário é admin (criador ou admin do grupo)
+// 2. Torneios onde o usuário está participando como participante
+$sql_torneios_count = "SELECT COUNT(DISTINCT t.id) as total 
+                       FROM torneios t 
+                       LEFT JOIN grupos g ON g.id = t.grupo_id
+                       LEFT JOIN torneio_participantes tp ON tp.torneio_id = t.id AND tp.usuario_id = ?
+                       WHERE t.status IN ('Criado', 'Inscrições Abertas', 'Em Andamento', 'Finalizado')
+                       AND (
+                           t.criado_por = ? 
+                           OR (g.id IS NOT NULL AND g.administrador_id = ?)
+                           OR tp.id IS NOT NULL
+                       )";
+$stmt_torneios = executeQuery($pdo, $sql_torneios_count, [$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
+$total_torneios = $stmt_torneios ? (int)$stmt_torneios->fetch()['total'] : 0;
+
+// Obter jogos confirmados do usuário para exibição
 $sql = "SELECT j.*, g.nome as grupo_nome, cp.status as confirmacao_status
         FROM jogos j
         JOIN grupos g ON j.grupo_id = g.id
@@ -101,7 +145,7 @@ include 'includes/header.php';
             <div class="card-body">
                 <?php if (empty($grupos_usuario)): ?>
                     <p class="text-muted text-center">Você não está em nenhum grupo ainda.</p>
-                    <a href="grupos.php" class="btn btn-primary btn-sm w-100">
+                    <a href="grupos/grupos.php" class="btn btn-primary btn-sm w-100">
                         <i class="fas fa-plus me-1"></i>Encontrar Grupos
                     </a>
                 <?php else: ?>
@@ -113,7 +157,7 @@ include 'includes/header.php';
                                     <span class="badge bg-warning text-dark">Admin</span>
                                 <?php endif; ?>
                             </div>
-                            <a href="grupo.php?id=<?php echo $grupo['id']; ?>" class="btn btn-sm btn-outline-primary">
+                            <a href="grupos/grupo.php?id=<?php echo $grupo['id']; ?>" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-eye"></i>
                             </a>
                         </div>
@@ -131,7 +175,7 @@ include 'includes/header.php';
                 <div class="card bg-primary text-white">
                     <div class="card-body text-center">
                         <i class="fas fa-calendar-alt fa-2x mb-2"></i>
-                        <h4><?php echo count($jogos_usuario); ?></h4>
+                        <h4><?php echo $total_jogos; ?></h4>
                         <p class="mb-0">Próximos Jogos</p>
                     </div>
                 </div>
@@ -140,7 +184,7 @@ include 'includes/header.php';
                 <div class="card bg-success text-white">
                     <div class="card-body text-center">
                         <i class="fas fa-users fa-2x mb-2"></i>
-                        <h4><?php echo count($grupos_usuario); ?></h4>
+                        <h4><?php echo $total_grupos; ?></h4>
                         <p class="mb-0">Grupos</p>
                     </div>
                 </div>
@@ -149,7 +193,7 @@ include 'includes/header.php';
                 <div class="card bg-warning text-white">
                     <div class="card-body text-center">
                         <i class="fas fa-trophy fa-2x mb-2"></i>
-                        <h4><?php echo count($torneios_ativos); ?></h4>
+                        <h4><?php echo $total_torneios; ?></h4>
                         <p class="mb-0">Torneios Ativos</p>
                     </div>
                 </div>
@@ -171,7 +215,7 @@ include 'includes/header.php';
                 <h5 class="mb-0">
                     <i class="fas fa-calendar-alt me-2"></i>Próximos Jogos
                 </h5>
-                <a href="jogos.php" class="btn btn-sm btn-outline-primary">
+                <a href="jogos/jogos.php" class="btn btn-sm btn-outline-primary">
                     Ver Todos
                 </a>
             </div>
@@ -180,7 +224,7 @@ include 'includes/header.php';
                     <div class="text-center py-4">
                         <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
                         <p class="text-muted">Nenhum jogo agendado no momento.</p>
-                        <a href="jogos.php" class="btn btn-primary">
+                        <a href="jogos/jogos.php" class="btn btn-primary">
                             <i class="fas fa-search me-1"></i>Buscar Jogos
                         </a>
                     </div>
@@ -216,7 +260,7 @@ include 'includes/header.php';
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <a href="jogo.php?id=<?php echo $jogo['id']; ?>" class="btn btn-sm btn-primary">
+                                            <a href="jogos/jogo.php?id=<?php echo $jogo['id']; ?>" class="btn btn-sm btn-primary">
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                         </td>
@@ -236,7 +280,7 @@ include 'includes/header.php';
                 <h5 class="mb-0">
                     <i class="fas fa-trophy me-2"></i>Torneios Ativos
                 </h5>
-                <a href="torneios.php" class="btn btn-sm btn-outline-primary">
+                <a href="torneios/torneios.php" class="btn btn-sm btn-outline-primary">
                     Ver Todos
                 </a>
             </div>
@@ -266,7 +310,7 @@ include 'includes/header.php';
                                         <span class="badge bg-<?php echo $torneio['status'] === 'Inscrições Abertas' ? 'success' : 'info'; ?>">
                                             <?php echo $torneio['status']; ?>
                                         </span>
-                                        <a href="torneio.php?id=<?php echo $torneio['id']; ?>" class="btn btn-sm btn-warning">
+                                        <a href="torneios/torneio.php?id=<?php echo $torneio['id']; ?>" class="btn btn-sm btn-warning">
                                             Ver Detalhes
                                         </a>
                                     </div>
@@ -289,19 +333,19 @@ include 'includes/header.php';
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-3 mb-3">
-                        <a href="jogos.php" class="btn btn-outline-primary w-100">
+                        <a href="jogos/jogos.php" class="btn btn-outline-primary w-100">
                             <i class="fas fa-search fa-2x d-block mb-2"></i>
                             Buscar Jogos
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <a href="grupos.php" class="btn btn-outline-success w-100">
+                        <a href="grupos/grupos.php" class="btn btn-outline-success w-100">
                             <i class="fas fa-users fa-2x d-block mb-2"></i>
                             Encontrar Grupos
                         </a>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <a href="torneios.php" class="btn btn-outline-warning w-100">
+                        <a href="torneios/torneios.php" class="btn btn-outline-warning w-100">
                             <i class="fas fa-trophy fa-2x d-block mb-2"></i>
                             Ver Torneios
                         </a>

@@ -48,18 +48,17 @@ if ($_POST && isset($_POST['acao']) && $_POST['acao'] === 'login') {
 if ($_POST && isset($_POST['acao']) && $_POST['acao'] === 'cadastro') {
     $nome = sanitizar($_POST['nome'] ?? '');
     $usuario_nome = sanitizar($_POST['usuario'] ?? '');
-    $cpf = ''; // Temporariamente removido do cadastro
+    $cpf = sanitizar($_POST['cpf'] ?? '');
     $telefone = sanitizar($_POST['telefone'] ?? '');
     $email = sanitizar($_POST['email'] ?? '');
     $senha = $_POST['senha'] ?? '';
     $confirmar_senha = $_POST['confirmar_senha'] ?? '';
     $nivel = $_POST['nivel'] ?? '';
-    $genero = sanitizar($_POST['genero'] ?? '');
     $disponibilidade = sanitizar($_POST['disponibilidade'] ?? '');
     $aceita_termos = isset($_POST['aceita_termos']);
     
     // Validações
-    if (empty($nome) || empty($usuario_nome) || empty($telefone) || empty($email) || empty($senha) || empty($confirmar_senha) || empty($genero)) {
+    if (empty($nome) || empty($usuario_nome) || empty($cpf) || empty($telefone) || empty($email) || empty($senha) || empty($confirmar_senha)) {
         $erro = 'Por favor, preencha todos os campos obrigatórios.';
     } elseif (!validarEmail($email)) {
         $erro = 'Email inválido.';
@@ -73,31 +72,28 @@ if ($_POST && isset($_POST['acao']) && $_POST['acao'] === 'cadastro') {
         $erro = 'Este email já está cadastrado.';
     } else {
         // Verificar se usuário já existe
-        $sql_check = "SELECT id FROM usuarios WHERE usuario = ?";
-        $stmt_check = executeQuery($pdo, $sql_check, [$usuario_nome]);
+        $sql_check = "SELECT id FROM usuarios WHERE usuario = ? OR cpf = ?";
+        $stmt_check = executeQuery($pdo, $sql_check, [$usuario_nome, $cpf]);
         if ($stmt_check && $stmt_check->fetch()) {
-            $erro = 'Nome de usuário já cadastrado.';
+            $erro = 'Nome de usuário ou CPF já cadastrado.';
         } else {
+            // Formatar CPF (remover caracteres não numéricos)
+            $cpf_limpo = preg_replace('/[^0-9]/', '', $cpf);
+            
             // Formatar telefone (remover caracteres não numéricos, manter apenas números)
             $telefone_limpo = preg_replace('/[^0-9]/', '', $telefone);
-            $cpf_limpo = null; // CPF temporariamente removido
             
-            // Validar gênero
-            if (!in_array($genero, ['Masculino', 'Feminino'])) {
-                $erro = 'Gênero inválido.';
+            // Cadastrar usuário (começa com 100 pontos de reputação)
+            $senha_hash = hashSenha($senha);
+            $sql = "INSERT INTO usuarios (nome, usuario, cpf, telefone, email, senha, nivel, disponibilidade, reputacao) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 100)";
+            
+            if (executeQuery($pdo, $sql, [$nome, $usuario_nome, $cpf_limpo, $telefone_limpo, $email, $senha_hash, $nivel, $disponibilidade])) {
+                $sucesso = 'Cadastro realizado com sucesso! Agora você pode fazer login.';
+                // Limpar formulário
+                unset($_POST);
             } else {
-                // Cadastrar usuário (começa com 100 pontos de reputação)
-                $senha_hash = hashSenha($senha);
-                $sql = "INSERT INTO usuarios (nome, usuario, cpf, telefone, email, senha, nivel, genero, disponibilidade, reputacao) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 100)";
-                
-                if (executeQuery($pdo, $sql, [$nome, $usuario_nome, $cpf_limpo, $telefone_limpo, $email, $senha_hash, $nivel, $genero, $disponibilidade])) {
-                    $sucesso = 'Cadastro realizado com sucesso! Agora você pode fazer login.';
-                    // Limpar formulário
-                    unset($_POST);
-                } else {
-                    $erro = 'Erro ao cadastrar usuário. Tente novamente.';
-                }
+                $erro = 'Erro ao cadastrar usuário. Tente novamente.';
             }
         }
     }
@@ -293,7 +289,17 @@ include '../includes/header.php';
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-12 mb-3">
+                        <div class="col-md-6 mb-3">
+                            <label for="cpf_cadastro" class="form-label">
+                                <i class="fas fa-id-card me-1"></i>CPF *
+                            </label>
+                            <input type="text" class="form-control" id="cpf_cadastro" name="cpf" 
+                                   placeholder="000.000.000-00"
+                                   value="<?php echo isset($_POST['cpf']) && $_POST['acao'] === 'cadastro' ? htmlspecialchars($_POST['cpf']) : ''; ?>" 
+                                   maxlength="14" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
                             <label for="telefone_cadastro" class="form-label">
                                 <i class="fas fa-phone me-1"></i>Telefone *
                             </label>
@@ -330,22 +336,6 @@ include '../includes/header.php';
                         </div>
                         
                         <div class="col-md-6 mb-3">
-                            <label for="genero_cadastro" class="form-label">
-                                <i class="fas fa-venus-mars me-1"></i>Gênero *
-                            </label>
-                            <select class="form-select" id="genero_cadastro" name="genero" required>
-                                <option value="">Selecione seu gênero</option>
-                                <option value="Masculino" <?php echo (isset($_POST['genero']) && $_POST['genero'] === 'Masculino') ? 'selected' : ''; ?>>Masculino</option>
-                                <option value="Feminino" <?php echo (isset($_POST['genero']) && $_POST['genero'] === 'Feminino') ? 'selected' : ''; ?>>Feminino</option>
-                            </select>
-                            <small class="form-text text-muted">
-                                <i class="fas fa-info-circle me-1"></i>É importante preencher para fins de montar torneios e times na funcionalidade do sistema.
-                            </small>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-12 mb-3">
                             <label for="disponibilidade_cadastro" class="form-label">
                                 <i class="fas fa-clock me-1"></i>Disponibilidade
                             </label>
@@ -421,7 +411,17 @@ include '../includes/header.php';
 </div>
 
 <script>
-// Máscara para Telefone
+// Máscaras para CPF e Telefone
+document.getElementById('cpf_cadastro').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length <= 11) {
+        value = value.replace(/(\d{3})(\d)/, '$1.$2');
+        value = value.replace(/(\d{3})(\d)/, '$1.$2');
+        value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        e.target.value = value;
+    }
+});
+
 document.getElementById('telefone_cadastro').addEventListener('input', function(e) {
     let value = e.target.value.replace(/\D/g, '');
     if (value.length <= 11) {

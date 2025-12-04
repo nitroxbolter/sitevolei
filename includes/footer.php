@@ -12,11 +12,11 @@
                 <div class="col-md-6 text-md-end">
                     <p class="mb-0">
                         <i class="fas fa-envelope me-1"></i>
-                        contato@comunidadevolei.com.br
+                        eduardogaier@gmail.com
                     </p>
                     <p class="mb-0">
                         <i class="fas fa-phone me-1"></i>
-                        (55) 99999-9999
+                        (55) 991773439
                     </p>
                 </div>
             </div>
@@ -33,14 +33,21 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <!-- JS Customizado -->
     <?php
-    // Detectar se estamos em uma subpasta (como admin/)
-    // Se o arquivo que incluiu o footer está em uma subpasta, ajustar o caminho
+    // Detectar profundidade da subpasta para calcular caminho correto
     $script_path = $_SERVER['SCRIPT_NAME'];
     $script_dir = dirname($script_path);
-    // Remove barras iniciais e finais, se o resultado não estiver vazio, estamos em uma subpasta
-    $dir_clean = trim($script_dir, '/');
-    $is_subdir = !empty($dir_clean) && $script_dir !== '/';
-    $js_path = $is_subdir ? '../assets/js/main.js' : 'assets/js/main.js';
+    // Remover barra inicial se existir e normalizar
+    $dir_clean = trim($script_dir, '/\\');
+    // Contar quantos níveis de profundidade temos (separadores / ou \)
+    $depth = 0;
+    if (!empty($dir_clean)) {
+        // Contar separadores de diretório e adicionar 1 para cada nível
+        // Exemplo: "torneios/admin" tem 1 separador, então depth = 2 (torneios e admin)
+        $separadores = substr_count($dir_clean, '/') + substr_count($dir_clean, '\\');
+        $depth = $separadores + 1; // +1 porque cada separador indica um nível adicional
+    }
+    // Construir caminho relativo baseado na profundidade
+    $js_path = $depth > 0 ? str_repeat('../', $depth) . 'assets/js/main.js' : 'assets/js/main.js';
     ?>
     <script src="<?php echo htmlspecialchars($js_path); ?>"></script>
     

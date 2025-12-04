@@ -131,12 +131,6 @@ include '../includes/header.php';
                     <span>Backup</span>
                 </a>
             </div>
-            <div class="col-md-3 mb-3">
-                <a href="../payment/admin/loja.php" class="btn btn-outline-secondary w-100 h-100 d-flex flex-column align-items-center justify-content-center py-4">
-                    <i class="fas fa-store fa-3x mb-3"></i>
-                    <span>Gerenciar Loja</span>
-                </a>
-            </div>
         </div>
     </div>
 </div>

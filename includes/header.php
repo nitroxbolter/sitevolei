@@ -11,13 +11,21 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <!-- CSS Customizado -->
     <?php
-    // Detectar se estamos em uma subpasta (como admin/)
+    // Detectar profundidade da subpasta para calcular caminho correto
     $script_path = $_SERVER['SCRIPT_NAME'];
     $script_dir = dirname($script_path);
-    // Remove barras iniciais e finais, se o resultado não estiver vazio, estamos em uma subpasta
-    $dir_clean = trim($script_dir, '/');
-    $is_subdir = !empty($dir_clean) && $script_dir !== '/';
-    $css_path = $is_subdir ? '../assets/css/style.css' : 'assets/css/style.css';
+    // Remover barra inicial se existir e normalizar
+    $dir_clean = trim($script_dir, '/\\');
+    // Contar quantos níveis de profundidade temos (separadores / ou \)
+    $depth = 0;
+    if (!empty($dir_clean)) {
+        // Contar separadores de diretório e adicionar 1 para cada nível
+        // Exemplo: "torneios/admin" tem 1 separador, então depth = 2 (torneios e admin)
+        $separadores = substr_count($dir_clean, '/') + substr_count($dir_clean, '\\');
+        $depth = $separadores + 1; // +1 porque cada separador indica um nível adicional
+    }
+    // Construir caminho relativo baseado na profundidade
+    $css_path = $depth > 0 ? str_repeat('../', $depth) . 'assets/css/style.css' : 'assets/css/style.css';
     ?>
     <link href="<?php echo htmlspecialchars($css_path); ?>" rel="stylesheet">
     <!-- jQuery (necessário antes de scripts inline em páginas) -->
@@ -56,23 +64,18 @@
                         </a>
                     </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/grupos.php">
+                            <a class="nav-link" href="/grupos/grupos.php">
                                 <i class="fas fa-users me-1"></i>Grupos
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/jogos.php">
+                            <a class="nav-link" href="/jogos/jogos.php">
                                 <i class="fas fa-calendar-alt me-1"></i>Jogos
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/torneios.php">
+                            <a class="nav-link" href="/torneios/torneios.php">
                                 <i class="fas fa-trophy me-1"></i>Torneios
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/payment/loja.php">
-                                <i class="fas fa-shopping-cart me-1"></i>Loja
                             </a>
                         </li>
                     <?php endif; ?>

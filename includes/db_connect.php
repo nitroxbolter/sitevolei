@@ -1,6 +1,6 @@
 <?php
 // Conexão com o banco de dados
-$host = 'localhost';
+$host = '127.0.0.1';
 $dbname = 'database_vb';
 $username = 'root';
 $password = '';

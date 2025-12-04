@@ -17,17 +17,17 @@ $sucesso = '';
 if ($_POST) {
     $nome = sanitizar($_POST['nome']);
     $usuario_nome = sanitizar($_POST['usuario'] ?? '');
-    $cpf = ''; // Temporariamente removido do cadastro
+    $cpf = sanitizar($_POST['cpf'] ?? '');
     $telefone = sanitizar($_POST['telefone'] ?? '');
     $email = sanitizar($_POST['email']);
     $senha = $_POST['senha'];
     $confirmar_senha = $_POST['confirmar_senha'];
     $nivel = $_POST['nivel'];
-    $genero = sanitizar($_POST['genero'] ?? '');
     $disponibilidade = sanitizar($_POST['disponibilidade']);
+    $data_aniversario = isset($_POST['data_aniversario']) && !empty($_POST['data_aniversario']) ? $_POST['data_aniversario'] : null;
     
     // Validações
-    if (empty($nome) || empty($usuario_nome) || empty($telefone) || empty($email) || empty($senha) || empty($confirmar_senha) || empty($genero)) {
+    if (empty($nome) || empty($usuario_nome) || empty($cpf) || empty($telefone) || empty($email) || empty($senha) || empty($confirmar_senha)) {
         $erro = 'Por favor, preencha todos os campos obrigatórios.';
     } elseif (!validarEmail($email)) {
         $erro = 'Email inválido.';
@@ -38,32 +38,50 @@ if ($_POST) {
     } elseif (getUserByEmail($pdo, $email)) {
         $erro = 'Este email já está cadastrado.';
     } else {
-        // Verificar se usuário já existe
-        $sql_check = "SELECT id FROM usuarios WHERE usuario = ?";
-        $stmt_check = executeQuery($pdo, $sql_check, [$usuario_nome]);
+        // Verificar se usuário ou CPF já existem
+        $sql_check = "SELECT id FROM usuarios WHERE usuario = ? OR cpf = ?";
+        $stmt_check = executeQuery($pdo, $sql_check, [$usuario_nome, $cpf]);
         if ($stmt_check && $stmt_check->fetch()) {
-            $erro = 'Nome de usuário já cadastrado.';
+            $erro = 'Nome de usuário ou CPF já cadastrado.';
         } else {
-            // Normalizar telefone (apenas números)
+            // Normalizar CPF e telefone (apenas números)
+            $cpf_limpo = preg_replace('/[^0-9]/', '', $cpf);
             $telefone_limpo = preg_replace('/[^0-9]/', '', $telefone);
-            $cpf_limpo = null; // CPF temporariamente removido
 
-            // Validar gênero
-            if (!in_array($genero, ['Masculino', 'Feminino'])) {
-                $erro = 'Gênero inválido.';
-            } else {
-                // Cadastrar usuário com reputação inicial 100
-                $senha_hash = hashSenha($senha);
-                $sql = "INSERT INTO usuarios (nome, usuario, cpf, telefone, email, senha, nivel, genero, disponibilidade, reputacao) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 100)";
+            // Verificar se campo data_aniversario existe na tabela
+            try {
+                $sql_check = "SHOW COLUMNS FROM usuarios LIKE 'data_aniversario'";
+                $stmt_check = $pdo->query($sql_check);
+                $aniversario_exists = $stmt_check && $stmt_check->rowCount() > 0;
                 
-                if (executeQuery($pdo, $sql, [$nome, $usuario_nome, $cpf_limpo, $telefone_limpo, $email, $senha_hash, $nivel, $genero, $disponibilidade])) {
-                    $sucesso = 'Cadastro realizado com sucesso! Você já pode fazer login.';
-                    // Limpar formulário
-                    $_POST = [];
-                } else {
-                    $erro = 'Erro ao cadastrar usuário. Tente novamente.';
+                if (!$aniversario_exists) {
+                    $sql_add = "ALTER TABLE usuarios ADD COLUMN data_aniversario DATE DEFAULT NULL AFTER disponibilidade";
+                    $pdo->exec($sql_add);
+                    $aniversario_exists = true;
                 }
+            } catch (Exception $e) {
+                $aniversario_exists = false;
+            }
+            
+            // Cadastrar usuário com reputação inicial 100
+            $senha_hash = hashSenha($senha);
+            
+            if ($aniversario_exists && $data_aniversario) {
+                $sql = "INSERT INTO usuarios (nome, usuario, cpf, telefone, email, senha, nivel, disponibilidade, data_aniversario, reputacao) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 100)";
+                $params = [$nome, $usuario_nome, $cpf_limpo, $telefone_limpo, $email, $senha_hash, $nivel, $disponibilidade, $data_aniversario];
+            } else {
+                $sql = "INSERT INTO usuarios (nome, usuario, cpf, telefone, email, senha, nivel, disponibilidade, reputacao) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 100)";
+                $params = [$nome, $usuario_nome, $cpf_limpo, $telefone_limpo, $email, $senha_hash, $nivel, $disponibilidade];
+            }
+            
+            if (executeQuery($pdo, $sql, $params)) {
+                $sucesso = 'Cadastro realizado com sucesso! Você já pode fazer login.';
+                // Limpar formulário
+                $_POST = [];
+            } else {
+                $erro = 'Erro ao cadastrar usuário. Tente novamente.';
             }
         }
     }
@@ -115,6 +133,13 @@ include '../includes/header.php';
                                    value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" required>
                         </div>
                         
+                        <div class="col-md-6 mb-3">
+                            <label for="cpf" class="form-label">
+                                <i class="fas fa-id-card me-1"></i>CPF *
+                            </label>
+                            <input type="text" class="form-control" id="cpf" name="cpf" 
+                                   value="<?php echo isset($_POST['cpf']) ? htmlspecialchars($_POST['cpf']) : ''; ?>" required>
+                        </div>
                     </div>
                     
                     <div class="row">
@@ -159,26 +184,21 @@ include '../includes/header.php';
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="genero" class="form-label">
-                                <i class="fas fa-venus-mars me-1"></i>Gênero *
+                            <label for="data_aniversario" class="form-label">
+                                <i class="fas fa-birthday-cake me-1"></i>Data de Aniversário
                             </label>
-                            <select class="form-select" id="genero" name="genero" required>
-                                <option value="">Selecione seu gênero</option>
-                                <option value="Masculino" <?php echo (isset($_POST['genero']) && $_POST['genero'] === 'Masculino') ? 'selected' : ''; ?>>Masculino</option>
-                                <option value="Feminino" <?php echo (isset($_POST['genero']) && $_POST['genero'] === 'Feminino') ? 'selected' : ''; ?>>Feminino</option>
-                            </select>
-                            <small class="form-text text-muted">
-                                <i class="fas fa-info-circle me-1"></i>É importante preencher para fins de montar torneios e times na funcionalidade do sistema.
-                            </small>
+                            <input type="date" class="form-control" id="data_aniversario" name="data_aniversario" 
+                                   value="<?php echo isset($_POST['data_aniversario']) ? htmlspecialchars($_POST['data_aniversario']) : ''; ?>">
+                            <div class="form-text">Opcional - para exibir aniversariantes no grupo</div>
                         </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="disponibilidade" class="form-label">
-                            <i class="fas fa-clock me-1"></i>Disponibilidade
-                        </label>
-                        <textarea class="form-control" id="disponibilidade" name="disponibilidade" rows="3" 
-                                  placeholder="Ex: Finais de semana, manhãs, noites..."><?php echo isset($_POST['disponibilidade']) ? htmlspecialchars($_POST['disponibilidade']) : ''; ?></textarea>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="disponibilidade" class="form-label">
+                                <i class="fas fa-clock me-1"></i>Disponibilidade
+                            </label>
+                            <textarea class="form-control" id="disponibilidade" name="disponibilidade" rows="3" 
+                                      placeholder="Ex: Finais de semana, manhãs, noites..."><?php echo isset($_POST['disponibilidade']) ? htmlspecialchars($_POST['disponibilidade']) : ''; ?></textarea>
+                        </div>
                     </div>
                     
                     <div class="mb-3 form-check">

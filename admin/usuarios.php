@@ -206,14 +206,7 @@ include '../includes/header.php';
                                             <div class="mb-3">
                                                 <label for="premium_expira_<?php echo $usuario['id']; ?>" class="form-label">Premium Expira em:</label>
                                                 <input type="datetime-local" class="form-control" id="premium_expira_<?php echo $usuario['id']; ?>" 
-                                                       name="premium_expira" value="<?php 
-                                                       if (!empty($usuario['premium_expira_em']) && $usuario['premium_expira_em'] != '0000-00-00 00:00:00' && $usuario['premium_expira_em'] != '0000-00-00') {
-                                                           $timestamp = strtotime($usuario['premium_expira_em']);
-                                                           if ($timestamp !== false && $timestamp > 0) {
-                                                               echo date('Y-m-d\TH:i', $timestamp);
-                                                           }
-                                                       }
-                                                       ?>">
+                                                       name="premium_expira" value="<?php echo $usuario['premium_expira_em'] ? date('Y-m-d\TH:i', strtotime($usuario['premium_expira_em'])) : ''; ?>">
                                             </div>
                                             
                                             <div class="mb-3">

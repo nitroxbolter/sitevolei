@@ -285,16 +285,6 @@ include 'includes/header.php';
                         <p><span class="badge bg-<?php echo $usuario['nivel'] === 'Profissional' ? 'danger' : ($usuario['nivel'] === 'Avançado' ? 'warning' : ($usuario['nivel'] === 'Intermediário' ? 'info' : 'secondary')); ?>"><?php echo $usuario['nivel']; ?></span></p>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <strong>Gênero:</strong>
-                        <p>
-                            <?php if (!empty($usuario['genero'])): ?>
-                                <i class="fas fa-venus-mars me-1"></i><?php echo htmlspecialchars($usuario['genero']); ?>
-                            <?php else: ?>
-                                <span class="text-muted">Não informado</span>
-                            <?php endif; ?>
-                        </p>
-                    </div>
-                    <div class="col-md-6 mb-3">
                         <strong>Status:</strong>
                         <p>
                             <?php if ($usuario['is_premium']): ?>

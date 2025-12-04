@@ -118,7 +118,7 @@ include '../includes/header.php';
                         <i class="fas fa-trophy me-2"></i><?php echo htmlspecialchars($sistema['nome']); ?>
                     </h5>
                     <div>
-                        <a href="../pontuacao_classificacao.php?grupo_id=<?php echo $grupo_id; ?>" class="btn btn-info btn-sm">
+                        <a href="../grupos/pontuacao_classificacao.php?grupo_id=<?php echo $grupo_id; ?>" class="btn btn-info btn-sm">
                             <i class="fas fa-chart-bar me-1"></i>Ver Classificação
                         </a>
                         <button class="btn btn-warning btn-sm" onclick="desativarSistema(<?php echo $sistema['id']; ?>)">

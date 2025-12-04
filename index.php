@@ -10,6 +10,27 @@ $proximos_jogos = getProximosJogos($pdo, 6);
 $torneios_ativos = getTorneiosAtivos($pdo, 3);
 $ranking = getRankingJogadores($pdo, 5);
 
+// Estatísticas gerais
+// Total de jogadores ativos
+$sql_jogadores = "SELECT COUNT(*) as total FROM usuarios WHERE ativo = 1";
+$stmt_jogadores = executeQuery($pdo, $sql_jogadores);
+$total_jogadores = $stmt_jogadores ? (int)$stmt_jogadores->fetch()['total'] : 0;
+
+// Total de grupos ativos
+$sql_grupos = "SELECT COUNT(*) as total FROM grupos WHERE ativo = 1";
+$stmt_grupos = executeQuery($pdo, $sql_grupos);
+$total_grupos = $stmt_grupos ? (int)$stmt_grupos->fetch()['total'] : 0;
+
+// Total de jogos (todos, independente de status)
+$sql_jogos = "SELECT COUNT(*) as total FROM jogos";
+$stmt_jogos = executeQuery($pdo, $sql_jogos);
+$total_jogos = $stmt_jogos ? (int)$stmt_jogos->fetch()['total'] : 0;
+
+// Total de torneios (todos, independente de status)
+$sql_torneios = "SELECT COUNT(*) as total FROM torneios";
+$stmt_torneios = executeQuery($pdo, $sql_torneios);
+$total_torneios = $stmt_torneios ? (int)$stmt_torneios->fetch()['total'] : 0;
+
 include 'includes/header.php';
 ?>
 
@@ -151,7 +172,7 @@ include 'includes/header.php';
                                     <?php echo $torneio['status']; ?>
                                 </span>
                                 <?php if (isLoggedIn()): ?>
-                                    <a href="torneio.php?id=<?php echo $torneio['id']; ?>" class="btn btn-warning btn-sm">
+                                    <a href="torneios/torneio.php?id=<?php echo $torneio['id']; ?>" class="btn btn-warning btn-sm">
                                         Ver Detalhes
                                     </a>
                                 <?php endif; ?>
@@ -241,7 +262,7 @@ include 'includes/header.php';
                 <div class="card border-0 bg-primary text-white">
                     <div class="card-body">
                         <i class="fas fa-users fa-3x mb-3"></i>
-                        <h3 class="card-title">150+</h3>
+                        <h3 class="card-title"><?php echo $total_jogadores; ?></h3>
                         <p class="card-text">Jogadores Ativos</p>
                     </div>
                 </div>
@@ -250,7 +271,7 @@ include 'includes/header.php';
                 <div class="card border-0 bg-success text-white">
                     <div class="card-body">
                         <i class="fas fa-users fa-3x mb-3"></i>
-                        <h3 class="card-title">12</h3>
+                        <h3 class="card-title"><?php echo $total_grupos; ?></h3>
                         <p class="card-text">Grupos Ativos</p>
                     </div>
                 </div>
@@ -259,8 +280,8 @@ include 'includes/header.php';
                 <div class="card border-0 bg-info text-white">
                     <div class="card-body">
                         <i class="fas fa-calendar-alt fa-3x mb-3"></i>
-                        <h3 class="card-title">50+</h3>
-                        <p class="card-text">Jogos por Mês</p>
+                        <h3 class="card-title"><?php echo $total_jogos; ?></h3>
+                        <p class="card-text">Jogos</p>
                     </div>
                 </div>
             </div>
@@ -268,8 +289,8 @@ include 'includes/header.php';
                 <div class="card border-0 bg-warning text-white">
                     <div class="card-body">
                         <i class="fas fa-trophy fa-3x mb-3"></i>
-                        <h3 class="card-title">8</h3>
-                        <p class="card-text">Torneios Realizados</p>
+                        <h3 class="card-title"><?php echo $total_torneios; ?></h3>
+                        <p class="card-text">Torneios</p>
                     </div>
                 </div>
             </div>
