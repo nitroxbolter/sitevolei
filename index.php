@@ -5,7 +5,7 @@ require_once 'includes/functions.php';
 
 $titulo = 'Início';
 
-// Obter próximos jogos e torneios
+// Obter próximos jogos (status Aberto)
 $proximos_jogos = getProximosJogos($pdo, 6);
 $torneios_ativos = getTorneiosAtivos($pdo, 3);
 $ranking = getRankingJogadores($pdo, 5);
@@ -48,10 +48,10 @@ include 'includes/header.php';
                     Encontre jogos, participe de torneios e faça parte da nossa comunidade!
                 </p>
         <div class="d-flex gap-3">
-            <a href="dashboard_guest.php" class="btn btn-light btn-lg">
-                <i class="fas fa-eye me-2"></i>Explorar como Visitante
-            </a>
             <?php if (!isLoggedIn()): ?>
+                <a href="dashboard_guest.php" class="btn btn-light btn-lg">
+                    <i class="fas fa-eye me-2"></i>Explorar como Visitante
+                </a>
                 <a href="auth/login.php" class="btn btn-outline-light btn-lg">
                     <i class="fas fa-sign-in-alt me-2"></i>Entrar
                 </a>
@@ -68,6 +68,7 @@ include 'includes/header.php';
 </section>
 
 <!-- Próximos Jogos -->
+<?php if (!empty($proximos_jogos)): ?>
 <section class="mb-5">
     <div class="container">
         <div class="row">
@@ -78,59 +79,59 @@ include 'includes/header.php';
             </div>
         </div>
         
-        <?php if (empty($proximos_jogos)): ?>
-            <div class="row">
-                <div class="col-12">
-                    <div class="alert alert-info text-center">
-                        <i class="fas fa-info-circle me-2"></i>
-                        Nenhum jogo agendado no momento.
-                    </div>
-                </div>
-            </div>
-        <?php else: ?>
-            <div class="row">
-                <?php foreach ($proximos_jogos as $jogo): ?>
-                    <div class="col-md-6 col-lg-4 mb-4">
-                        <div class="card h-100 shadow-sm">
-                            <div class="card-body">
-                                <h5 class="card-title">
-                                    <i class="fas fa-volleyball-ball me-2"></i>
-                                    <?php echo htmlspecialchars($jogo['titulo']); ?>
-                                </h5>
-                                <p class="card-text">
-                                    <i class="fas fa-users me-2"></i>
-                                    <strong>Grupo:</strong> <?php echo htmlspecialchars($jogo['grupo_nome']); ?>
-                                </p>
-                                <p class="card-text">
-                                    <i class="fas fa-calendar me-2"></i>
-                                    <strong>Data:</strong> <?php echo formatarData($jogo['data_jogo']); ?>
-                                </p>
-                                <p class="card-text">
-                                    <i class="fas fa-map-marker-alt me-2"></i>
-                                    <strong>Local:</strong> <?php echo htmlspecialchars($jogo['local']); ?>
-                                </p>
-                                <p class="card-text">
-                                    <i class="fas fa-user-friends me-2"></i>
-                                    <strong>Vagas:</strong> <?php echo $jogo['vagas_disponiveis']; ?>/<?php echo $jogo['max_jogadores']; ?>
-                                </p>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <small class="text-muted">
-                                        <?php echo tempoRestante($jogo['data_jogo']); ?>
-                                    </small>
-                                    <?php if (isLoggedIn()): ?>
-                                        <a href="jogo.php?id=<?php echo $jogo['id']; ?>" class="btn btn-primary btn-sm">
-                                            Ver Detalhes
-                                        </a>
-                                    <?php endif; ?>
-                                </div>
+        <div class="row">
+            <?php foreach ($proximos_jogos as $jogo): ?>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-volleyball-ball me-2"></i>
+                                <?php echo htmlspecialchars($jogo['titulo'] ?? 'Jogo de Vôlei'); ?>
+                            </h5>
+                            <p class="card-text">
+                                <i class="fas fa-users me-2"></i>
+                                <strong>Grupo:</strong> <?php echo htmlspecialchars($jogo['grupo_nome']); ?>
+                            </p>
+                            <p class="card-text">
+                                <i class="fas fa-calendar me-2"></i>
+                                <strong>Data:</strong> 
+                                <?php 
+                                $data_jogo = new DateTime($jogo['data_jogo']);
+                                $data_fim = isset($jogo['data_fim']) ? new DateTime($jogo['data_fim']) : null;
+                                echo $data_jogo->format('d/m/Y H:i');
+                                if ($data_fim) {
+                                    echo ' — ' . $data_fim->format('H:i');
+                                }
+                                ?>
+                            </p>
+                            <p class="card-text">
+                                <i class="fas fa-map-marker-alt me-2"></i>
+                                <strong>Local:</strong> <?php echo htmlspecialchars($jogo['local'] ?? $jogo['local_principal'] ?? 'Não informado'); ?>
+                            </p>
+                            <p class="card-text">
+                                <i class="fas fa-user-friends me-2"></i>
+                                <strong>Vagas:</strong> 
+                                <?php 
+                                $vagas_disponiveis = (int)($jogo['max_jogadores'] ?? 0) - (int)($jogo['jogadores_confirmados'] ?? 0);
+                                echo $vagas_disponiveis > 0 ? $vagas_disponiveis : 0;
+                                ?>/<?php echo (int)($jogo['max_jogadores'] ?? 0); ?>
+                            </p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-success"><?php echo htmlspecialchars($jogo['status']); ?></span>
+                                <?php if (isLoggedIn()): ?>
+                                    <a href="jogo.php?id=<?php echo $jogo['id']; ?>" class="btn btn-primary btn-sm">
+                                        Ver Detalhes
+                                    </a>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
     </div>
 </section>
+<?php endif; ?>
 
 <!-- Torneios Ativos -->
 <?php if (!empty($torneios_ativos)): ?>

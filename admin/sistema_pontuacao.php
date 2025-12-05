@@ -134,11 +134,25 @@ include '../includes/header.php';
                         </div>
                         <div class="col-md-3">
                             <strong>Data Final:</strong><br>
-                            <?php echo date('d/m/Y', strtotime($sistema['data_final'])); ?>
+                            <div class="d-flex align-items-center gap-2">
+                                <span id="dataFinalDisplay"><?php echo date('d/m/Y', strtotime($sistema['data_final'])); ?></span>
+                                <input type="date" id="dataFinalInput" class="form-control form-control-sm d-none" 
+                                       value="<?php echo date('Y-m-d', strtotime($sistema['data_final'])); ?>" style="max-width: 150px;">
+                                <button class="btn btn-sm btn-link p-0" onclick="editarDataFinal()" id="btnEditarDataFinal">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-md-3">
                             <strong>Total de Jogos:</strong><br>
-                            <?php echo (int)$sistema['quantidade_jogos']; ?>
+                            <div class="d-flex align-items-center gap-2">
+                                <span id="totalJogosDisplay"><?php echo (int)$sistema['quantidade_jogos']; ?></span>
+                                <input type="number" id="totalJogosInput" class="form-control form-control-sm d-none" 
+                                       value="<?php echo (int)$sistema['quantidade_jogos']; ?>" min="1" style="max-width: 100px;">
+                                <button class="btn btn-sm btn-link p-0" onclick="editarTotalJogos()" id="btnEditarTotalJogos">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-md-3">
                             <strong>Jogos Criados:</strong><br>
@@ -809,6 +823,139 @@ function desativarSistema(sistemaId) {
             }
         });
     }
+}
+
+function editarDataFinal() {
+    const display = document.getElementById('dataFinalDisplay');
+    const input = document.getElementById('dataFinalInput');
+    const btn = document.getElementById('btnEditarDataFinal');
+    
+    display.classList.add('d-none');
+    input.classList.remove('d-none');
+    input.focus();
+    btn.innerHTML = '<i class="fas fa-save"></i>';
+    btn.onclick = salvarDataFinal;
+    btn.classList.remove('btn-link');
+    btn.classList.add('btn-success', 'btn-sm');
+    
+    // Salvar ao pressionar Enter
+    input.onkeypress = function(e) {
+        if (e.key === 'Enter') {
+            salvarDataFinal();
+        }
+    };
+}
+
+function salvarDataFinal() {
+    const input = document.getElementById('dataFinalInput');
+    const novaData = input.value;
+    const sistemaId = <?php echo (int)$sistema['id']; ?>;
+    
+    if (!novaData) {
+        showAlert('Data inválida', 'warning');
+        return;
+    }
+    
+    $.ajax({
+        url: '../ajax/editar_sistema_pontuacao.php',
+        method: 'POST',
+        data: {
+            sistema_id: sistemaId,
+            campo: 'data_final',
+            valor: novaData
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                showAlert('Data final atualizada com sucesso!', 'success');
+                // Atualizar display
+                const dataFormatada = new Date(novaData + 'T00:00:00');
+                const dia = String(dataFormatada.getDate()).padStart(2, '0');
+                const mes = String(dataFormatada.getMonth() + 1).padStart(2, '0');
+                const ano = dataFormatada.getFullYear();
+                document.getElementById('dataFinalDisplay').textContent = dia + '/' + mes + '/' + ano;
+                
+                // Voltar ao modo visualização
+                document.getElementById('dataFinalDisplay').classList.remove('d-none');
+                input.classList.add('d-none');
+                const btn = document.getElementById('btnEditarDataFinal');
+                btn.innerHTML = '<i class="fas fa-edit"></i>';
+                btn.onclick = editarDataFinal;
+                btn.classList.remove('btn-success', 'btn-sm');
+                btn.classList.add('btn-link');
+            } else {
+                showAlert(response.message, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('Erro ao atualizar data final', 'danger');
+        }
+    });
+}
+
+function editarTotalJogos() {
+    const display = document.getElementById('totalJogosDisplay');
+    const input = document.getElementById('totalJogosInput');
+    const btn = document.getElementById('btnEditarTotalJogos');
+    
+    display.classList.add('d-none');
+    input.classList.remove('d-none');
+    input.focus();
+    input.select();
+    btn.innerHTML = '<i class="fas fa-save"></i>';
+    btn.onclick = salvarTotalJogos;
+    btn.classList.remove('btn-link');
+    btn.classList.add('btn-success', 'btn-sm');
+    
+    // Salvar ao pressionar Enter
+    input.onkeypress = function(e) {
+        if (e.key === 'Enter') {
+            salvarTotalJogos();
+        }
+    };
+}
+
+function salvarTotalJogos() {
+    const input = document.getElementById('totalJogosInput');
+    const novoTotal = parseInt(input.value);
+    const sistemaId = <?php echo (int)$sistema['id']; ?>;
+    
+    if (!novoTotal || novoTotal < 1) {
+        showAlert('Total de jogos deve ser maior que zero', 'warning');
+        return;
+    }
+    
+    $.ajax({
+        url: '../ajax/editar_sistema_pontuacao.php',
+        method: 'POST',
+        data: {
+            sistema_id: sistemaId,
+            campo: 'quantidade_jogos',
+            valor: novoTotal
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                showAlert('Total de jogos atualizado com sucesso!', 'success');
+                // Atualizar display
+                document.getElementById('totalJogosDisplay').textContent = novoTotal;
+                
+                // Voltar ao modo visualização
+                document.getElementById('totalJogosDisplay').classList.remove('d-none');
+                input.classList.add('d-none');
+                const btn = document.getElementById('btnEditarTotalJogos');
+                btn.innerHTML = '<i class="fas fa-edit"></i>';
+                btn.onclick = editarTotalJogos;
+                btn.classList.remove('btn-success', 'btn-sm');
+                btn.classList.add('btn-link');
+            } else {
+                showAlert(response.message, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('Erro ao atualizar total de jogos', 'danger');
+        }
+    });
 }
 
 // Formulário criar sistema

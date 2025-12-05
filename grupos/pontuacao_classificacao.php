@@ -151,7 +151,7 @@ include '../includes/header.php';
         </h2>
         <div class="d-flex gap-2">
             <?php if ($sou_admin_grupo): ?>
-                <a href="admin/sistema_pontuacao.php?grupo_id=<?php echo $grupo_id; ?>" class="btn btn-warning">
+                <a href="../admin/sistema_pontuacao.php?grupo_id=<?php echo $grupo_id; ?>" class="btn btn-warning">
                     <i class="fas fa-cog me-1"></i>Gerenciar Sistema
                 </a>
             <?php endif; ?>

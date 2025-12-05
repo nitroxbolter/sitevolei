@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Tempo de geração: 04/12/2025 às 14:05
+-- Tempo de geração: 05/12/2025 às 04:29
 -- Versão do servidor: 10.4.32-MariaDB
--- Versão do PHP: 8.0.30
+-- Versão do PHP: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -20,6 +20,28 @@ SET time_zone = "+00:00";
 --
 -- Banco de dados: `database_vb`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `atualizacoes_site`
+--
+
+CREATE TABLE `atualizacoes_site` (
+  `id` int(11) NOT NULL,
+  `titulo` varchar(255) NOT NULL,
+  `versao` varchar(50) DEFAULT NULL,
+  `descricao` text NOT NULL,
+  `ativo` tinyint(1) NOT NULL DEFAULT 1,
+  `data_publicacao` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Despejando dados para a tabela `atualizacoes_site`
+--
+
+INSERT INTO `atualizacoes_site` (`id`, `titulo`, `versao`, `descricao`, `ativo`, `data_publicacao`) VALUES
+(1, 'Implementação de Funcionalidades de informações', '1.0.1', 'Adição de Registro de Quadras.\r\nAdição de Registro de Profissionais.\r\nAjustes no Sistema de Criação de Torneio.', 1, '2025-12-04 23:34:24');
 
 -- --------------------------------------------------------
 
@@ -77,7 +99,40 @@ CREATE TABLE `confirmacoes_presenca` (
 --
 
 INSERT INTO `confirmacoes_presenca` (`id`, `jogo_id`, `usuario_id`, `status`, `data_confirmacao`, `observacoes`) VALUES
-(34, 25, 21, 'Confirmado', '2025-11-25 19:40:20', NULL);
+(34, 25, 21, 'Confirmado', '2025-11-25 19:40:20', NULL),
+(35, 26, 37, 'Confirmado', '2025-12-05 02:13:23', NULL),
+(36, 26, 21, 'Confirmado', '2025-12-05 02:59:06', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `dicas`
+--
+
+CREATE TABLE `dicas` (
+  `id` int(11) NOT NULL,
+  `titulo` varchar(255) NOT NULL,
+  `conteudo` text NOT NULL,
+  `ativo` tinyint(1) NOT NULL DEFAULT 1,
+  `data_criacao` datetime NOT NULL DEFAULT current_timestamp(),
+  `data_atualizacao` datetime DEFAULT NULL ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `galeria_fotos`
+--
+
+CREATE TABLE `galeria_fotos` (
+  `id` int(11) NOT NULL,
+  `titulo` varchar(255) DEFAULT NULL,
+  `descricao` text DEFAULT NULL,
+  `caminho` varchar(500) NOT NULL COMMENT 'Caminho da imagem',
+  `ativo` tinyint(1) NOT NULL DEFAULT 1,
+  `data_upload` datetime NOT NULL DEFAULT current_timestamp(),
+  `data_atualizacao` datetime DEFAULT NULL ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -178,7 +233,8 @@ CREATE TABLE `jogos` (
 --
 
 INSERT INTO `jogos` (`id`, `grupo_id`, `titulo`, `descricao`, `data_jogo`, `data_fim`, `local`, `max_jogadores`, `vagas_disponiveis`, `status`, `criado_por`, `data_criacao`, `modalidade`, `contato`) VALUES
-(25, 15, 'jogoo bora', 'xffxgdf', '2025-11-25 16:40:00', '2025-11-26 16:40:00', '8000', 6, 6, 'Em Andamento', 21, '2025-11-25 19:40:20', 'Volei', '55991773439');
+(25, 15, 'jogoo bora', 'xffxgdf', '2025-11-25 16:40:00', '2025-11-26 16:40:00', '8000', 6, 6, 'Finalizado', 21, '2025-11-25 19:40:20', 'Volei', '55991773439'),
+(26, NULL, 'só vem', 'No 8000 só vem quarteto', '2025-12-30 23:12:00', '2025-12-04 00:14:00', '8000', 6, 6, 'Aberto', 37, '2025-12-05 02:13:23', 'Volei', '3984792873423');
 
 -- --------------------------------------------------------
 
@@ -230,7 +286,8 @@ CREATE TABLE `loja_produtos` (
 
 INSERT INTO `loja_produtos` (`id`, `nome`, `descricao`, `valor`, `imagem`, `ativo`, `data_criacao`, `data_atualizacao`) VALUES
 (1, 'Bola de Volei', 'Bola de volei de muito boa qualidade.', 199.00, 'assets/arquivos/produtos/6917b9be5dbb7_1763162558.jpg', 1, '2025-11-14 23:22:38', NULL),
-(2, 'Joelheira', 'Protege os joelhos contra impactos.', 55.00, 'assets/arquivos/produtos/6917b9e87414f_1763162600.jpg', 1, '2025-11-14 23:23:20', NULL);
+(2, 'Joelheira', 'Protege os joelhos contra impactos.', 55.00, 'assets/arquivos/produtos/6917b9e87414f_1763162600.jpg', 1, '2025-11-14 23:23:20', NULL),
+(3, 'Manguito', 'Protege o antebraço', 300.00, 'assets/arquivos/produtos/69324876bb0dc_1764903030.png', 1, '2025-12-05 02:50:30', NULL);
 
 -- --------------------------------------------------------
 
@@ -274,32 +331,34 @@ INSERT INTO `notificacoes` (`id`, `usuario_id`, `titulo`, `mensagem`, `lida`, `c
 (20, 21, 'Solicitação de participação no jogo', 'Você recebeu uma solicitação de entrada no seu jogo #24.', 1, '2025-10-30 22:39:57'),
 (21, 27, 'Você foi aceito no jogo', 'Sua solicitação para o jogo #24 foi aprovada pelo criador.', 1, '2025-10-30 22:40:29'),
 (22, 27, 'Avaliação positiva', 'Você foi avaliado em jogo da pamela (+4 pts) por jogador prestativo.', 1, '2025-10-30 22:45:57'),
-(23, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 18:38:14'),
+(23, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 18:38:14'),
 (24, 23, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 18:38:36'),
-(25, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 18:41:23'),
-(26, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 18:42:00'),
+(25, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 18:41:23'),
+(26, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 18:42:00'),
 (27, 28, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 18:45:37'),
 (28, 2, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 18:45:39'),
-(29, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 18:48:00'),
-(30, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 18:49:52'),
-(31, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 18:50:38'),
+(29, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 18:48:00'),
+(30, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 18:49:52'),
+(31, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 18:50:38'),
 (32, 30, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 18:51:16'),
 (33, 29, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 18:51:16'),
 (34, 22, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 18:51:18'),
-(35, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 18:56:29'),
-(36, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 18:58:51'),
-(37, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 18:59:08'),
+(35, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 18:56:29'),
+(36, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 18:58:51'),
+(37, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 18:59:08'),
 (38, 34, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 18:59:20'),
 (39, 33, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 18:59:21'),
 (40, 31, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 18:59:21'),
-(41, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 19:55:48'),
-(42, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 19:56:39'),
-(43, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 19:58:33'),
-(44, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 0, '2025-11-14 20:00:11'),
+(41, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 19:55:48'),
+(42, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 19:56:39'),
+(43, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 19:58:33'),
+(44, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 20:00:11'),
 (45, 39, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:30'),
 (46, 37, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:32'),
 (47, 36, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:33'),
-(48, 35, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:34');
+(48, 35, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:34'),
+(49, 37, 'Solicitação de participação no jogo', 'Você recebeu uma solicitação de entrada no seu jogo #26.', 0, '2025-12-05 02:59:06'),
+(50, 21, 'Você foi aceito no jogo', 'Sua solicitação para o jogo #26 foi aprovada pelo criador.', 0, '2025-12-05 02:59:25');
 
 -- --------------------------------------------------------
 
@@ -339,6 +398,56 @@ CREATE TABLE `partidas` (
   `data_inicio` datetime DEFAULT NULL,
   `data_fim` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `profissionais`
+--
+
+CREATE TABLE `profissionais` (
+  `id` int(11) NOT NULL,
+  `nome` varchar(255) NOT NULL,
+  `modalidade` varchar(255) DEFAULT NULL,
+  `telefone` varchar(20) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `descricao` text DEFAULT NULL,
+  `ativo` tinyint(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Despejando dados para a tabela `profissionais`
+--
+
+INSERT INTO `profissionais` (`id`, `nome`, `modalidade`, `telefone`, `email`, `descricao`, `ativo`) VALUES
+(1, 'Eduardo Gaier', 'Treinado Fisico Volei', '55991773439', 'eduardogaier@gmail.com', 'Vagas alunos de seg a sexta feira das 08 a 11 no 8000 sports', 1);
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `quadras`
+--
+
+CREATE TABLE `quadras` (
+  `id` int(11) NOT NULL,
+  `nome` varchar(255) NOT NULL,
+  `endereco` text NOT NULL,
+  `valor_hora` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `descricao` text DEFAULT NULL,
+  `foto` varchar(500) DEFAULT NULL COMMENT 'Caminho da foto',
+  `tipo` enum('areia','quadra') NOT NULL DEFAULT 'quadra',
+  `localizacao` text DEFAULT NULL COMMENT 'Link do Google Maps ou coordenadas',
+  `ativo` tinyint(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Despejando dados para a tabela `quadras`
+--
+
+INSERT INTO `quadras` (`id`, `nome`, `endereco`, `valor_hora`, `descricao`, `foto`, `tipo`, `localizacao`, `ativo`) VALUES
+(1, '8000 Sports', 'Av Prefeito Evandro Berh 1600', 160.00, 'Em frente a Angelos Faixa Velha', 'assets/arquivos/quadras/693243d081dde_1764901840_imagem_2025-12-04_233012459.png', 'areia', 'https://share.google/kRxwkMPMGIND77rnB', 1),
+(2, 'DGT Sports', 'R. Pedro Santini, 1633 - Nossa Sra. de Lourdes, Santa Maria - RS, 97095-000', 160.00, 'Local com churrasqueira e diversas quadras ao ar livre.', 'assets/arquivos/quadras/69324440e3726_1764901952_imagem_2025-12-04_233217673.png', 'areia', 'https://share.google/kLbcWYrXUsGQtqzDe', 1),
+(3, 'PELEIA FC', 'R. Duque de Caxias, 2653', 150.00, 'Na principal duque de caxias', 'assets/arquivos/quadras/693247e73fec0_1764902887_imagem_2025-12-04_234804706.png', 'quadra', 'https://share.google/Fq4gHtXrabITfn8Cp', 1);
 
 -- --------------------------------------------------------
 
@@ -913,7 +1022,7 @@ CREATE TABLE `usuarios` (
 INSERT INTO `usuarios` (`id`, `nome`, `usuario`, `cpf`, `telefone`, `email`, `senha`, `nivel`, `genero`, `disponibilidade`, `data_aniversario`, `reputacao`, `foto_perfil`, `data_cadastro`, `ativo`, `is_premium`, `premium_ativado_em`, `premium_expira_em`, `ultimo_pagamento`, `is_admin`) VALUES
 (1, 'administrador', 'admin', '03032845017', '55991773439', 'admin@gmail.com', '$2y$10$p58DLcET.rA4fv7y/AT4SOmNtfHw9NMiXXWm2QC.1GttD0.dLWjc2', 'Profissional', 'Masculino', 'Finais de semana', NULL, 100, 'assets/arquivos/logousers/1.png', '2025-10-29 17:49:23', 1, 1, NULL, NULL, NULL, 3),
 (2, 'Josep', 'josep', NULL, '', 'josep@gmail.com', '$2y$10$dlBB3lkXJUuM7y9NaNbuEePAr/R4.MiHKaLwmkmyoKLeTe0i2jaYW', 'Iniciante', 'Masculino', 'sempre quando da', NULL, 100, 'assets/arquivos/logousers/2.png', '2025-10-29 18:02:51', 1, 0, NULL, NULL, NULL, 0),
-(21, 'Eduardo Gaier', 'eduardo', NULL, '', 'eduardo@gmail.com', '$2y$10$1tJci0JBDXIJp8t6PloT0.pGIFsiYOqvKAeHDpy/MS548jiiJNwpO', 'Intermediário', 'Masculino', '', NULL, 100, 'assets/arquivos/logousers/21.png', '2025-10-29 21:22:37', 1, 0, NULL, NULL, NULL, 0),
+(21, 'Eduardo Gaier', 'eduardo', NULL, NULL, 'eduardo@gmail.com', '$2y$10$1tJci0JBDXIJp8t6PloT0.pGIFsiYOqvKAeHDpy/MS548jiiJNwpO', 'Intermediário', 'Masculino', '', NULL, 100, 'assets/arquivos/logousers/21.png', '2025-10-29 21:22:37', 1, 1, NULL, '2026-01-04 06:36:27', NULL, 0),
 (22, 'Caroline Claussen', 'carol', NULL, '', 'carol@gmail.com', '$2y$10$p58DLcET.rA4fv7y/AT4SOmNtfHw9NMiXXWm2QC.1GttD0.dLWjc2', 'Intermediário', 'Feminino', '', NULL, 100, 'assets/arquivos/logousers/22.png', '2025-10-29 21:22:37', 1, 0, NULL, NULL, NULL, 0),
 (23, 'Maria Vitoria', 'Vitoria', NULL, '', 'vitoria@gmail.com', '$2y$10$pQQGlh6rPtxk3sEwx/gp4O04MdaS2zp8quvIycaB2meJuW6xDz596', 'Intermediário', 'Feminino', '', NULL, 100, 'assets/arquivos/logousers/23.png', '2025-10-29 21:22:37', 1, 0, NULL, '0000-00-00 00:00:00', NULL, 0),
 (24, 'Pamela Claussen', 'Pamela', NULL, '', 'pamela@gmail.com', '$2y$10$rDM4Duemn5KZlCuueN6KXeOqSlHPKtyprIeEOrWxfABxtLMsxMJ6K', 'Avançado', 'Feminino', '', NULL, 100, 'assets/arquivos/logousers/24.png', '2025-10-29 21:22:37', 0, 0, NULL, NULL, NULL, 0),
@@ -930,11 +1039,17 @@ INSERT INTO `usuarios` (`id`, `nome`, `usuario`, `cpf`, `telefone`, `email`, `se
 (36, 'Alisson Claussen', 'alisson', '03032845074', '55991773439', 'alisson@gmail.com', '$2y$10$3qYJcpMdWBTblP3Ikl6gieKprUP.U9UpJOKT4AYCmjQyX26iYQIW2', 'Intermediário', 'Masculino', '1', NULL, 100, 'assets/arquivos/logousers/36.png', '2025-11-14 19:04:57', 1, 0, NULL, NULL, NULL, 0),
 (37, 'Pedro Rossato', 'pedro', '03032845078', '55991773439', 'pedro@gmail.com', '$2y$10$dNO63Ulf0jqwWsDQT29Keezz9Gfju/dmkVvuc4K/ivOL8D0ppuN.u', 'Iniciante', 'Masculino', '1', NULL, 100, 'assets/arquivos/logousers/37.png', '2025-11-14 19:57:47', 1, 0, NULL, NULL, NULL, 0),
 (39, 'Natan', 'natan', '03032845079', '55991773439', 'natan@gmail.com', '$2y$10$OwC.Rr38eFk.OB3cpdwY7OaHbojYOkKDtrC.NfQ1f99TQNngWglye', 'Intermediário', 'Masculino', '1', NULL, 100, NULL, '2025-11-14 19:59:59', 1, 0, NULL, NULL, NULL, 0),
-(40, 'Lucas cassol', 'lucas', NULL, '55991773435', 'lucas@gmail.com', '$2y$10$LSTBXkdv4B0LwhwWZQpeYOoL5rcQM3bdcrcNM4VRDsG9Sy6a.kIvW', 'Intermediário', 'Masculino', '1', NULL, 100, NULL, '2025-11-14 22:50:31', 1, 0, NULL, NULL, NULL, 0);
+(40, 'Lucas cassol', 'lucas', NULL, '55991773435', 'lucas@gmail.com', '$2y$10$LSTBXkdv4B0LwhwWZQpeYOoL5rcQM3bdcrcNM4VRDsG9Sy6a.kIvW', 'Intermediário', 'Masculino', '1', NULL, 100, NULL, '2025-11-14 22:50:31', 1, 1, NULL, '2026-01-04 06:04:43', NULL, 0);
 
 --
 -- Índices para tabelas despejadas
 --
+
+--
+-- Índices de tabela `atualizacoes_site`
+--
+ALTER TABLE `atualizacoes_site`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Índices de tabela `avaliacoes_reputacao`
@@ -962,6 +1077,18 @@ ALTER TABLE `confirmacoes_presenca`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `unique_confirmation` (`jogo_id`,`usuario_id`),
   ADD KEY `usuario_id` (`usuario_id`);
+
+--
+-- Índices de tabela `dicas`
+--
+ALTER TABLE `dicas`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Índices de tabela `galeria_fotos`
+--
+ALTER TABLE `galeria_fotos`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Índices de tabela `grupos`
@@ -1021,6 +1148,18 @@ ALTER TABLE `partidas`
   ADD KEY `jogo_id` (`jogo_id`),
   ADD KEY `time1_id` (`time1_id`),
   ADD KEY `time2_id` (`time2_id`);
+
+--
+-- Índices de tabela `profissionais`
+--
+ALTER TABLE `profissionais`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Índices de tabela `quadras`
+--
+ALTER TABLE `quadras`
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Índices de tabela `sistemas_pontuacao`
@@ -1221,6 +1360,12 @@ ALTER TABLE `usuarios`
 --
 
 --
+-- AUTO_INCREMENT de tabela `atualizacoes_site`
+--
+ALTER TABLE `atualizacoes_site`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
 -- AUTO_INCREMENT de tabela `avaliacoes_reputacao`
 --
 ALTER TABLE `avaliacoes_reputacao`
@@ -1236,7 +1381,19 @@ ALTER TABLE `avisos`
 -- AUTO_INCREMENT de tabela `confirmacoes_presenca`
 --
 ALTER TABLE `confirmacoes_presenca`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+
+--
+-- AUTO_INCREMENT de tabela `dicas`
+--
+ALTER TABLE `dicas`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de tabela `galeria_fotos`
+--
+ALTER TABLE `galeria_fotos`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT de tabela `grupos`
@@ -1254,7 +1411,7 @@ ALTER TABLE `grupo_membros`
 -- AUTO_INCREMENT de tabela `jogos`
 --
 ALTER TABLE `jogos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
 
 --
 -- AUTO_INCREMENT de tabela `logos_grupos`
@@ -1266,13 +1423,13 @@ ALTER TABLE `logos_grupos`
 -- AUTO_INCREMENT de tabela `loja_produtos`
 --
 ALTER TABLE `loja_produtos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT de tabela `notificacoes`
 --
 ALTER TABLE `notificacoes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=49;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=51;
 
 --
 -- AUTO_INCREMENT de tabela `pagamentos`
@@ -1285,6 +1442,18 @@ ALTER TABLE `pagamentos`
 --
 ALTER TABLE `partidas`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de tabela `profissionais`
+--
+ALTER TABLE `profissionais`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT de tabela `quadras`
+--
+ALTER TABLE `quadras`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT de tabela `sistemas_pontuacao`

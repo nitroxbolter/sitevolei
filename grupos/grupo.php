@@ -125,11 +125,6 @@ include '../includes/header.php';
                     <i class="fas fa-trophy me-1"></i>Classificação
                 </a>
             <?php endif; ?>
-            <?php if ($usuario_e_admin): ?>
-                <a href="admin/sistema_pontuacao.php?grupo_id=<?php echo $grupo_id; ?>" class="btn btn-warning">
-                    <i class="fas fa-cog me-1"></i>Gerenciar Pontuação
-                </a>
-            <?php endif; ?>
             <?php if ($usuario_e_membro && !$usuario_e_admin): ?>
                 <button class="btn btn-outline-danger" onclick="sairDoGrupo(<?php echo $grupo_id; ?>)">
                     <i class="fas fa-sign-out-alt me-1"></i>Sair do Grupo

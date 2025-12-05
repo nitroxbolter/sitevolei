@@ -80,6 +80,14 @@ include '../includes/header.php';
                 </a>
             </div>
         </div>
+        <div class="row">
+            <div class="col-md-3 mb-3">
+                <a href="loja.php" class="btn btn-outline-primary w-100 h-100 d-flex flex-column align-items-center justify-content-center py-4">
+                    <i class="fas fa-store fa-3x mb-3"></i>
+                    <span>Gerenciar Loja</span>
+                </a>
+            </div>
+        </div>
     </div>
 </div>
 

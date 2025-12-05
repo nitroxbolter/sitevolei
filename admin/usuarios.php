@@ -168,8 +168,16 @@ include '../includes/header.php';
                             <td><?php echo formatarData($usuario['data_cadastro'], 'd/m/Y'); ?></td>
                             <td>
                                 <div class="btn-group" role="group">
-                                    <a href="editar_usuario.php?id=<?php echo $usuario['id']; ?>" class="btn btn-sm btn-primary">
+                                    <?php 
+                                    // Debug: verificar o ID que está sendo usado no link
+                                    $link_id = $usuario['id'];
+                                    error_log("DEBUG usuarios.php: Gerando link para usuário ID = $link_id, Nome = {$usuario['nome']}");
+                                    ?>
+                                    <a href="editar_usuario.php?id=<?php echo $usuario['id']; ?>" 
+                                       class="btn btn-sm btn-primary"
+                                       title="Editar usuário ID: <?php echo $usuario['id']; ?>">
                                         <i class="fas fa-edit"></i>
+                                        <span class="d-none d-md-inline ms-1">Editar</span>
                                     </a>
                                     <?php if ($usuario['id'] != $_SESSION['user_id']): ?>
                                         <button class="btn btn-sm btn-danger" onclick="confirmarRemocao(<?php echo $usuario['id']; ?>, '<?php echo htmlspecialchars($usuario['nome']); ?>')">

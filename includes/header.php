@@ -53,7 +53,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="<?php echo isLoggedIn() ? '/dashboard.php' : '/index.php'; ?>">
+                        <a class="nav-link" href="/index.php">
                             <i class="fas fa-home me-1"></i>Início
                         </a>
                     </li>
@@ -79,6 +79,16 @@
                             </a>
                         </li>
                     <?php endif; ?>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/loja.php">
+                            <i class="fas fa-shopping-cart me-1"></i>Loja
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/informacoes.php">
+                            <i class="fas fa-info-circle me-1"></i>Informações
+                        </a>
+                    </li>
                 </ul>
                 
                 <ul class="navbar-nav">

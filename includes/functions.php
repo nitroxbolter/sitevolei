@@ -19,10 +19,13 @@ function atualizarReputacao($pdo, $usuario_id) {
 
 // Função para obter próximos jogos
 function getProximosJogos($pdo, $limite = 5) {
-    $sql = "SELECT j.*, g.nome as grupo_nome, g.local_principal 
+    $sql = "SELECT j.*, g.nome as grupo_nome, g.local_principal,
+                   COUNT(DISTINCT cp.id) as jogadores_confirmados
             FROM jogos j 
             JOIN grupos g ON j.grupo_id = g.id 
-            WHERE j.status = 'Aberto' AND j.data_jogo > NOW() 
+            LEFT JOIN confirmacoes_presenca cp ON j.id = cp.jogo_id AND cp.status = 'Confirmado'
+            WHERE j.status = 'Aberto' AND DATE(j.data_jogo) >= CURDATE()
+            GROUP BY j.id, j.titulo, j.data_jogo, j.data_fim, j.local, j.max_jogadores, j.status, g.nome, g.local_principal
             ORDER BY j.data_jogo ASC 
             LIMIT ?";
     $stmt = executeQuery($pdo, $sql, [$limite]);

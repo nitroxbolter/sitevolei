@@ -1,12 +1,12 @@
 <?php
 session_start();
-require_once '../includes/db_connect.php';
-require_once '../includes/functions.php';
+require_once '../../includes/db_connect.php';
+require_once '../../includes/functions.php';
 
 $titulo = 'Gerenciar Grupo';
 
 if (!isLoggedIn()) {
-    header('Location: ../auth/login.php');
+    header('Location: ../../auth/login.php');
     exit();
 }
 
@@ -265,7 +265,7 @@ $sql = "SELECT u.id, u.nome, u.email, u.telefone, u.nivel
 $stmt = executeQuery($pdo, $sql, [$grupo_id]);
 $solicitacoes = $stmt ? $stmt->fetchAll() : [];
 
-include '../includes/header.php';
+include '../../includes/header.php';
 ?>
 
 <div class="row mb-3">
@@ -476,7 +476,7 @@ function rejeitarSolicitacao(grupoId, usuarioId) {
 }
 </script>
 
-<?php include '../includes/footer.php'; ?>
+<?php include '../../includes/footer.php'; ?>
 
 <!-- Cropper para recorte de logo -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
