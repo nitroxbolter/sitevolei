@@ -44,14 +44,22 @@ if (!$sou_criador && !$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
     exit();
 }
 
-// Verificar se a coluna existe
+// Verificar se a coluna existe e criar se necessário
 try {
     $columnsQuery = $pdo->query("SHOW COLUMNS FROM torneios LIKE 'inscricoes_abertas'");
     $coluna_existe = $columnsQuery && $columnsQuery->rowCount() > 0;
     
     if (!$coluna_existe) {
-        echo json_encode(['success' => false, 'message' => 'A funcionalidade de inscrições não está disponível. Execute o script SQL primeiro.']);
-        exit();
+        // Criar a coluna automaticamente
+        try {
+            $sql_add_column = "ALTER TABLE torneios ADD COLUMN inscricoes_abertas TINYINT(1) DEFAULT 0 NOT NULL";
+            $pdo->exec($sql_add_column);
+            error_log("Coluna inscricoes_abertas criada com sucesso na tabela torneios");
+        } catch (Exception $e) {
+            error_log("Erro ao criar coluna inscricoes_abertas: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erro ao criar coluna de inscrições: ' . $e->getMessage()]);
+            exit();
+        }
     }
     
     // Atualizar campo

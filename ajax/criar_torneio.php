@@ -26,17 +26,17 @@ $nome = trim($_POST['nome'] ?? '');
 $data_torneio = $_POST['data_torneio'] ?? '';
 $tipo = $_POST['tipo'] ?? 'grupo';
 $grupo_id = !empty($_POST['grupo_id']) ? (int)$_POST['grupo_id'] : null;
-$quantidade_participantes = (int)($_POST['quantidade_participantes'] ?? 0);
+$quantidade_participantes = isset($_POST['quantidade_participantes']) ? (int)$_POST['quantidade_participantes'] : null;
 
 error_log("Dados processados:");
 error_log("  nome: " . $nome);
 error_log("  data_torneio: " . $data_torneio);
 error_log("  tipo: " . $tipo);
 error_log("  grupo_id: " . ($grupo_id ?? 'null'));
-error_log("  quantidade_participantes: " . $quantidade_participantes);
+error_log("  quantidade_participantes: " . ($quantidade_participantes ?? 'null'));
 
 // Validar dados
-if ($nome === '' || $data_torneio === '' || $quantidade_participantes < 2) {
+if ($nome === '' || $data_torneio === '') {
     error_log("Erro de validação: campos obrigatórios não preenchidos");
     echo json_encode(['success' => false, 'message' => 'Preencha todos os campos obrigatórios.']);
     exit();
@@ -145,10 +145,11 @@ try {
         }
     }
     
-    if ($campo_quantidade) {
-        $campos[] = $campo_quantidade;
-        $valores[] = $quantidade_participantes;
-    }
+    // Não incluir quantidade_participantes na criação - será definido no gerenciamento
+    // if ($campo_quantidade && $quantidade_participantes !== null) {
+    //     $campos[] = $campo_quantidade;
+    //     $valores[] = $quantidade_participantes;
+    // }
     
     $campos[] = 'criado_por';
     $valores[] = $_SESSION['user_id'];

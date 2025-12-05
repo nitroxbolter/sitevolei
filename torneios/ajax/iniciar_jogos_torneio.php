@@ -105,6 +105,19 @@ if ($modalidade === 'todos_chaves') {
         echo json_encode(['success' => false, 'message' => 'A quantidade de chaves não pode ser maior que a quantidade de times.']);
         exit();
     }
+    
+    // Verificar se a quantidade total de times é divisível pela quantidade de chaves
+    // Se não for, sempre ficará uma chave com 1 time a menos
+    $total_times = count($times);
+    if ($total_times % $quantidade_grupos !== 0) {
+        echo json_encode([
+            'success' => false, 
+            'message' => 'A quantidade total de times (' . $total_times . ') não é divisível pela quantidade de chaves (' . $quantidade_grupos . '). ' .
+                        'Para criar chaves, a quantidade de times deve ser divisível pela quantidade de chaves. ' .
+                        'Exemplo: Para ' . $quantidade_grupos . ' chaves, você precisa de ' . (ceil($total_times / $quantidade_grupos) * $quantidade_grupos) . ' ou ' . (floor($total_times / $quantidade_grupos) * $quantidade_grupos) . ' times.'
+        ]);
+        exit();
+    }
 }
 
 // Verificar se já existem partidas válidas

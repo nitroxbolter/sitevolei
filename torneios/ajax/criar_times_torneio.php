@@ -44,7 +44,10 @@ $quantidade_times = (int)($torneio['quantidade_times'] ?? 0);
 $integrantes_por_time = (int)($torneio['integrantes_por_time'] ?? 0);
 
 if ($quantidade_times <= 0 || $integrantes_por_time <= 0) {
-    echo json_encode(['success' => false, 'message' => 'Configure quantidade de times e integrantes por time primeiro.']);
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Configure quantidade de times e integrantes por time primeiro. Vá em "Configurações do Torneio" e salve as configurações antes de criar os times.'
+    ]);
     exit();
 }
 
@@ -109,7 +112,6 @@ try {
             $id_criado = (int)$pdo->lastInsertId();
             $ids_criados[] = $id_criado;
             $times_criados++;
-            error_log("Time criado: ID=$id_criado, Nome=$nome, Ordem=$i, Torneio=$torneio_id");
         } else {
             $error = $stmt->errorInfo();
             error_log("Erro ao criar time $i para torneio $torneio_id: " . ($error[2] ?? 'Erro desconhecido'));

@@ -37,19 +37,31 @@ if (!$sou_criador && !$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
     exit();
 }
 
-// Buscar participantes disponíveis (não estão em nenhum time ou não estão no time especificado)
+// Buscar participantes disponíveis (não estão em nenhum time do torneio)
+// Primeiro, buscar todos os participantes que já estão em algum time do torneio
+$sql_times = "SELECT DISTINCT tti.participante_id 
+              FROM torneio_time_integrantes tti
+              INNER JOIN torneio_times tt ON tt.id = tti.time_id
+              WHERE tt.torneio_id = ?";
+$stmt_times = executeQuery($pdo, $sql_times, [$torneio_id]);
+$participantes_em_times = [];
+if ($stmt_times) {
+    $result = $stmt_times->fetchAll();
+    $participantes_em_times = array_column($result, 'participante_id');
+}
+
+// Buscar todos os participantes do torneio
 $sql = "SELECT tp.*, u.nome AS usuario_nome, u.foto_perfil
         FROM torneio_participantes tp
-        LEFT JOIN usuarios u ON u.id = tp.usuario_id";
-        
-if ($time_id > 0) {
-    $sql .= " LEFT JOIN torneio_time_integrantes tti ON tti.participante_id = tp.id AND tti.time_id = ?
-             WHERE tp.torneio_id = ? AND tti.id IS NULL";
-    $params = [$time_id, $torneio_id];
-} else {
-    $sql .= " LEFT JOIN torneio_time_integrantes tti ON tti.participante_id = tp.id
-             WHERE tp.torneio_id = ? AND tti.id IS NULL";
-    $params = [$torneio_id];
+        LEFT JOIN usuarios u ON u.id = tp.usuario_id
+        WHERE tp.torneio_id = ?";
+$params = [$torneio_id];
+
+// Se houver participantes em times, excluir da lista
+if (!empty($participantes_em_times)) {
+    $placeholders = implode(',', array_fill(0, count($participantes_em_times), '?'));
+    $sql .= " AND tp.id NOT IN ($placeholders)";
+    $params = array_merge($params, $participantes_em_times);
 }
 
 // Verificar se a coluna 'ordem' existe

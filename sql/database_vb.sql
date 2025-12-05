@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Tempo de geração: 05/12/2025 às 04:29
+-- Tempo de geração: 05/12/2025 às 19:16
 -- Versão do servidor: 10.4.32-MariaDB
--- Versão do PHP: 8.2.12
+-- Versão do PHP: 8.0.30
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -354,11 +354,16 @@ INSERT INTO `notificacoes` (`id`, `usuario_id`, `titulo`, `mensagem`, `lida`, `c
 (43, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 19:58:33'),
 (44, 21, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #15.', 1, '2025-11-14 20:00:11'),
 (45, 39, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:30'),
-(46, 37, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:32'),
+(46, 37, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 1, '2025-11-14 20:00:32'),
 (47, 36, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:33'),
 (48, 35, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:34'),
-(49, 37, 'Solicitação de participação no jogo', 'Você recebeu uma solicitação de entrada no seu jogo #26.', 0, '2025-12-05 02:59:06'),
-(50, 21, 'Você foi aceito no jogo', 'Sua solicitação para o jogo #26 foi aprovada pelo criador.', 0, '2025-12-05 02:59:25');
+(49, 37, 'Solicitação de participação no jogo', 'Você recebeu uma solicitação de entrada no seu jogo #26.', 1, '2025-12-05 02:59:06'),
+(50, 21, 'Você foi aceito no jogo', 'Sua solicitação para o jogo #26 foi aprovada pelo criador.', 0, '2025-12-05 02:59:25'),
+(51, 37, 'Solicitação de participação aprovada', 'Sua solicitação de participação no torneio \"Verao 2026\" foi aprovada!', 1, '2025-12-05 17:08:32'),
+(52, 37, 'Solicitação de participação aprovada', 'Sua solicitação de participação no torneio \"Verao 2026\" foi aprovada!', 1, '2025-12-05 17:11:07'),
+(53, 37, 'Solicitação de participação aprovada', 'Sua solicitação de participação no torneio \"Verao 2026\" foi aprovada!', 1, '2025-12-05 17:16:20'),
+(54, 37, 'Você foi removido do torneio', 'Você foi removido do torneio \"Verao 2026\" pelo administrador.', 1, '2025-12-05 17:16:27'),
+(55, 37, 'Solicitação de participação aprovada', 'Sua solicitação de participação no torneio \"Verao 2026\" foi aprovada!', 0, '2025-12-05 17:17:34');
 
 -- --------------------------------------------------------
 
@@ -664,15 +669,17 @@ CREATE TABLE `torneios` (
   `quantidade_grupos` int(11) DEFAULT NULL,
   `status` enum('Criado','Inscrições Abertas','Em Andamento','Finalizado','Cancelado') DEFAULT 'Criado',
   `criado_por` int(11) NOT NULL,
-  `data_criacao` timestamp NOT NULL DEFAULT current_timestamp()
+  `data_criacao` timestamp NOT NULL DEFAULT current_timestamp(),
+  `inscricoes_abertas` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Despejando dados para a tabela `torneios`
 --
 
-INSERT INTO `torneios` (`id`, `nome`, `descricao`, `grupo_id`, `tipo`, `data_inicio`, `data_fim`, `max_participantes`, `quantidade_times`, `integrantes_por_time`, `modalidade`, `quantidade_grupos`, `status`, `criado_por`, `data_criacao`) VALUES
-(20, 'Diretoria do Volley', NULL, 15, 'grupo', '2025-11-26 00:00:00', NULL, 16, 8, 2, 'todos_contra_todos', 2, 'Criado', 21, '2025-11-25 19:41:25');
+INSERT INTO `torneios` (`id`, `nome`, `descricao`, `grupo_id`, `tipo`, `data_inicio`, `data_fim`, `max_participantes`, `quantidade_times`, `integrantes_por_time`, `modalidade`, `quantidade_grupos`, `status`, `criado_por`, `data_criacao`, `inscricoes_abertas`) VALUES
+(21, 'Verao 2026', NULL, NULL, 'avulso', '2025-12-31 00:00:00', NULL, 32, 8, 4, 'todos_chaves', 2, 'Criado', 21, '2025-12-05 17:02:20', 1),
+(22, 'Unidos pelo Volei', NULL, 15, 'grupo', '2025-12-31 00:00:00', NULL, 16, 4, 4, 'todos_contra_todos', 2, 'Criado', 21, '2025-12-05 18:05:31', 0);
 
 -- --------------------------------------------------------
 
@@ -714,6 +721,16 @@ CREATE TABLE `torneio_chaves_times` (
   `data_criacao` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Despejando dados para a tabela `torneio_chaves_times`
+--
+
+INSERT INTO `torneio_chaves_times` (`id`, `torneio_id`, `fase`, `chave_numero`, `time1_id`, `time2_id`, `vencedor_id`, `pontos_time1`, `pontos_time2`, `data_partida`, `status`, `data_criacao`) VALUES
+(1, 21, 'Semi', 1, 261, 265, 261, 15, 14, NULL, 'Finalizada', '2025-12-05 17:57:20'),
+(2, 21, 'Semi', 2, 264, 260, 260, 12, 15, NULL, 'Finalizada', '2025-12-05 17:57:20'),
+(3, 21, 'Final', 1, 261, 260, 260, 14, 15, NULL, 'Finalizada', '2025-12-05 17:57:20'),
+(4, 21, '3º Lugar', 1, 265, 264, 264, 13, 15, NULL, 'Finalizada', '2025-12-05 17:57:20');
+
 -- --------------------------------------------------------
 
 --
@@ -741,14 +758,18 @@ CREATE TABLE `torneio_classificacao` (
 --
 
 INSERT INTO `torneio_classificacao` (`id`, `torneio_id`, `time_id`, `vitorias`, `derrotas`, `empates`, `pontos_pro`, `pontos_contra`, `saldo_pontos`, `average`, `pontos_total`, `posicao`, `data_atualizacao`) VALUES
-(17, 20, 211, 2, 5, 0, 69, 74, -5, 0.93, 6, 6, '2025-12-04 13:02:59'),
-(18, 20, 212, 2, 5, 0, 63, 70, -7, 0.90, 6, 7, '2025-12-04 13:03:06'),
-(19, 20, 213, 3, 4, 0, 45, 51, -6, 0.88, 9, 5, '2025-12-04 13:03:11'),
-(20, 20, 214, 4, 3, 0, 73, 70, 3, 1.04, 12, 3, '2025-12-04 13:03:17'),
-(21, 20, 215, 4, 3, 0, 67, 62, 5, 1.08, 12, 2, '2025-12-04 13:03:17'),
-(22, 20, 216, 7, 0, 0, 89, 54, 35, 1.65, 21, 1, '2025-12-04 13:03:11'),
-(23, 20, 217, 2, 5, 0, 53, 72, -19, 0.74, 6, 8, '2025-12-04 13:03:06'),
-(24, 20, 218, 4, 3, 0, 50, 56, -6, 0.89, 12, 4, '2025-12-04 13:03:17');
+(97, 21, 259, 1, 2, 0, 35, 43, -8, 0.81, 3, 5, '2025-12-05 17:56:41'),
+(98, 21, 260, 4, 1, 0, 72, 62, 10, 1.16, 12, 3, '2025-12-05 18:01:11'),
+(99, 21, 261, 4, 1, 0, 74, 61, 13, 1.21, 12, 2, '2025-12-05 18:01:11'),
+(100, 21, 262, 0, 3, 0, 34, 45, -11, 0.76, 0, 7, '2025-12-05 17:57:07'),
+(101, 21, 263, 0, 3, 0, 26, 45, -19, 0.58, 0, 8, '2025-12-05 17:57:07'),
+(102, 21, 264, 4, 1, 0, 72, 44, 28, 1.64, 12, 1, '2025-12-05 18:01:37'),
+(103, 21, 265, 2, 3, 0, 63, 66, -3, 0.95, 6, 4, '2025-12-05 18:01:37'),
+(104, 21, 266, 1, 2, 0, 32, 42, -10, 0.76, 3, 6, '2025-12-05 17:57:07'),
+(105, 22, 267, 3, 0, 0, 45, 32, 13, 1.41, 9, 1, '2025-12-05 18:09:32'),
+(106, 22, 268, 2, 1, 0, 40, 29, 11, 1.38, 6, 2, '2025-12-05 18:09:38'),
+(107, 22, 269, 0, 3, 0, 31, 45, -14, 0.69, 0, 4, '2025-12-05 18:09:38'),
+(108, 22, 270, 1, 2, 0, 32, 42, -10, 0.76, 3, 3, '2025-12-05 18:09:32');
 
 -- --------------------------------------------------------
 
@@ -764,6 +785,14 @@ CREATE TABLE `torneio_grupos` (
   `data_criacao` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Grupos do torneio (A, B, C, etc.)';
 
+--
+-- Despejando dados para a tabela `torneio_grupos`
+--
+
+INSERT INTO `torneio_grupos` (`id`, `torneio_id`, `nome`, `ordem`, `data_criacao`) VALUES
+(29, 21, 'Chave 1', 1, '2025-12-05 17:52:28'),
+(30, 21, 'Chave 2', 2, '2025-12-05 17:52:28');
+
 -- --------------------------------------------------------
 
 --
@@ -776,6 +805,20 @@ CREATE TABLE `torneio_grupo_times` (
   `time_id` int(11) NOT NULL,
   `data_criacao` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Associação entre grupos e times';
+
+--
+-- Despejando dados para a tabela `torneio_grupo_times`
+--
+
+INSERT INTO `torneio_grupo_times` (`id`, `grupo_id`, `time_id`, `data_criacao`) VALUES
+(153, 29, 259, '2025-12-05 17:52:28'),
+(154, 29, 260, '2025-12-05 17:52:28'),
+(155, 29, 261, '2025-12-05 17:52:28'),
+(156, 29, 262, '2025-12-05 17:52:28'),
+(157, 30, 263, '2025-12-05 17:52:28'),
+(158, 30, 264, '2025-12-05 17:52:28'),
+(159, 30, 265, '2025-12-05 17:52:28'),
+(160, 30, 266, '2025-12-05 17:52:28');
 
 -- --------------------------------------------------------
 
@@ -850,22 +893,54 @@ CREATE TABLE `torneio_participantes` (
 --
 
 INSERT INTO `torneio_participantes` (`id`, `torneio_id`, `usuario_id`, `nome_avulso`, `ordem`, `data_inscricao`, `posicao_final`) VALUES
-(230, 20, 36, NULL, 1, '2025-11-25 19:46:52', NULL),
-(231, 20, 29, NULL, 2, '2025-11-25 19:46:52', NULL),
-(232, 20, 35, NULL, 3, '2025-11-25 19:46:52', NULL),
-(233, 20, 22, NULL, 4, '2025-11-25 19:46:52', NULL),
-(234, 20, 21, NULL, 5, '2025-11-25 19:46:52', NULL),
-(235, 20, 28, NULL, 6, '2025-11-25 19:46:52', NULL),
-(236, 20, 27, NULL, 7, '2025-11-25 19:46:52', NULL),
-(237, 20, 34, NULL, 8, '2025-11-25 19:46:52', NULL),
-(238, 20, 2, NULL, 9, '2025-11-25 19:46:52', NULL),
-(239, 20, 31, NULL, 10, '2025-11-25 19:46:52', NULL),
-(240, 20, 23, NULL, 11, '2025-11-25 19:46:52', NULL),
-(241, 20, 25, NULL, 12, '2025-11-25 19:46:52', NULL),
-(242, 20, 39, NULL, 13, '2025-11-25 19:46:52', NULL),
-(243, 20, 24, NULL, 14, '2025-11-25 19:46:52', NULL),
-(244, 20, 33, NULL, 15, '2025-11-25 19:46:52', NULL),
-(245, 20, 37, NULL, 16, '2025-11-25 19:46:52', NULL);
+(250, 21, 37, NULL, 1, '2025-12-05 17:17:34', NULL),
+(251, 21, NULL, 'Lúcio', 2, '2025-12-05 17:17:53', NULL),
+(252, 21, NULL, 'Marina', 3, '2025-12-05 17:17:53', NULL),
+(253, 21, NULL, 'Valmir', 4, '2025-12-05 17:17:53', NULL),
+(254, 21, NULL, 'Jéssica', 5, '2025-12-05 17:17:53', NULL),
+(255, 21, NULL, 'Renato', 6, '2025-12-05 17:17:53', NULL),
+(256, 21, NULL, 'Bianca', 7, '2025-12-05 17:17:53', NULL),
+(257, 21, NULL, 'César', 8, '2025-12-05 17:17:53', NULL),
+(258, 21, NULL, 'Tainá', 9, '2025-12-05 17:17:53', NULL),
+(259, 21, NULL, 'Mauro', 10, '2025-12-05 17:17:53', NULL),
+(260, 21, NULL, 'Patrícia', 11, '2025-12-05 17:17:53', NULL),
+(261, 21, NULL, 'Álvaro', 12, '2025-12-05 17:17:53', NULL),
+(262, 21, NULL, 'Camila', 13, '2025-12-05 17:17:53', NULL),
+(263, 21, NULL, 'Edson', 14, '2025-12-05 17:17:53', NULL),
+(264, 21, NULL, 'Larissa', 15, '2025-12-05 17:17:53', NULL),
+(265, 21, NULL, 'Fábio', 16, '2025-12-05 17:17:53', NULL),
+(266, 21, NULL, 'Viviane', 17, '2025-12-05 17:17:53', NULL),
+(267, 21, NULL, 'Ricardo', 18, '2025-12-05 17:17:53', NULL),
+(268, 21, NULL, 'Tereza', 19, '2025-12-05 17:18:16', NULL),
+(269, 21, NULL, 'Daniel', 20, '2025-12-05 17:18:16', NULL),
+(270, 21, NULL, 'Natália', 21, '2025-12-05 17:18:16', NULL),
+(271, 21, NULL, 'Gustavo', 22, '2025-12-05 17:18:16', NULL),
+(272, 21, NULL, 'João', 23, '2025-12-05 17:18:16', NULL),
+(273, 21, NULL, 'Sabrina', 24, '2025-12-05 17:18:16', NULL),
+(274, 21, NULL, 'Ícaro', 25, '2025-12-05 17:18:16', NULL),
+(275, 21, NULL, 'Melissa', 26, '2025-12-05 17:18:16', NULL),
+(276, 21, NULL, 'Raul', 27, '2025-12-05 17:18:16', NULL),
+(277, 21, NULL, 'Sâmia', 28, '2025-12-05 17:18:16', NULL),
+(278, 21, NULL, 'Breno', 29, '2025-12-05 17:18:16', NULL),
+(279, 21, NULL, 'Eloá', 30, '2025-12-05 17:18:16', NULL),
+(280, 21, NULL, 'Henrique', 31, '2025-12-05 17:18:16', NULL),
+(281, 21, NULL, 'Taís', 32, '2025-12-05 17:18:16', NULL),
+(282, 22, 36, NULL, 1, '2025-12-05 18:05:51', NULL),
+(283, 22, 29, NULL, 2, '2025-12-05 18:05:51', NULL),
+(284, 22, 35, NULL, 3, '2025-12-05 18:05:51', NULL),
+(285, 22, 22, NULL, 4, '2025-12-05 18:05:51', NULL),
+(286, 22, 21, NULL, 5, '2025-12-05 18:05:51', NULL),
+(287, 22, 28, NULL, 6, '2025-12-05 18:05:51', NULL),
+(288, 22, 27, NULL, 7, '2025-12-05 18:05:51', NULL),
+(289, 22, 34, NULL, 8, '2025-12-05 18:05:51', NULL),
+(290, 22, 2, NULL, 9, '2025-12-05 18:05:51', NULL),
+(291, 22, 31, NULL, 10, '2025-12-05 18:05:51', NULL),
+(292, 22, 23, NULL, 11, '2025-12-05 18:05:51', NULL),
+(293, 22, 25, NULL, 12, '2025-12-05 18:05:51', NULL),
+(294, 22, 39, NULL, 13, '2025-12-05 18:05:51', NULL),
+(295, 22, 24, NULL, 14, '2025-12-05 18:05:51', NULL),
+(296, 22, 33, NULL, 15, '2025-12-05 18:05:51', NULL),
+(297, 22, 37, NULL, 16, '2025-12-05 18:05:51', NULL);
 
 -- --------------------------------------------------------
 
@@ -894,34 +969,47 @@ CREATE TABLE `torneio_partidas` (
 --
 
 INSERT INTO `torneio_partidas` (`id`, `torneio_id`, `time1_id`, `time2_id`, `fase`, `rodada`, `grupo_id`, `pontos_time1`, `pontos_time2`, `vencedor_id`, `data_partida`, `status`, `data_criacao`) VALUES
-(41, 20, 211, 212, 'Grupos', 1, NULL, 20, 18, 211, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(42, 20, 213, 214, 'Grupos', 1, NULL, 14, 18, 214, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(43, 20, 215, 216, 'Grupos', 1, NULL, 15, 17, 216, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(44, 20, 217, 218, 'Grupos', 1, NULL, 12, 16, 218, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(45, 20, 211, 213, 'Grupos', 2, NULL, 14, 16, 213, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(46, 20, 212, 214, 'Grupos', 2, NULL, 15, 16, 214, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(47, 20, 215, 217, 'Grupos', 2, NULL, 21, 14, 215, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(48, 20, 216, 218, 'Grupos', 2, NULL, 20, 8, 216, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(49, 20, 211, 214, 'Grupos', 3, NULL, 12, 15, 214, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(50, 20, 212, 213, 'Grupos', 3, NULL, 5, 2, 212, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(51, 20, 215, 218, 'Grupos', 3, NULL, 7, 10, 218, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(52, 20, 216, 217, 'Grupos', 3, NULL, 12, 7, 216, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(53, 20, 211, 215, 'Grupos', 4, NULL, 8, 9, 215, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(54, 20, 212, 216, 'Grupos', 4, NULL, 12, 17, 216, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(55, 20, 213, 217, 'Grupos', 4, NULL, 4, 2, 213, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(56, 20, 214, 218, 'Grupos', 4, NULL, 2, 3, 218, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(57, 20, 211, 216, 'Grupos', 5, NULL, 8, 10, 216, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(58, 20, 212, 215, 'Grupos', 5, NULL, 2, 4, 215, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(59, 20, 213, 218, 'Grupos', 5, NULL, 4, 6, 218, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(60, 20, 214, 217, 'Grupos', 5, NULL, 12, 8, 214, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(61, 20, 211, 217, 'Grupos', 6, NULL, 2, 3, 217, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(62, 20, 212, 218, 'Grupos', 6, NULL, 6, 4, 212, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(63, 20, 213, 215, 'Grupos', 6, NULL, 3, 1, 213, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(64, 20, 214, 216, 'Grupos', 6, NULL, 2, 8, 216, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(65, 20, 211, 218, 'Grupos', 7, NULL, 5, 3, 211, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(66, 20, 212, 217, 'Grupos', 7, NULL, 5, 7, 217, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(67, 20, 213, 216, 'Grupos', 7, NULL, 2, 5, 216, NULL, 'Finalizada', '2025-12-04 12:44:29'),
-(68, 20, 214, 215, 'Grupos', 7, NULL, 8, 10, 215, NULL, 'Finalizada', '2025-12-04 12:44:29');
+(137, 21, 259, 260, 'Grupos', 1, 29, 12, 15, 260, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(138, 21, 261, 262, 'Grupos', 1, 29, 15, 12, 261, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(139, 21, 259, 261, 'Grupos', 2, 29, 8, 15, 261, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(140, 21, 260, 262, 'Grupos', 2, 29, 15, 9, 260, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(141, 21, 259, 262, 'Grupos', 3, 29, 15, 13, 259, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(142, 21, 260, 261, 'Grupos', 3, 29, 12, 15, 261, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(143, 21, 263, 264, 'Grupos', 1, 30, 5, 15, 264, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(144, 21, 265, 266, 'Grupos', 1, 30, 15, 12, 265, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(145, 21, 263, 265, 'Grupos', 2, 30, 9, 15, 265, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(146, 21, 264, 266, 'Grupos', 2, 30, 15, 5, 264, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(147, 21, 263, 266, 'Grupos', 3, 30, 12, 15, 266, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(148, 21, 264, 265, 'Grupos', 3, 30, 15, 6, 264, NULL, 'Finalizada', '2025-12-05 17:52:28'),
+(149, 22, 267, 268, 'Grupos', 1, NULL, 15, 10, 267, NULL, 'Finalizada', '2025-12-05 18:08:09'),
+(150, 22, 269, 270, 'Grupos', 1, NULL, 12, 15, 270, NULL, 'Finalizada', '2025-12-05 18:08:09'),
+(151, 22, 267, 269, 'Grupos', 2, NULL, 15, 10, 267, NULL, 'Finalizada', '2025-12-05 18:08:09'),
+(152, 22, 268, 270, 'Grupos', 2, NULL, 15, 5, 268, NULL, 'Finalizada', '2025-12-05 18:08:09'),
+(153, 22, 267, 270, 'Grupos', 3, NULL, 15, 12, 267, NULL, 'Finalizada', '2025-12-05 18:08:09'),
+(154, 22, 268, 269, 'Grupos', 3, NULL, 15, 9, 268, NULL, 'Finalizada', '2025-12-05 18:08:09');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `torneio_solicitacoes`
+--
+
+CREATE TABLE `torneio_solicitacoes` (
+  `id` int(11) NOT NULL,
+  `torneio_id` int(11) NOT NULL,
+  `usuario_id` int(11) NOT NULL,
+  `status` enum('Pendente','Aprovada','Aceita','Rejeitada') DEFAULT 'Pendente',
+  `data_solicitacao` timestamp NOT NULL DEFAULT current_timestamp(),
+  `data_resposta` timestamp NULL DEFAULT NULL,
+  `respondido_por` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Despejando dados para a tabela `torneio_solicitacoes`
+--
+
+INSERT INTO `torneio_solicitacoes` (`id`, `torneio_id`, `usuario_id`, `status`, `data_solicitacao`, `data_resposta`, `respondido_por`) VALUES
+(4, 21, 37, 'Aprovada', '2025-12-05 17:17:19', '2025-12-05 17:17:34', 21);
 
 -- --------------------------------------------------------
 
@@ -943,14 +1031,18 @@ CREATE TABLE `torneio_times` (
 --
 
 INSERT INTO `torneio_times` (`id`, `torneio_id`, `nome`, `cor`, `ordem`, `data_criacao`) VALUES
-(211, 20, 'Time 1', '#007bff', 1, '2025-11-25 21:07:12'),
-(212, 20, 'Time 2', '#28a745', 2, '2025-11-25 21:07:12'),
-(213, 20, 'Time 3', '#dc3545', 3, '2025-11-25 21:07:12'),
-(214, 20, 'Time 4', '#ffc107', 4, '2025-11-25 21:07:12'),
-(215, 20, 'Time 5', '#17a2b8', 5, '2025-11-25 21:07:12'),
-(216, 20, 'Time 6', '#6f42c1', 6, '2025-11-25 21:07:12'),
-(217, 20, 'Time 7', '#e83e8c', 7, '2025-11-25 21:07:12'),
-(218, 20, 'Time 8', '#fd7e14', 8, '2025-11-25 21:07:12');
+(259, 21, 'Time 1', '#007bff', 1, '2025-12-05 17:26:23'),
+(260, 21, 'Time 2', '#28a745', 2, '2025-12-05 17:26:23'),
+(261, 21, 'Time 3', '#dc3545', 3, '2025-12-05 17:26:23'),
+(262, 21, 'Time 4', '#ffc107', 4, '2025-12-05 17:26:23'),
+(263, 21, 'Time 5', '#17a2b8', 5, '2025-12-05 17:26:23'),
+(264, 21, 'Time 6', '#6f42c1', 6, '2025-12-05 17:26:23'),
+(265, 21, 'Time 7', '#e83e8c', 7, '2025-12-05 17:26:23'),
+(266, 21, 'Time 8', '#fd7e14', 8, '2025-12-05 17:26:23'),
+(267, 22, 'Time 1', '#007bff', 1, '2025-12-05 18:05:58'),
+(268, 22, 'Time 2', '#28a745', 2, '2025-12-05 18:05:58'),
+(269, 22, 'Time 3', '#dc3545', 3, '2025-12-05 18:05:58'),
+(270, 22, 'Time 4', '#ffc107', 4, '2025-12-05 18:05:58');
 
 -- --------------------------------------------------------
 
@@ -969,22 +1061,54 @@ CREATE TABLE `torneio_time_integrantes` (
 --
 
 INSERT INTO `torneio_time_integrantes` (`id`, `time_id`, `participante_id`) VALUES
-(771, 211, 231),
-(772, 211, 233),
-(774, 212, 237),
-(773, 212, 241),
-(775, 213, 242),
-(776, 213, 244),
-(778, 214, 234),
-(777, 214, 245),
-(779, 215, 232),
-(780, 215, 239),
-(782, 216, 235),
-(781, 216, 238),
-(783, 217, 240),
-(784, 217, 243),
-(785, 218, 230),
-(786, 218, 236);
+(820, 259, 256),
+(819, 259, 268),
+(821, 259, 276),
+(822, 259, 281),
+(825, 260, 250),
+(824, 260, 263),
+(823, 260, 277),
+(849, 260, 279),
+(828, 261, 254),
+(829, 261, 259),
+(826, 261, 260),
+(827, 261, 267),
+(833, 262, 261),
+(832, 262, 262),
+(830, 262, 271),
+(831, 262, 274),
+(850, 263, 251),
+(835, 263, 257),
+(836, 263, 265),
+(834, 263, 278),
+(839, 264, 252),
+(837, 264, 253),
+(840, 264, 255),
+(838, 264, 269),
+(841, 265, 270),
+(842, 265, 272),
+(843, 265, 273),
+(844, 265, 280),
+(845, 266, 258),
+(847, 266, 264),
+(848, 266, 266),
+(846, 266, 275),
+(901, 267, 283),
+(904, 267, 294),
+(902, 267, 296),
+(903, 267, 297),
+(905, 268, 286),
+(906, 268, 288),
+(907, 268, 289),
+(908, 268, 292),
+(909, 269, 282),
+(910, 269, 287),
+(911, 269, 290),
+(912, 269, 291),
+(913, 270, 284),
+(914, 270, 285),
+(915, 270, 293),
+(916, 270, 295);
 
 -- --------------------------------------------------------
 
@@ -1325,6 +1449,15 @@ ALTER TABLE `torneio_partidas`
   ADD KEY `idx_grupo_id` (`grupo_id`);
 
 --
+-- Índices de tabela `torneio_solicitacoes`
+--
+ALTER TABLE `torneio_solicitacoes`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `torneio_id` (`torneio_id`),
+  ADD KEY `usuario_id` (`usuario_id`),
+  ADD KEY `status` (`status`);
+
+--
 -- Índices de tabela `torneio_times`
 --
 ALTER TABLE `torneio_times`
@@ -1429,7 +1562,7 @@ ALTER TABLE `loja_produtos`
 -- AUTO_INCREMENT de tabela `notificacoes`
 --
 ALTER TABLE `notificacoes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=51;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=56;
 
 --
 -- AUTO_INCREMENT de tabela `pagamentos`
@@ -1507,7 +1640,7 @@ ALTER TABLE `time_jogadores`
 -- AUTO_INCREMENT de tabela `torneios`
 --
 ALTER TABLE `torneios`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_chaves`
@@ -1519,25 +1652,25 @@ ALTER TABLE `torneio_chaves`
 -- AUTO_INCREMENT de tabela `torneio_chaves_times`
 --
 ALTER TABLE `torneio_chaves_times`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_classificacao`
 --
 ALTER TABLE `torneio_classificacao`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=109;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_grupos`
 --
 ALTER TABLE `torneio_grupos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_grupo_times`
 --
 ALTER TABLE `torneio_grupo_times`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=129;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=161;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_jogos`
@@ -1561,25 +1694,31 @@ ALTER TABLE `torneio_modalidades`
 -- AUTO_INCREMENT de tabela `torneio_participantes`
 --
 ALTER TABLE `torneio_participantes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=246;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=298;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_partidas`
 --
 ALTER TABLE `torneio_partidas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=69;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=155;
+
+--
+-- AUTO_INCREMENT de tabela `torneio_solicitacoes`
+--
+ALTER TABLE `torneio_solicitacoes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_times`
 --
 ALTER TABLE `torneio_times`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=219;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=271;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_time_integrantes`
 --
 ALTER TABLE `torneio_time_integrantes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=787;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=917;
 
 --
 -- AUTO_INCREMENT de tabela `usuarios`

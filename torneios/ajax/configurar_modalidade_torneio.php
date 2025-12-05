@@ -35,6 +35,37 @@ if ($modalidade === 'todos_chaves') {
         echo json_encode(['success' => false, 'message' => 'A quantidade de chaves deve ser no mínimo 2.']);
         exit();
     }
+    
+    // Buscar quantidade de times do torneio
+    $sql_times = "SELECT COUNT(*) as total FROM torneio_times WHERE torneio_id = ?";
+    $stmt_times = executeQuery($pdo, $sql_times, [$torneio_id]);
+    $total_times = $stmt_times ? (int)$stmt_times->fetch()['total'] : 0;
+    
+    // Se não há times salvos, verificar quantidade configurada
+    if ($total_times === 0) {
+        $sql_config = "SELECT quantidade_times FROM torneios WHERE id = ?";
+        $stmt_config = executeQuery($pdo, $sql_config, [$torneio_id]);
+        $config = $stmt_config ? $stmt_config->fetch() : false;
+        $total_times = $config ? (int)($config['quantidade_times'] ?? 0) : 0;
+    }
+    
+    // Verificar se a quantidade de times é divisível pela quantidade de chaves
+    if ($total_times > 0 && $total_times % $quantidade_grupos !== 0) {
+        echo json_encode([
+            'success' => false, 
+            'message' => 'A quantidade total de times (' . $total_times . ') não é divisível pela quantidade de chaves (' . $quantidade_grupos . '). Para criar chaves, a quantidade de times deve ser divisível pela quantidade de chaves.'
+        ]);
+        exit();
+    }
+    
+    // Verificar se o número de times é par (mínimo 4)
+    if ($total_times > 0 && ($total_times < 4 || $total_times % 2 !== 0)) {
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Não é possível criar chaves com ' . $total_times . ' time(s). É necessário um número par de times (mínimo 4) para criar chaves.'
+        ]);
+        exit();
+    }
 }
 
 // Verificar permissão

@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $torneio_id = (int)($_POST['torneio_id'] ?? 0);
 $max_participantes = isset($_POST['max_participantes']) ? (int)$_POST['max_participantes'] : null;
 $quantidade_times = isset($_POST['quantidade_times']) ? (int)$_POST['quantidade_times'] : null;
-$integrantes_por_time = isset($_POST['integrantes_por_time']) ? (int)$_POST['integrantes_por_time'] : null;
+$integrantes_por_time = isset($_POST['integrantes_por_time']) && $_POST['integrantes_por_time'] !== '' ? (int)$_POST['integrantes_por_time'] : null;
 
 if ($torneio_id <= 0) {
     echo json_encode(['success' => false, 'message' => 'Torneio inválido.']);
@@ -74,13 +74,13 @@ try {
         }
     }
     
-    // Atualizar quantidade_times
-    if ($quantidade_times !== null && in_array('quantidade_times', $columns)) {
+    // Atualizar quantidade_times (sempre atualizar se foi enviado, mesmo que seja 0)
+    if (isset($_POST['quantidade_times']) && in_array('quantidade_times', $columns)) {
         $updates[] = "quantidade_times = " . (int)$quantidade_times;
     }
     
-    // Atualizar integrantes_por_time
-    if ($integrantes_por_time !== null && in_array('integrantes_por_time', $columns)) {
+    // Atualizar integrantes_por_time (sempre atualizar se foi enviado, mesmo que seja 0)
+    if (isset($_POST['integrantes_por_time']) && $_POST['integrantes_por_time'] !== '' && in_array('integrantes_por_time', $columns)) {
         $updates[] = "integrantes_por_time = " . (int)$integrantes_por_time;
     }
     

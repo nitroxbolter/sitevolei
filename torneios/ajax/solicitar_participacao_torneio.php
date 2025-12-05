@@ -74,18 +74,18 @@ if ($solicitacao_existente) {
             echo json_encode(['success' => false, 'message' => 'Sua solicitação já foi aprovada e você está participando do torneio.']);
             exit();
         } else {
-            // Foi aprovada mas foi removido, permitir criar nova (remover a antiga)
-            $sql_delete = "DELETE FROM torneio_solicitacoes WHERE id = ?";
-            executeQuery($pdo, $sql_delete, [$solicitacao_id]);
+            // Foi aprovada mas foi removido, permitir criar nova (remover todas as solicitações antigas deste usuário)
+            $sql_delete = "DELETE FROM torneio_solicitacoes WHERE torneio_id = ? AND usuario_id = ?";
+            executeQuery($pdo, $sql_delete, [$torneio_id, $usuario_id]);
         }
     } elseif ($status_existente === 'Rejeitada') {
-        // Se foi rejeitada, permitir criar uma nova solicitação (deletar a antiga primeiro)
-        $sql_delete = "DELETE FROM torneio_solicitacoes WHERE id = ?";
-        executeQuery($pdo, $sql_delete, [$solicitacao_id]);
+        // Se foi rejeitada, permitir criar uma nova solicitação (deletar todas as solicitações antigas deste usuário)
+        $sql_delete = "DELETE FROM torneio_solicitacoes WHERE torneio_id = ? AND usuario_id = ?";
+        executeQuery($pdo, $sql_delete, [$torneio_id, $usuario_id]);
     } else {
-        // Para qualquer outro status desconhecido, remover e permitir criar nova
-        $sql_delete = "DELETE FROM torneio_solicitacoes WHERE id = ?";
-        executeQuery($pdo, $sql_delete, [$solicitacao_id]);
+        // Para qualquer outro status desconhecido, remover todas as solicitações antigas e permitir criar nova
+        $sql_delete = "DELETE FROM torneio_solicitacoes WHERE torneio_id = ? AND usuario_id = ?";
+        executeQuery($pdo, $sql_delete, [$torneio_id, $usuario_id]);
     }
 }
 
@@ -104,14 +104,30 @@ if ($maxParticipantes > 0) {
 
 // Criar solicitação
 try {
-    // Verificar se a tabela existe
+    // Verificar se a tabela existe e criar se necessário
     try {
         $check_table = $pdo->query("SHOW TABLES LIKE 'torneio_solicitacoes'");
         if (!$check_table || $check_table->rowCount() == 0) {
-            echo json_encode(['success' => false, 'message' => 'Tabela de solicitações não encontrada. Entre em contato com o administrador.']);
-            exit();
+            // Criar a tabela automaticamente
+            $sql_create_table = "CREATE TABLE IF NOT EXISTS `torneio_solicitacoes` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `torneio_id` int(11) NOT NULL,
+                `usuario_id` int(11) NOT NULL,
+                `status` enum('Pendente','Aprovada','Aceita','Rejeitada') DEFAULT 'Pendente',
+                `data_solicitacao` timestamp NOT NULL DEFAULT current_timestamp(),
+                `data_resposta` timestamp NULL DEFAULT NULL,
+                `respondido_por` int(11) DEFAULT NULL,
+                PRIMARY KEY (`id`),
+                KEY `torneio_id` (`torneio_id`),
+                KEY `usuario_id` (`usuario_id`),
+                KEY `status` (`status`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+            
+            $pdo->exec($sql_create_table);
+            error_log("Tabela torneio_solicitacoes criada com sucesso");
         }
     } catch (PDOException $e) {
+        error_log("Erro ao verificar/criar tabela torneio_solicitacoes: " . $e->getMessage());
         echo json_encode(['success' => false, 'message' => 'Erro ao verificar tabela: ' . $e->getMessage()]);
         exit();
     }

@@ -211,7 +211,7 @@ include '../../includes/header.php';
 
 <div id="alert-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
 
-<div class="row mb-3">
+<div class="row mb-3" style="margin-top: 10px;">
     <div class="col-12 d-flex justify-content-between align-items-center">
         <h2>
             <i class="fas fa-trophy me-2"></i>Gerenciar Torneio: <?php echo htmlspecialchars($torneio['nome']); ?>
@@ -229,7 +229,10 @@ include '../../includes/header.php';
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informações do Torneio</h5>
+                <div class="d-flex align-items-center gap-2" style="cursor: pointer;" onclick="toggleSecaoInformacoes()">
+                    <i class="fas fa-chevron-down" id="iconeSecaoInformacoes"></i>
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informações do Torneio</h5>
+                </div>
                 <?php if ($sou_criador): ?>
                     <div class="d-flex gap-2">
                         <?php if ($torneio['status'] !== 'Finalizado' && $pode_encerrar): ?>
@@ -243,7 +246,7 @@ include '../../includes/header.php';
                     </div>
                 <?php endif; ?>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="corpoSecaoInformacoes">
                 <div class="row">
                     <div class="col-md-3">
                         <strong>Data:</strong><br>
@@ -269,7 +272,11 @@ include '../../includes/header.php';
                     <div class="col-md-3">
                         <strong>Participantes:</strong><br>
                         <?php 
-                        $maxParticipantes = $torneio['quantidade_participantes'] ?? $torneio['max_participantes'] ?? 0;
+                        // Calcular quantidade máxima baseado em times × integrantes
+                        $quantidadeTimes = $quantidade_times_db > 0 ? $quantidade_times_db : (int)($torneio['quantidade_times'] ?? 0);
+                        $integrantesPorTime = (int)($torneio['integrantes_por_time'] ?? 0);
+                        $maxParticipantesCalculado = ($quantidadeTimes > 0 && $integrantesPorTime > 0) ? ($quantidadeTimes * $integrantesPorTime) : 0;
+                        $maxParticipantes = $maxParticipantesCalculado > 0 ? $maxParticipantesCalculado : ($torneio['quantidade_participantes'] ?? $torneio['max_participantes'] ?? 0);
                         echo count($participantes); ?> / <?php echo (int)$maxParticipantes; 
                         ?>
                     </div>
@@ -311,7 +318,10 @@ include '../../includes/header.php';
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Configurações do Torneio</h5>
+                <div class="d-flex align-items-center gap-2" style="cursor: pointer;" onclick="toggleSecaoConfiguracoes()">
+                    <i class="fas fa-chevron-down" id="iconeSecaoConfiguracoes"></i>
+                    <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Configurações do Torneio</h5>
+                </div>
                 <?php 
                 $configSalva = ($torneio['quantidade_times'] ?? 0) > 0 && ($torneio['integrantes_por_time'] ?? 0) > 0;
                 if ($configSalva): ?>
@@ -320,28 +330,55 @@ include '../../includes/header.php';
                     </button>
                 <?php endif; ?>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="corpoSecaoConfiguracoes">
                 <form id="formConfigTorneio">
                     <input type="hidden" name="torneio_id" value="<?php echo $torneio_id; ?>">
                     <div class="row">
                         <div class="col-md-3 mb-3">
                             <label for="max_participantes" class="form-label">Quantidade Máxima de Participantes</label>
+                            <?php 
+                            // Calcular valor inicial baseado em times × integrantes se já estiver configurado
+                            $quantidadeTimes = $quantidade_times_db > 0 ? $quantidade_times_db : (int)($torneio['quantidade_times'] ?? 0);
+                            $integrantesPorTime = (int)($torneio['integrantes_por_time'] ?? 0);
+                            $maxParticipantesCalculado = ($quantidadeTimes > 0 && $integrantesPorTime > 0) ? ($quantidadeTimes * $integrantesPorTime) : 0;
+                            $maxParticipantesInicial = $maxParticipantesCalculado > 0 ? $maxParticipantesCalculado : (int)($torneio['max_participantes'] ?? $torneio['quantidade_participantes'] ?? 0);
+                            ?>
                             <input type="number" class="form-control config-field" id="max_participantes" name="max_participantes" 
-                                   min="1" value="<?php echo (int)($torneio['max_participantes'] ?? $torneio['quantidade_participantes'] ?? 0); ?>"
-                                   <?php echo $configSalva ? 'disabled' : ''; ?>>
+                                   min="1" value="<?php echo $maxParticipantesInicial; ?>"
+                                   readonly style="background-color: #e9ecef; cursor: not-allowed;">
                             <small class="text-muted">Atual: <?php echo count($participantes); ?> participantes</small>
+                            <small class="text-info d-block mt-1">
+                                <i class="fas fa-info-circle me-1"></i>Calculado automaticamente (Times × Integrantes)
+                            </small>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="tipo_time" class="form-label">Tipo de Time</label>
+                            <?php 
+                            $integrantesAtual = (int)($torneio['integrantes_por_time'] ?? 0);
+                            $tipoAtual = '';
+                            if ($integrantesAtual === 2) $tipoAtual = 'dupla';
+                            elseif ($integrantesAtual === 3) $tipoAtual = 'trio';
+                            elseif ($integrantesAtual === 4) $tipoAtual = 'quarteto';
+                            elseif ($integrantesAtual === 5) $tipoAtual = 'quinteto';
+                            ?>
+                            <select class="form-control config-field" id="tipo_time" name="tipo_time" onchange="calcularParticipantesNecessarios()" <?php echo $configSalva ? 'disabled' : ''; ?>>
+                                <option value="">Selecione...</option>
+                                <option value="dupla" data-integrantes="2" <?php echo $tipoAtual === 'dupla' ? 'selected' : ''; ?>>Dupla (2 pessoas)</option>
+                                <option value="trio" data-integrantes="3" <?php echo $tipoAtual === 'trio' ? 'selected' : ''; ?>>Trio (3 pessoas)</option>
+                                <option value="quarteto" data-integrantes="4" <?php echo $tipoAtual === 'quarteto' ? 'selected' : ''; ?>>Quarteto (4 pessoas)</option>
+                                <option value="quinteto" data-integrantes="5" <?php echo $tipoAtual === 'quinteto' ? 'selected' : ''; ?>>Quinteto (5 pessoas)</option>
+                            </select>
+                            <input type="hidden" id="integrantes_por_time" name="integrantes_por_time" value="<?php echo $integrantesAtual; ?>">
                         </div>
                         <div class="col-md-3 mb-3">
                             <label for="quantidade_times" class="form-label">Quantidade de Times</label>
                             <input type="number" class="form-control config-field" id="quantidade_times" name="quantidade_times" 
                                    min="2" value="<?php echo (int)($torneio['quantidade_times'] ?? 0); ?>"
+                                   onchange="calcularParticipantesNecessarios()" oninput="calcularParticipantesNecessarios()"
                                    <?php echo $configSalva ? 'disabled' : ''; ?>>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <label for="integrantes_por_time" class="form-label">Integrantes por Time</label>
-                            <input type="number" class="form-control config-field" id="integrantes_por_time" name="integrantes_por_time" 
-                                   min="1" value="<?php echo (int)($torneio['integrantes_por_time'] ?? 0); ?>"
-                                   <?php echo $configSalva ? 'disabled' : ''; ?>>
+                            <small class="text-muted" id="info_participantes_necessarios" style="display: none;">
+                                <span id="participantes_necessarios">0</span> participantes necessários
+                            </small>
                         </div>
                         <div class="col-md-3 mb-3 d-flex align-items-end">
                             <button type="submit" class="btn btn-primary w-100" id="btnSalvarConfig" <?php echo $configSalva ? 'style="display:none;"' : ''; ?>>
@@ -395,7 +432,7 @@ include '../../includes/header.php';
                     if (empty($participantes)): 
                     ?>
                         <p class="text-muted mb-0">Nenhum participante adicionado ainda.</p>
-                        <p class="text-muted mb-0"><small>Debug: Torneio ID <?php echo $torneio_id; ?></small></p>
+                        
                     <?php else: ?>
                         <div class="list-group">
                             <?php foreach ($participantes as $p): ?>
@@ -516,7 +553,7 @@ if ($quantidadeTimes > 0 || $quantidade_times_db > 0):
         <div class="card">
             <div class="card-header">
                 <div class="d-flex align-items-center gap-2 mb-2" style="cursor: pointer;" onclick="toggleSecaoTimes()">
-                    <i class="fas fa-chevron-down" id="iconeSecaoTimes"></i>
+                    <i class="fas fa-chevron-right" id="iconeSecaoTimes"></i>
                 <div>
                     <h5 class="mb-0"><i class="fas fa-users-cog me-2"></i>Times do Torneio</h5>
                     <small class="text-muted">
@@ -567,7 +604,7 @@ if ($quantidadeTimes > 0 || $quantidade_times_db > 0):
                     <?php endif; ?>
                 </div>
             </div>
-            <div class="card-body" id="corpoSecaoTimes">
+            <div class="card-body" id="corpoSecaoTimes" style="display: none;">
                 <?php if ($quantidade_times_db == 0 && $quantidadeTimes > 0): ?>
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
@@ -605,8 +642,6 @@ if ($quantidadeTimes > 0 || $quantidade_times_db > 0):
                             }
                             return $ordemA - $ordemB;
                         });
-                        
-                        error_log("Total de times únicos para exibição: " . count($timesExistentes));
                     }
                     ?>
                     <?php if (empty($timesExistentes)): ?>
@@ -795,46 +830,100 @@ if ($timesSalvos):
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-trophy me-2"></i>Formato de Campeonato</h5>
+                <div class="d-flex align-items-center gap-2" style="cursor: pointer;" onclick="toggleSecaoFormato()">
+                    <i class="fas fa-chevron-down" id="iconeSecaoFormato"></i>
+                    <h5 class="mb-0"><i class="fas fa-trophy me-2"></i>Formato de Campeonato</h5>
+                </div>
                 <div class="d-flex gap-2">
                     <button type="submit" form="formModalidadeTorneio" class="btn btn-sm btn-primary" id="btnSalvarModalidade">
                         <i class="fas fa-save"></i>
                     </button>
-                    <?php if ($modalidade && $torneio['status'] !== 'Finalizado'): ?>
-                        <button type="button" class="btn btn-sm btn-success" id="btnIniciarJogos" onclick="iniciarJogos()">
-                            <i class="fas fa-play"></i>
-                        </button>
-                    <?php elseif ($torneio['status'] !== 'Finalizado'): ?>
-                        <button type="button" class="btn btn-sm btn-success" id="btnIniciarJogos" onclick="iniciarJogos()" style="display: none;">
-                            <i class="fas fa-play"></i>
-                        </button>
-                    <?php endif; ?>
                 </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="corpoSecaoFormato">
                 <form id="formModalidadeTorneio">
                     <input type="hidden" name="torneio_id" value="<?php echo $torneio_id; ?>">
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Tipo de Formato *</label>
                             <div class="form-check mb-2">
-                                <input class="form-check-input" type="radio" name="modalidade" id="modalidade_todos_contra_todos" value="todos_contra_todos" <?php echo ($modalidade === 'todos_contra_todos') ? 'checked' : ''; ?>>
+                                <?php 
+                                // Se não pode criar chaves e estava selecionado todos_chaves, forçar todos_contra_todos
+                                $quantidadeTimes = $quantidade_times_db > 0 ? $quantidade_times_db : (int)($torneio['quantidade_times'] ?? 0);
+                                $podeCriarChaves = $quantidadeTimes > 0 && $quantidadeTimes % 2 === 0 && $quantidadeTimes >= 4;
+                                if (!$podeCriarChaves && $modalidade === 'todos_chaves') {
+                                    $modalidade = 'todos_contra_todos';
+                                }
+                                ?>
+                                <input class="form-check-input" type="radio" name="modalidade" id="modalidade_todos_contra_todos" value="todos_contra_todos" <?php echo ($modalidade === 'todos_contra_todos' || (!$podeCriarChaves && $modalidade === 'todos_chaves')) ? 'checked' : ''; ?>>
                                 <label class="form-check-label" for="modalidade_todos_contra_todos">
                                     <strong>Todos contra Todos</strong>
                                     <p class="text-muted small mb-0">Classificação por pontuação. Em caso de empate de vitórias, será considerado o average (diferença de pontos).</p>
                                 </label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="modalidade" id="modalidade_todos_chaves" value="todos_chaves" <?php echo ($modalidade === 'todos_chaves') ? 'checked' : ''; ?> onchange="toggleQuantidadeGrupos()">
-                                <label class="form-check-label" for="modalidade_todos_chaves">
+                                <?php 
+                                $quantidadeTimes = $quantidade_times_db > 0 ? $quantidade_times_db : (int)($torneio['quantidade_times'] ?? 0);
+                                $podeCriarChaves = $quantidadeTimes > 0 && $quantidadeTimes % 2 === 0 && $quantidadeTimes >= 4;
+                                $disabledChaves = !$podeCriarChaves ? 'disabled' : '';
+                                // Se não pode criar chaves mas estava selecionado, desmarcar e forçar todos_contra_todos
+                                $checkedChaves = ($modalidade === 'todos_chaves' && $podeCriarChaves) ? 'checked' : '';
+                                if (!$podeCriarChaves && $modalidade === 'todos_chaves') {
+                                    // Forçar todos_contra_todos se não pode criar chaves
+                                    $checkedChaves = '';
+                                    $modalidade = 'todos_contra_todos'; // Atualizar para garantir que o outro radio fique marcado
+                                }
+                                ?>
+                                <input class="form-check-input" type="radio" name="modalidade" id="modalidade_todos_chaves" value="todos_chaves" <?php echo $checkedChaves; ?> <?php echo $disabledChaves; ?> onchange="toggleQuantidadeGrupos()" style="<?php echo !$podeCriarChaves ? 'opacity: 0.5; cursor: not-allowed;' : ''; ?>">
+                                <label class="form-check-label <?php echo !$podeCriarChaves ? 'text-danger' : ''; ?>" for="modalidade_todos_chaves" style="<?php echo !$podeCriarChaves ? 'cursor: not-allowed;' : ''; ?>">
                                     <strong>Todos contra Todos + Chaves</strong>
                                     <p class="text-muted small mb-0">Os times serão divididos em chaves. Dentro de cada chave, todos se enfrentam. Os melhores de cada chave avançam para as chaves eliminatórias.</p>
                                 </label>
                             </div>
-                            <div id="divQuantidadeGrupos" style="display: <?php echo ($modalidade === 'todos_chaves') ? 'block' : 'none'; ?>;" class="mt-3">
-                                <label class="form-label">Quantidade de Chaves *</label>
-                                <input type="number" class="form-control" name="quantidade_grupos" id="quantidade_grupos" min="2" value="<?php echo $torneio['quantidade_grupos'] ?? 2; ?>" required>
-                                <small class="text-muted">Os times serão divididos igualmente entre as chaves. Ex: 8 times em 2 chaves = 4 times por chave.</small>
+                            <?php if (!$podeCriarChaves && $quantidadeTimes > 0): ?>
+                                <div class="alert alert-danger mt-2 mb-0" role="alert">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Atenção:</strong> A quantidade de times (<?php echo $quantidadeTimes; ?>) não é suficiente para gerar chaves. É necessário um número par de times (mínimo 4) para criar chaves.
+                                </div>
+                            <?php endif; ?>
+                            <div id="divQuantidadeGrupos" style="display: <?php echo ($modalidade === 'todos_chaves' && $podeCriarChaves) ? 'block' : 'none'; ?>;" class="mt-3">
+                                <label class="form-label">Selecione a quantidade de chaves *</label>
+                                <div id="opcoesChaves">
+                                    <?php
+                                    if ($podeCriarChaves) {
+                                        // Calcular divisores válidos (que resultam em pelo menos 2 times por chave)
+                                        $divisores = [];
+                                        for ($i = 2; $i <= $quantidadeTimes / 2; $i++) {
+                                            if ($quantidadeTimes % $i === 0) {
+                                                $timesPorChave = $quantidadeTimes / $i;
+                                                if ($timesPorChave >= 2) {
+                                                    $divisores[] = $i;
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Adicionar opção de 1 chave (todos contra todos sem divisão)
+                                        // Mas na verdade, isso seria igual a todos_contra_todos, então não vamos incluir
+                                        
+                                        if (empty($divisores)) {
+                                            echo '<p class="text-muted">Nenhuma opção de chaves disponível para ' . $quantidadeTimes . ' times.</p>';
+                                        } else {
+                                            $quantidadeGruposAtual = (int)($torneio['quantidade_grupos'] ?? 0);
+                                            foreach ($divisores as $divisor) {
+                                                $timesPorChave = $quantidadeTimes / $divisor;
+                                                $checked = ($quantidadeGruposAtual === $divisor) ? 'checked' : '';
+                                                echo '<div class="form-check mb-2">';
+                                                echo '<input class="form-check-input" type="radio" name="quantidade_grupos" id="chaves_' . $divisor . '" value="' . $divisor . '" ' . $checked . ' required>';
+                                                echo '<label class="form-check-label" for="chaves_' . $divisor . '">';
+                                                echo '<strong>' . $divisor . ' chaves</strong> - ' . $timesPorChave . ' time(s) em cada chave';
+                                                echo '</label>';
+                                                echo '</div>';
+                                            }
+                                        }
+                                    }
+                                    ?>
+                                </div>
+                                <small class="text-muted d-block mt-2">Os times serão divididos igualmente entre as chaves selecionadas.</small>
                             </div>
                         </div>
                     </div>
@@ -978,13 +1067,22 @@ if ($timesSalvos && $modalidade):
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="fas fa-futbol me-2"></i>Jogos de Enfrentamento</h5>
-                <div>
+                <div class="d-flex gap-2">
                     <?php 
                     // Verificar se há partidas (válidas ou não) para mostrar o botão
                     $sql_count_todas = "SELECT COUNT(*) as total FROM torneio_partidas WHERE torneio_id = ?";
                     $stmt_count_todas = executeQuery($pdo, $sql_count_todas, [$torneio_id]);
                     $total_partidas = $stmt_count_todas ? (int)$stmt_count_todas->fetch()['total'] : 0;
                     ?>
+                    <?php if ($modalidade && $torneio['status'] !== 'Finalizado' && empty($partidas)): ?>
+                        <button type="button" class="btn btn-sm btn-success" id="btnIniciarJogos" onclick="iniciarJogos()">
+                            <i class="fas fa-play me-1"></i>Iniciar Jogos
+                        </button>
+                    <?php elseif ($torneio['status'] !== 'Finalizado' && empty($partidas)): ?>
+                        <button type="button" class="btn btn-sm btn-success" id="btnIniciarJogos" onclick="iniciarJogos()" style="display: none;">
+                            <i class="fas fa-play me-1"></i>Iniciar Jogos
+                        </button>
+                    <?php endif; ?>
                     <?php if (!empty($partidas)): ?>
                         <button class="btn btn-sm btn-outline-primary" onclick="imprimirEnfrentamentos()">
                             <i class="fas fa-print me-1"></i>Imprimir
@@ -1006,7 +1104,7 @@ if ($timesSalvos && $modalidade):
                 <?php if (empty($partidas)): ?>
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        Nenhum jogo gerado ainda. Clique em "Iniciar Jogos" para gerar os confrontos.
+                        Nenhum jogo gerado ainda. Configure o formato do campeonato e clique em "Iniciar Jogos" no cabeçalho acima para gerar os confrontos.
                     </div>
                 <?php else: ?>
                     <div class="table-responsive" id="tabela-enfrentamentos">
@@ -1030,7 +1128,7 @@ if ($timesSalvos && $modalidade):
                                         $grupo_atual = $partida['grupo_id'];
                                 ?>
                                     <tr class="table-info">
-                                        <td colspan="5"><strong><i class="fas fa-users me-2"></i><?php echo htmlspecialchars($partida['grupo_nome'] ?? 'Chave'); ?></strong></td>
+                                        <td colspan="5" class="text-center"><strong><i class="fas fa-users me-2"></i><?php echo htmlspecialchars($partida['grupo_nome'] ?? 'Chave'); ?></strong></td>
                                     </tr>
                                 <?php endif; ?>
                                     <?php if ($partida['rodada'] != $rodada_atual):
@@ -1048,21 +1146,41 @@ if ($timesSalvos && $modalidade):
                                                 <?php if (!empty($integrantes_por_time[$partida['time1_id']])): ?>
                                                     <?php 
                                                     $primeiro_integ = $integrantes_por_time[$partida['time1_id']][0];
-                                                    if ($primeiro_integ['usuario_id']):
-                                                        $avatar = $primeiro_integ['foto_perfil'] ?: '../../assets/arquivos/logo.png';
-                                                        if (strpos($avatar, '../../assets/') === 0 || strpos($avatar, '../assets/') === 0 || strpos($avatar, 'assets/') === 0) {
-                                                            if (strpos($avatar, '../../') !== 0) {
-                                                                if (strpos($avatar, '../') === 0) {
-                                                                    $avatar = '../' . ltrim($avatar, '/');
-                                                                } else {
-                                                                    $avatar = '../../' . ltrim($avatar, '/');
+                                                    $tem_foto_valida = false;
+                                                    $avatar = '';
+                                                    
+                                                    if ($primeiro_integ['usuario_id'] && !empty($primeiro_integ['foto_perfil'])):
+                                                        $avatar = $primeiro_integ['foto_perfil'];
+                                                        // Verificar se não é a logo padrão
+                                                        if ($avatar !== '../../assets/arquivos/logo.png' && $avatar !== '../assets/arquivos/logo.png' && $avatar !== 'assets/arquivos/logo.png' && $avatar !== 'logo.png'):
+                                                            if (strpos($avatar, '../../assets/') === 0 || strpos($avatar, '../assets/') === 0 || strpos($avatar, 'assets/') === 0) {
+                                                                if (strpos($avatar, '../../') !== 0) {
+                                                                    if (strpos($avatar, '../') === 0) {
+                                                                        $avatar = '../' . ltrim($avatar, '/');
+                                                                    } else {
+                                                                        $avatar = '../../' . ltrim($avatar, '/');
+                                                                    }
                                                                 }
+                                                            } elseif (strpos($avatar, 'http') !== 0 && strpos($avatar, '/') !== 0) {
+                                                                $avatar = '../../assets/arquivos/' . $avatar;
                                                             }
-                                                        } elseif (strpos($avatar, 'http') !== 0 && strpos($avatar, '/') !== 0) {
-                                                            $avatar = '../../assets/arquivos/' . $avatar;
-                                                        }
+                                                            $tem_foto_valida = true;
+                                                        endif;
+                                                    endif;
+                                                    
+                                                    if ($tem_foto_valida):
                                                     ?>
-                                                        <img src="<?php echo htmlspecialchars($avatar); ?>" class="rounded-circle" width="20" height="20" style="object-fit:cover;" alt="<?php echo htmlspecialchars($primeiro_integ['usuario_nome']); ?>" title="<?php echo htmlspecialchars($primeiro_integ['usuario_nome']); ?>">
+                                                        <img src="<?php echo htmlspecialchars($avatar); ?>" class="rounded-circle" width="20" height="20" style="object-fit:cover;" alt="<?php echo htmlspecialchars($primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso']); ?>" title="<?php echo htmlspecialchars($primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso']); ?>">
+                                                    <?php else: ?>
+                                                        <small class="text-muted">
+                                                            <?php 
+                                                            // Mostrar apenas o primeiro nome do primeiro integrante
+                                                            $primeiro_integ = $integrantes_por_time[$partida['time1_id']][0];
+                                                            $nome = $primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso'] ?? 'Sem nome';
+                                                            $primeiro_nome = explode(' ', trim($nome))[0];
+                                                            echo htmlspecialchars($primeiro_nome);
+                                                            ?>
+                                                        </small>
                                                     <?php endif; ?>
                                                 <?php endif; ?>
                                                 <?php if ($partida['status'] === 'Finalizada' && $partida['vencedor_id'] == $partida['time1_id']): ?>
@@ -1079,8 +1197,8 @@ if ($timesSalvos && $modalidade):
                                                        min="0" 
                                                        style="width: 60px; height: 28px; text-align: center; padding: 2px 4px;"
                                                        data-partida-id="<?php echo $partida['id']; ?>"
-                                                       <?php echo ($partida['status'] === 'Finalizada' || $tem_eliminatorias) ? 'readonly' : ''; ?>
-                                                       <?php echo ($tem_eliminatorias || $partida['status'] === 'Finalizada') ? 'disabled' : ''; ?>>
+                                                       readonly
+                                                       disabled>
                                                 <span class="mx-1">x</span>
                                                 <input type="number" 
                                                        class="form-control form-control-sm pontos-input" 
@@ -1089,8 +1207,8 @@ if ($timesSalvos && $modalidade):
                                                        min="0" 
                                                        style="width: 60px; height: 28px; text-align: center; padding: 2px 4px;"
                                                        data-partida-id="<?php echo $partida['id']; ?>"
-                                                       <?php echo ($partida['status'] === 'Finalizada' || $tem_eliminatorias) ? 'readonly' : ''; ?>
-                                                       <?php echo ($tem_eliminatorias || $partida['status'] === 'Finalizada') ? 'disabled' : ''; ?>>
+                                                       readonly
+                                                       disabled>
                                             </div>
                                         </td>
                                         <td>
@@ -1100,21 +1218,41 @@ if ($timesSalvos && $modalidade):
                                                 <?php if (!empty($integrantes_por_time[$partida['time2_id']])): ?>
                                                     <?php 
                                                     $primeiro_integ = $integrantes_por_time[$partida['time2_id']][0];
-                                                    if ($primeiro_integ['usuario_id']):
-                                                        $avatar = $primeiro_integ['foto_perfil'] ?: '../../assets/arquivos/logo.png';
-                                                        if (strpos($avatar, '../../assets/') === 0 || strpos($avatar, '../assets/') === 0 || strpos($avatar, 'assets/') === 0) {
-                                                            if (strpos($avatar, '../../') !== 0) {
-                                                                if (strpos($avatar, '../') === 0) {
-                                                                    $avatar = '../' . ltrim($avatar, '/');
-                                                                } else {
-                                                                    $avatar = '../../' . ltrim($avatar, '/');
+                                                    $tem_foto_valida = false;
+                                                    $avatar = '';
+                                                    
+                                                    if ($primeiro_integ['usuario_id'] && !empty($primeiro_integ['foto_perfil'])):
+                                                        $avatar = $primeiro_integ['foto_perfil'];
+                                                        // Verificar se não é a logo padrão
+                                                        if ($avatar !== '../../assets/arquivos/logo.png' && $avatar !== '../assets/arquivos/logo.png' && $avatar !== 'assets/arquivos/logo.png' && $avatar !== 'logo.png'):
+                                                            if (strpos($avatar, '../../assets/') === 0 || strpos($avatar, '../assets/') === 0 || strpos($avatar, 'assets/') === 0) {
+                                                                if (strpos($avatar, '../../') !== 0) {
+                                                                    if (strpos($avatar, '../') === 0) {
+                                                                        $avatar = '../' . ltrim($avatar, '/');
+                                                                    } else {
+                                                                        $avatar = '../../' . ltrim($avatar, '/');
+                                                                    }
                                                                 }
+                                                            } elseif (strpos($avatar, 'http') !== 0 && strpos($avatar, '/') !== 0) {
+                                                                $avatar = '../../assets/arquivos/' . $avatar;
                                                             }
-                                                        } elseif (strpos($avatar, 'http') !== 0 && strpos($avatar, '/') !== 0) {
-                                                            $avatar = '../../assets/arquivos/' . $avatar;
-                                                        }
+                                                            $tem_foto_valida = true;
+                                                        endif;
+                                                    endif;
+                                                    
+                                                    if ($tem_foto_valida):
                                                     ?>
-                                                        <img src="<?php echo htmlspecialchars($avatar); ?>" class="rounded-circle" width="20" height="20" style="object-fit:cover;" alt="<?php echo htmlspecialchars($primeiro_integ['usuario_nome']); ?>" title="<?php echo htmlspecialchars($primeiro_integ['usuario_nome']); ?>">
+                                                        <img src="<?php echo htmlspecialchars($avatar); ?>" class="rounded-circle" width="20" height="20" style="object-fit:cover;" alt="<?php echo htmlspecialchars($primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso']); ?>" title="<?php echo htmlspecialchars($primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso']); ?>">
+                                                    <?php else: ?>
+                                                        <small class="text-muted">
+                                                            <?php 
+                                                            // Mostrar apenas o primeiro nome do primeiro integrante
+                                                            $primeiro_integ = $integrantes_por_time[$partida['time2_id']][0];
+                                                            $nome = $primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso'] ?? 'Sem nome';
+                                                            $primeiro_nome = explode(' ', trim($nome))[0];
+                                                            echo htmlspecialchars($primeiro_nome);
+                                                            ?>
+                                                        </small>
                                                     <?php endif; ?>
                                                 <?php endif; ?>
                                                 <?php if ($partida['status'] === 'Finalizada' && $partida['vencedor_id'] == $partida['time2_id']): ?>
@@ -1222,6 +1360,33 @@ if ($timesSalvos && $modalidade):
     $stmt_chaves = executeQuery($pdo, $sql_chaves, [$torneio_id]);
     $chaves = $stmt_chaves ? $stmt_chaves->fetchAll() : [];
     $tem_eliminatorias = !empty($chaves);
+    
+    // Buscar integrantes dos times para as chaves eliminatórias
+    $integrantes_por_time_chaves = [];
+    if (!empty($chaves)) {
+        foreach ($chaves as $chave) {
+            if ($chave['time1_id'] && !isset($integrantes_por_time_chaves[$chave['time1_id']])) {
+                $sql_integrantes = "SELECT tp.id AS participante_id, tp.*, u.nome AS usuario_nome, u.foto_perfil
+                                   FROM torneio_time_integrantes tti
+                                   JOIN torneio_participantes tp ON tp.id = tti.participante_id
+                                   LEFT JOIN usuarios u ON u.id = tp.usuario_id
+                                   WHERE tti.time_id = ?
+                                   ORDER BY tp.nome_avulso, u.nome";
+                $stmt_integrantes = executeQuery($pdo, $sql_integrantes, [$chave['time1_id']]);
+                $integrantes_por_time_chaves[$chave['time1_id']] = $stmt_integrantes ? $stmt_integrantes->fetchAll() : [];
+            }
+            if ($chave['time2_id'] && !isset($integrantes_por_time_chaves[$chave['time2_id']])) {
+                $sql_integrantes = "SELECT tp.id AS participante_id, tp.*, u.nome AS usuario_nome, u.foto_perfil
+                                   FROM torneio_time_integrantes tti
+                                   JOIN torneio_participantes tp ON tp.id = tti.participante_id
+                                   LEFT JOIN usuarios u ON u.id = tp.usuario_id
+                                   WHERE tti.time_id = ?
+                                   ORDER BY tp.nome_avulso, u.nome";
+                $stmt_integrantes = executeQuery($pdo, $sql_integrantes, [$chave['time2_id']]);
+                $integrantes_por_time_chaves[$chave['time2_id']] = $stmt_integrantes ? $stmt_integrantes->fetchAll() : [];
+            }
+        }
+    }
 ?>
 <div class="row mb-4">
     <div class="col-12">
@@ -1271,8 +1436,8 @@ if ($timesSalvos && $modalidade):
                                         <th></th>
                                         <th></th>
                                         <th></th>
-                                        <th>
-                                            <div class="d-inline-block">
+                                        <th class="text-center">
+                                            <div class="d-flex justify-content-center align-items-center">
                                                 <div class="rounded border border-primary border-2 d-flex align-items-center justify-content-center" 
                                                      style="width: 100px; height: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 8px !important;">
                                                     <div class="text-center text-white">
@@ -1287,8 +1452,8 @@ if ($timesSalvos && $modalidade):
                                                                 echo $fase;
                                                             }
                                                         ?></strong>
-                                            </div>
-                                            </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </th>
                                         <th>Status</th>
@@ -1302,6 +1467,46 @@ if ($timesSalvos && $modalidade):
                                                 <div class="d-flex align-items-center gap-2">
                                                     <div style="width: 16px; height: 16px; background-color: <?php echo htmlspecialchars($chave['time1_cor'] ?? '#ccc'); ?>; border-radius: 3px;"></div>
                                                     <strong><?php echo htmlspecialchars($chave['time1_nome'] ?? 'Aguardando'); ?></strong>
+                                                    <?php if ($chave['time1_id'] && !empty($integrantes_por_time_chaves[$chave['time1_id']])): ?>
+                                                        <?php 
+                                                        $primeiro_integ = $integrantes_por_time_chaves[$chave['time1_id']][0];
+                                                        $tem_foto_valida = false;
+                                                        $avatar = '';
+                                                        
+                                                        if ($primeiro_integ['usuario_id'] && !empty($primeiro_integ['foto_perfil'])):
+                                                            $avatar = $primeiro_integ['foto_perfil'];
+                                                            // Verificar se não é a logo padrão
+                                                            if ($avatar !== '../../assets/arquivos/logo.png' && $avatar !== '../assets/arquivos/logo.png' && $avatar !== 'assets/arquivos/logo.png' && $avatar !== 'logo.png'):
+                                                                if (strpos($avatar, '../../assets/') === 0 || strpos($avatar, '../assets/') === 0 || strpos($avatar, 'assets/') === 0) {
+                                                                    if (strpos($avatar, '../../') !== 0) {
+                                                                        if (strpos($avatar, '../') === 0) {
+                                                                            $avatar = '../' . ltrim($avatar, '/');
+                                                                        } else {
+                                                                            $avatar = '../../' . ltrim($avatar, '/');
+                                                                        }
+                                                                    }
+                                                                } elseif (strpos($avatar, 'http') !== 0 && strpos($avatar, '/') !== 0) {
+                                                                    $avatar = '../../assets/arquivos/' . $avatar;
+                                                                }
+                                                                $tem_foto_valida = true;
+                                                            endif;
+                                                        endif;
+                                                        
+                                                        if ($tem_foto_valida):
+                                                        ?>
+                                                            <img src="<?php echo htmlspecialchars($avatar); ?>" class="rounded-circle" width="20" height="20" style="object-fit:cover;" alt="<?php echo htmlspecialchars($primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso']); ?>" title="<?php echo htmlspecialchars($primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso']); ?>">
+                                                        <?php else: ?>
+                                                            <small class="text-muted">
+                                                                <?php 
+                                                                // Mostrar apenas o primeiro nome do primeiro integrante
+                                                                $primeiro_integ = $integrantes_por_time_chaves[$chave['time1_id']][0];
+                                                                $nome = $primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso'] ?? 'Sem nome';
+                                                                $primeiro_nome = explode(' ', trim($nome))[0];
+                                                                echo htmlspecialchars($primeiro_nome);
+                                                                ?>
+                                                            </small>
+                                                        <?php endif; ?>
+                                                    <?php endif; ?>
                                                     <?php if ($chave['status'] === 'Finalizada' && $chave['vencedor_id'] == $chave['time1_id']): ?>
                                                         <i class="fas fa-trophy text-warning" title="Vencedor"></i>
                                                     <?php endif; ?>
@@ -1309,9 +1514,7 @@ if ($timesSalvos && $modalidade):
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center gap-1 justify-content-center">
-                                                    <?php if ($chave['status'] === 'Finalizada' && $chave['time1_id'] && $chave['time2_id']): ?>
-                                                    <strong><?php echo $chave['pontos_time1']; ?> x <?php echo $chave['pontos_time2']; ?></strong>
-                                                    <?php elseif ($chave['time1_id'] && $chave['time2_id']): ?>
+                                                    <?php if ($chave['time1_id'] && $chave['time2_id']): ?>
                                                         <input type="number" 
                                                                class="form-control form-control-sm pontos-chave-input" 
                                                                id="pontos_time1_chave_<?php echo $chave['id']; ?>" 
@@ -1319,6 +1522,7 @@ if ($timesSalvos && $modalidade):
                                                                min="0" 
                                                                style="width: 60px; height: 30px; text-align: center; padding: 2px 4px;"
                                                                data-chave-id="<?php echo $chave['id']; ?>"
+                                                               readonly
                                                                disabled>
                                                         <span class="mx-1">x</span>
                                                         <input type="number" 
@@ -1328,6 +1532,7 @@ if ($timesSalvos && $modalidade):
                                                                min="0" 
                                                                style="width: 60px; height: 30px; text-align: center; padding: 2px 4px;"
                                                                data-chave-id="<?php echo $chave['id']; ?>"
+                                                               readonly
                                                                disabled>
                                                 <?php else: ?>
                                                         <span class="text-muted">Aguardando</span>
@@ -1338,6 +1543,46 @@ if ($timesSalvos && $modalidade):
                                                 <div class="d-flex align-items-center gap-2">
                                                     <div style="width: 16px; height: 16px; background-color: <?php echo htmlspecialchars($chave['time2_cor'] ?? '#ccc'); ?>; border-radius: 3px;"></div>
                                                     <strong><?php echo htmlspecialchars($chave['time2_nome'] ?? 'Aguardando'); ?></strong>
+                                                    <?php if ($chave['time2_id'] && !empty($integrantes_por_time_chaves[$chave['time2_id']])): ?>
+                                                        <?php 
+                                                        $primeiro_integ = $integrantes_por_time_chaves[$chave['time2_id']][0];
+                                                        $tem_foto_valida = false;
+                                                        $avatar = '';
+                                                        
+                                                        if ($primeiro_integ['usuario_id'] && !empty($primeiro_integ['foto_perfil'])):
+                                                            $avatar = $primeiro_integ['foto_perfil'];
+                                                            // Verificar se não é a logo padrão
+                                                            if ($avatar !== '../../assets/arquivos/logo.png' && $avatar !== '../assets/arquivos/logo.png' && $avatar !== 'assets/arquivos/logo.png' && $avatar !== 'logo.png'):
+                                                                if (strpos($avatar, '../../assets/') === 0 || strpos($avatar, '../assets/') === 0 || strpos($avatar, 'assets/') === 0) {
+                                                                    if (strpos($avatar, '../../') !== 0) {
+                                                                        if (strpos($avatar, '../') === 0) {
+                                                                            $avatar = '../' . ltrim($avatar, '/');
+                                                                        } else {
+                                                                            $avatar = '../../' . ltrim($avatar, '/');
+                                                                        }
+                                                                    }
+                                                                } elseif (strpos($avatar, 'http') !== 0 && strpos($avatar, '/') !== 0) {
+                                                                    $avatar = '../../assets/arquivos/' . $avatar;
+                                                                }
+                                                                $tem_foto_valida = true;
+                                                            endif;
+                                                        endif;
+                                                        
+                                                        if ($tem_foto_valida):
+                                                        ?>
+                                                            <img src="<?php echo htmlspecialchars($avatar); ?>" class="rounded-circle" width="20" height="20" style="object-fit:cover;" alt="<?php echo htmlspecialchars($primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso']); ?>" title="<?php echo htmlspecialchars($primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso']); ?>">
+                                                        <?php else: ?>
+                                                            <small class="text-muted">
+                                                                <?php 
+                                                                // Mostrar apenas o primeiro nome do primeiro integrante
+                                                                $primeiro_integ = $integrantes_por_time_chaves[$chave['time2_id']][0];
+                                                                $nome = $primeiro_integ['usuario_nome'] ?? $primeiro_integ['nome_avulso'] ?? 'Sem nome';
+                                                                $primeiro_nome = explode(' ', trim($nome))[0];
+                                                                echo htmlspecialchars($primeiro_nome);
+                                                                ?>
+                                                            </small>
+                                                        <?php endif; ?>
+                                                    <?php endif; ?>
                                                     <?php if ($chave['status'] === 'Finalizada' && $chave['vencedor_id'] == $chave['time2_id']): ?>
                                                         <i class="fas fa-trophy text-warning" title="Vencedor"></i>
                                                     <?php endif; ?>
@@ -1679,7 +1924,7 @@ if ($timesSalvos && $modalidade):
                                     <th class="text-center">V</th>
                                     <th class="text-center">D</th>
                                     <th class="text-center">PF</th>
-                                    <th class="text-center">PC</th>
+                                    <th class="text-center">PS</th>
                                     <th class="text-center">Saldo</th>
                                     <th class="text-center">Average</th>
                                     <th class="text-center">Pontos</th>
@@ -2032,6 +2277,10 @@ let timeAtualNumero = null;
 let maxParticipantesTorneio = <?php echo (int)($torneio['quantidade_participantes'] ?? $torneio['max_participantes'] ?? 0); ?>;
 let totalParticipantesAtual = <?php echo count($participantes); ?>;
 let listaParticipantesExpandida = false; // Começar recolhida
+let secaoTimesExpandida = false; // Começar recolhida
+let secaoInformacoesExpandida = true; // Começar expandida
+let secaoConfiguracoesExpandida = true; // Começar expandida
+let secaoFormatoExpandida = true; // Começar expandida
 
 // Estilos CSS para drag and drop
 const style = document.createElement('style');
@@ -2113,6 +2362,80 @@ function toggleSecaoTimes() {
     }
 }
 
+function toggleSecaoInformacoes() {
+    const corpo = document.getElementById('corpoSecaoInformacoes');
+    const icone = document.getElementById('iconeSecaoInformacoes');
+    
+    if (corpo && icone) {
+        if (secaoInformacoesExpandida) {
+            corpo.style.display = 'none';
+            icone.classList.remove('fa-chevron-down');
+            icone.classList.add('fa-chevron-right');
+            secaoInformacoesExpandida = false;
+        } else {
+            corpo.style.display = 'block';
+            icone.classList.remove('fa-chevron-right');
+            icone.classList.add('fa-chevron-down');
+            secaoInformacoesExpandida = true;
+        }
+    }
+}
+
+function toggleSecaoConfiguracoes() {
+    const corpo = document.getElementById('corpoSecaoConfiguracoes');
+    const icone = document.getElementById('iconeSecaoConfiguracoes');
+    
+    if (corpo && icone) {
+        if (secaoConfiguracoesExpandida) {
+            corpo.style.display = 'none';
+            icone.classList.remove('fa-chevron-down');
+            icone.classList.add('fa-chevron-right');
+            secaoConfiguracoesExpandida = false;
+        } else {
+            corpo.style.display = 'block';
+            icone.classList.remove('fa-chevron-right');
+            icone.classList.add('fa-chevron-down');
+            secaoConfiguracoesExpandida = true;
+        }
+    }
+}
+
+function toggleSecaoFormato() {
+    const corpo = document.getElementById('corpoSecaoFormato');
+    const icone = document.getElementById('iconeSecaoFormato');
+    
+    if (corpo && icone) {
+        if (secaoFormatoExpandida) {
+            corpo.style.display = 'none';
+            icone.classList.remove('fa-chevron-down');
+            icone.classList.add('fa-chevron-right');
+            secaoFormatoExpandida = false;
+        } else {
+            corpo.style.display = 'block';
+            icone.classList.remove('fa-chevron-right');
+            icone.classList.add('fa-chevron-down');
+            secaoFormatoExpandida = true;
+        }
+    }
+}
+
+function recolherSecoesTorneio() {
+    // Recolher Informações do Torneio
+    if (secaoInformacoesExpandida) {
+        toggleSecaoInformacoes();
+    }
+    
+    // Recolher Configurações do Torneio
+    if (secaoConfiguracoesExpandida) {
+        toggleSecaoConfiguracoes();
+    }
+    
+    // Recolher Formato de Campeonato
+    if (secaoFormatoExpandida) {
+        toggleSecaoFormato();
+    }
+}
+
 // Inicializar estado: lista começa recolhida
 document.addEventListener('DOMContentLoaded', function() {
     const corpo = document.getElementById('corpoListaParticipantes');
@@ -2125,14 +2448,14 @@ document.addEventListener('DOMContentLoaded', function() {
         listaParticipantesExpandida = false;
     }
     
-    // Seção de times começa expandida
+    // Seção de times começa recolhida
     const corpoSecaoTimes = document.getElementById('corpoSecaoTimes');
     const iconeSecaoTimes = document.getElementById('iconeSecaoTimes');
     if (corpoSecaoTimes && iconeSecaoTimes) {
-        corpoSecaoTimes.style.display = 'block';
-        iconeSecaoTimes.classList.remove('fa-chevron-right');
-        iconeSecaoTimes.classList.add('fa-chevron-down');
-        secaoTimesExpandida = true;
+        corpoSecaoTimes.style.display = 'none';
+        iconeSecaoTimes.classList.remove('fa-chevron-down');
+        iconeSecaoTimes.classList.add('fa-chevron-right');
+        secaoTimesExpandida = false;
     }
 });
 
@@ -2377,16 +2700,153 @@ function adicionarParticipanteAoTimeSelecionado(participanteId, nome, foto) {
         return;
     }
     
-    // Adicionar participante
-    const participanteHtml = criarHtmlParticipante(participanteId, nome, foto);
-    timeContainer.insertAdjacentHTML('beforeend', participanteHtml);
+    // Obter informações do time
+    const timeCard = timeContainer.closest('.col-md-6, .col-lg-4');
+    const timeId = timeCard ? (timeCard.getAttribute('data-time-id') || null) : null;
+    const timeNumero = timeContainer.getAttribute('data-time-numero');
     
-    // Fechar modal
-    const modalElement = document.getElementById('modalAdicionarIntegrante');
-    if (modalElement) {
-        const modalInstance = bootstrap.Modal.getInstance(modalElement);
-        if (modalInstance) modalInstance.hide();
+    // Se o time já existe no banco (tem timeId válido), salvar imediatamente
+    if (timeId && !timeId.toString().startsWith('novo_')) {
+        $.ajax({
+            url: '../ajax/adicionar_integrante_time.php',
+            method: 'POST',
+            data: {
+                time_id: parseInt(timeId),
+                participante_id: parseInt(participanteId)
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    // Adicionar participante ao DOM
+                    const participanteHtml = criarHtmlParticipante(participanteId, nome, foto);
+                    timeContainer.insertAdjacentHTML('beforeend', participanteHtml);
+                    
+                    // Atualizar visibilidade do botão
+                    if (timeNumero) {
+                        atualizarVisibilidadeBotaoAdicionar(timeNumero);
+                    }
+                    
+                    // Recarregar lista de participantes disponíveis no modal
+                    recarregarListaParticipantesDisponiveis();
+                    
+                    showAlert('Participante adicionado ao time!', 'success');
+                } else {
+                    showAlert(response.message || 'Erro ao adicionar participante.', 'danger');
+                }
+            },
+            error: function() {
+                showAlert('Erro ao adicionar participante ao time.', 'danger');
+            }
+        });
+    } else {
+        // Se o time ainda não existe, criar o time primeiro e depois adicionar o participante
+        $.ajax({
+            url: '../ajax/adicionar_integrante_time.php',
+            method: 'POST',
+            data: {
+                time_id: 0,
+                participante_id: parseInt(participanteId),
+                torneio_id: <?php echo $torneio_id; ?>,
+                time_numero: parseInt(timeNumero)
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    // Atualizar o data-time-id do card com o ID retornado
+                    if (response.time_id && timeCard) {
+                        timeCard.setAttribute('data-time-id', response.time_id);
+                        // Atualizar o ID do container também
+                        timeContainer.id = 'time-' + response.time_id;
+                    }
+                    
+                    // Adicionar participante ao DOM
+                    const participanteHtml = criarHtmlParticipante(participanteId, nome, foto);
+                    timeContainer.insertAdjacentHTML('beforeend', participanteHtml);
+                    
+                    // Atualizar visibilidade do botão
+                    if (timeNumero) {
+                        atualizarVisibilidadeBotaoAdicionar(timeNumero);
+                    }
+                    
+                    // Recarregar lista de participantes disponíveis no modal
+                    recarregarListaParticipantesDisponiveis();
+                    
+                    showAlert('Participante adicionado ao time!', 'success');
+                } else {
+                    showAlert(response.message || 'Erro ao adicionar participante.', 'danger');
+                }
+            },
+            error: function() {
+                showAlert('Erro ao adicionar participante ao time.', 'danger');
+            }
+        });
     }
+}
+
+function recarregarListaParticipantesDisponiveis() {
+    // Recarregar lista de participantes disponíveis no modal se estiver aberto
+    const modalElement = document.getElementById('modalAdicionarIntegrante');
+    if (!modalElement) return;
+    
+    // Verificar se o modal está visível
+    const modalInstance = bootstrap.Modal.getInstance(modalElement);
+    if (!modalInstance) return;
+    
+    // Verificar se o modal está aberto (Bootstrap 5)
+    const isShown = modalElement.classList.contains('show') || modalElement.style.display === 'block';
+    if (!isShown) return;
+    
+    // Recarregar a lista via AJAX
+    $.ajax({
+        url: '../ajax/listar_participantes_disponiveis_torneio.php',
+        method: 'GET',
+        data: {
+            torneio_id: <?php echo $torneio_id; ?>,
+            time_id: timeAtualId || 0
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                let html = '';
+                if (response.participantes.length === 0) {
+                    html = '<p class="text-muted">Nenhum participante disponível.</p>';
+                } else {
+                    html = '<div class="list-group">';
+                    response.participantes.forEach(function(p) {
+                        html += '<a href="#" class="list-group-item list-group-item-action" onclick="adicionarParticipanteAoTimeSelecionado(' + p.id + ', \'' + p.nome.replace(/'/g, "\\'") + '\', \'' + (p.foto_perfil || '') + '\'); return false;">';
+                        if (p.usuario_id) {
+                            html += '<div class="d-flex align-items-center gap-2">';
+                            var fotoPerfil = p.foto_perfil || '../../assets/arquivos/logo.png';
+                            if (fotoPerfil && fotoPerfil.indexOf('http') !== 0 && fotoPerfil.indexOf('/') !== 0) {
+                                if (fotoPerfil.indexOf('../../assets/') === 0 || fotoPerfil.indexOf('../assets/') === 0 || fotoPerfil.indexOf('assets/') === 0) {
+                                    if (fotoPerfil.indexOf('../../') !== 0) {
+                                        if (fotoPerfil.indexOf('../') === 0) {
+                                            fotoPerfil = '../' + fotoPerfil;
+                                        } else {
+                                            fotoPerfil = '../../' + fotoPerfil;
+                                        }
+                                    }
+                                } else {
+                                    fotoPerfil = '../../assets/arquivos/' + fotoPerfil;
+                                }
+                            }
+                            html += '<img src="' + fotoPerfil + '" class="rounded-circle" width="24" height="24" style="object-fit:cover;">';
+                            html += '<span>' + p.nome + '</span>';
+                            html += '</div>';
+                        } else {
+                            html += '<i class="fas fa-user me-2"></i>' + p.nome_avulso;
+                        }
+                        html += '</a>';
+                    });
+                    html += '</div>';
+                }
+                document.getElementById('listaParticipantesDisponiveis').innerHTML = html;
+            }
+        },
+        error: function() {
+            // Silenciar erro, não mostrar alerta
+        }
+    });
 }
 
 function adicionarIntegranteAoTime(timeId, participanteId) {
@@ -2839,7 +3299,31 @@ function sortearTimes() {
         }
     }
     
-    showAlert('Participantes sorteados! Clique em "Salvar Times" para confirmar.', 'success');
+    // Salvar automaticamente no banco de dados
+    const torneioId = <?php echo $torneio_id; ?>;
+    
+    $.ajax({
+        url: '../ajax/sortear_times_torneio.php',
+        method: 'POST',
+        data: {
+            torneio_id: torneioId
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                showAlert(response.message || 'Participantes sorteados e salvos com sucesso!', 'success');
+                // Recarregar página após 1 segundo para atualizar a interface
+                setTimeout(function() {
+                    location.reload();
+                }, 1000);
+            } else {
+                showAlert(response.message || 'Erro ao salvar sorteio', 'danger');
+            }
+        },
+        error: function() {
+            showAlert('Erro ao salvar sorteio no banco de dados', 'danger');
+        }
+    });
 }
 
 function criarHtmlParticipante(participanteId, nome, foto) {
@@ -2969,13 +3453,78 @@ function salvarTimes() {
     });
 }
 
-function removerParticipanteDoTime(button) {
-    if (confirm('Remover este participante do time?')) {
-        const item = button.closest('.participante-item');
-        if (item) {
-            item.remove();
+function atualizarVisibilidadeBotaoAdicionar(timeNumero) {
+    const integrantesPorTime = <?php echo (int)($torneio['integrantes_por_time'] ?? 0); ?>;
+    const timeContainer = document.querySelector('[data-time-numero="' + timeNumero + '"]');
+    
+    if (!timeContainer) return;
+    
+    const totalIntegrantes = timeContainer.querySelectorAll('.participante-item').length;
+    const timeCard = timeContainer.closest('.col-md-6, .col-lg-4');
+    const timeId = timeCard ? (timeCard.getAttribute('data-time-id') || null) : null;
+    const btnId = timeId ? 'btn-adicionar-' + timeId : 'btn-adicionar-novo_' + timeNumero;
+    const btn = document.getElementById(btnId);
+    
+    if (!btn) return;
+    
+    // Se não há limite configurado (0), sempre mostrar o botão
+    // Se há limite, mostrar apenas se não atingiu o limite
+    if (integrantesPorTime === 0) {
+        btn.style.display = 'block';
+    } else {
+        if (totalIntegrantes >= integrantesPorTime) {
+            btn.style.display = 'none';
+        } else {
+            btn.style.display = 'block';
         }
     }
+}
+
+function removerParticipanteDoTime(button) {
+    if (!confirm('Remover este participante do time?')) return;
+    
+    const item = button.closest('.participante-item');
+    if (!item) return;
+    
+    const participanteId = item.getAttribute('data-participante-id');
+    const timeContainer = item.closest('.time-participantes');
+    const timeNumero = timeContainer ? timeContainer.getAttribute('data-time-numero') : null;
+    const timeCard = timeContainer ? timeContainer.closest('.col-md-6, .col-lg-4') : null;
+    const timeId = timeCard ? (timeCard.getAttribute('data-time-id') || null) : null;
+    
+    // Se não tem timeId válido, apenas remover do DOM (será salvo quando clicar em Salvar Times)
+    if (!timeId || timeId.toString().startsWith('novo_')) {
+        item.remove();
+        if (timeNumero) {
+            atualizarVisibilidadeBotaoAdicionar(timeNumero);
+        }
+        return;
+    }
+    
+    // Se tem timeId válido, remover do banco imediatamente
+    $.ajax({
+        url: '../ajax/remover_integrante_time.php',
+        method: 'POST',
+        data: {
+            time_id: parseInt(timeId),
+            participante_id: parseInt(participanteId)
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                item.remove();
+                if (timeNumero) {
+                    atualizarVisibilidadeBotaoAdicionar(timeNumero);
+                }
+                showAlert('Participante removido do time.', 'success');
+            } else {
+                showAlert(response.message || 'Erro ao remover participante.', 'danger');
+            }
+        },
+        error: function() {
+            showAlert('Erro ao remover participante do time.', 'danger');
+        }
+    });
 }
 
 // Sistema de seleção e troca por clique
@@ -3239,12 +3788,12 @@ function editarTimes() {
 
 // Função para mostrar/ocultar campo de quantidade de grupos
 function toggleQuantidadeGrupos() {
-    if ($('#modalidade_todos_chaves').is(':checked')) {
+    if ($('#modalidade_todos_chaves').is(':checked') && !$('#modalidade_todos_chaves').prop('disabled')) {
         $('#divQuantidadeGrupos').show();
-        $('#quantidade_grupos').prop('required', true);
+        $('input[name="quantidade_grupos"]').prop('required', true);
     } else {
         $('#divQuantidadeGrupos').hide();
-        $('#quantidade_grupos').prop('required', false);
+        $('input[name="quantidade_grupos"]').prop('required', false);
     }
 }
 
@@ -3359,9 +3908,15 @@ $('#formModalidadeTorneio').on('submit', function(e) {
     
     // Validar quantidade de grupos se for modalidade todos_chaves
     if ($('#modalidade_todos_chaves').is(':checked')) {
-        const quantidadeGrupos = parseInt($('#quantidade_grupos').val());
-        if (!quantidadeGrupos || quantidadeGrupos < 2) {
-            showAlert('A quantidade de chaves deve ser no mínimo 2', 'danger');
+        const quantidadeGrupos = $('input[name="quantidade_grupos"]:checked').val();
+        if (!quantidadeGrupos) {
+            showAlert('Selecione a quantidade de chaves', 'danger');
+            return;
+        }
+        
+        // Verificar se o radio está desabilitado (número ímpar de times)
+        if ($('#modalidade_todos_chaves').prop('disabled')) {
+            showAlert('Não é possível criar chaves com número ímpar de times', 'danger');
             return;
         }
     }
@@ -3392,6 +3947,32 @@ $('#formModalidadeTorneio').on('submit', function(e) {
 // Função para iniciar jogos (gerar todos contra todos)
 function iniciarJogos() {
     if (!confirm('Isso gerará todos os jogos de enfrentamento entre os times. Deseja continuar?')) return;
+    
+    // Recolher as seções de Informações, Configurações e Formato
+    recolherSecoesTorneio();
+    
+    // Verificar se é modalidade todos_chaves e validar quantidade de times
+    const modalidade = '<?php echo $torneio['modalidade'] ?? ''; ?>';
+    const quantidadeGrupos = $('input[name="quantidade_grupos"]:checked').val() || <?php echo (int)($torneio['quantidade_grupos'] ?? 0); ?>;
+    const quantidadeTimes = <?php echo $quantidade_times_db > 0 ? $quantidade_times_db : (int)($torneio['quantidade_times'] ?? 0); ?>;
+    
+    if (modalidade === 'todos_chaves' && quantidadeGrupos > 0) {
+        // Verificar se o radio está desabilitado (número ímpar de times)
+        if ($('#modalidade_todos_chaves').prop('disabled')) {
+            showAlert('Não é possível criar chaves com número ímpar de times', 'danger');
+            return;
+        }
+        
+        // Verificar se a quantidade de times é divisível pela quantidade de chaves
+        if (quantidadeTimes % quantidadeGrupos !== 0) {
+            showAlert(
+                'A quantidade total de times (' + quantidadeTimes + ') não é divisível pela quantidade de chaves (' + quantidadeGrupos + ').\n\n' +
+                'Para criar chaves, a quantidade de times deve ser divisível pela quantidade de chaves.',
+                'danger'
+            );
+            return;
+        }
+    }
     
     $.ajax({
         url: '../ajax/iniciar_jogos_torneio.php',
@@ -3464,14 +4045,10 @@ function salvarResultadoPartidaInline(partidaId) {
             if (response.success) {
                 showAlert(response.message, 'success');
                 
-                // Desabilitar campos novamente
-                $('#pontos_time1_' + partidaId).prop('disabled', true);
-                $('#pontos_time2_' + partidaId).prop('disabled', true);
+                // Bloquear campos novamente (disabled e readonly)
+                $('#pontos_time1_' + partidaId).prop('disabled', true).prop('readonly', true);
+                $('#pontos_time2_' + partidaId).prop('disabled', true).prop('readonly', true);
                 $('#status_' + partidaId).prop('disabled', true);
-                
-                // Tornar readonly pois está finalizada
-                $('#pontos_time1_' + partidaId).prop('readonly', true);
-                $('#pontos_time2_' + partidaId).prop('readonly', true);
                 
                 // Esconder botão salvar e mostrar editar
                 $('#btn_salvar_' + partidaId).hide();
@@ -4064,9 +4641,93 @@ function encerrarTorneio() {
     });
 }
 
+// Função para calcular participantes necessários
+function calcularParticipantesNecessarios() {
+    const tipoTime = document.getElementById('tipo_time');
+    const quantidadeTimes = parseInt(document.getElementById('quantidade_times').value) || 0;
+    const integrantesInput = document.getElementById('integrantes_por_time');
+    const maxParticipantesInput = document.getElementById('max_participantes');
+    const infoParticipantes = document.getElementById('info_participantes_necessarios');
+    const participantesNecessarios = document.getElementById('participantes_necessarios');
+    
+    if (tipoTime && tipoTime.value) {
+        const selectedOption = tipoTime.options[tipoTime.selectedIndex];
+        const integrantes = parseInt(selectedOption.getAttribute('data-integrantes')) || 0;
+        
+        // Atualizar campo oculto
+        if (integrantesInput) {
+            integrantesInput.value = integrantes;
+        }
+        
+        // Calcular e atualizar quantidade máxima de participantes
+        if (quantidadeTimes > 0 && integrantes > 0) {
+            const totalNecessario = quantidadeTimes * integrantes;
+            
+            // Atualizar campo de quantidade máxima de participantes
+            if (maxParticipantesInput) {
+                maxParticipantesInput.value = totalNecessario;
+            }
+            
+            // Atualizar texto de participantes necessários
+            if (participantesNecessarios) {
+                participantesNecessarios.textContent = totalNecessario;
+            }
+            if (infoParticipantes) {
+                infoParticipantes.style.display = 'block';
+            }
+        } else {
+            if (maxParticipantesInput) {
+                maxParticipantesInput.value = 0;
+            }
+            if (infoParticipantes) {
+                infoParticipantes.style.display = 'none';
+            }
+        }
+    } else {
+        if (integrantesInput) {
+            integrantesInput.value = '';
+        }
+        if (maxParticipantesInput) {
+            maxParticipantesInput.value = 0;
+        }
+        if (infoParticipantes) {
+            infoParticipantes.style.display = 'none';
+        }
+    }
+}
+
+// Calcular ao carregar a página
+$(document).ready(function() {
+    calcularParticipantesNecessarios();
+});
+
 // Formulário configurar torneio (inclui participantes, times, etc)
 $('#formConfigTorneio').on('submit', function(e) {
     e.preventDefault();
+    
+    // Garantir que integrantes_por_time está atualizado antes de enviar
+    calcularParticipantesNecessarios();
+    
+    // Garantir que integrantes_por_time está preenchido
+    const tipoTime = $('#tipo_time').val();
+    const integrantesPorTime = $('#integrantes_por_time').val();
+    const quantidadeTimes = $('#quantidade_times').val();
+    
+    if (!tipoTime) {
+        showAlert('Selecione o tipo de time', 'danger');
+        return;
+    }
+    
+    if (!integrantesPorTime || integrantesPorTime <= 0) {
+        showAlert('Erro: Tipo de time não configurado corretamente. Recarregue a página e tente novamente.', 'danger');
+        return;
+    }
+    
+    if (!quantidadeTimes || quantidadeTimes < 2) {
+        showAlert('Informe a quantidade de times (mínimo 2)', 'danger');
+        return;
+    }
+    
     $.ajax({
         url: '../ajax/configurar_torneio.php',
         method: 'POST',

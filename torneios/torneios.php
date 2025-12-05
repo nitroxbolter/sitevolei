@@ -287,24 +287,6 @@ include '../includes/header.php';
                             </select>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="quantidade_participantes" class="form-label">Quantidade de Participantes *</label>
-                        <input type="number" class="form-control" id="quantidade_participantes" name="quantidade_participantes" 
-                               min="2" required placeholder="Ex: 16, 20, 24...">
-                        <small class="text-muted">Defina quantas pessoas participarão do torneio</small>
-                    </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="inscricoes_abertas" name="inscricoes_abertas" value="1">
-                            <label class="form-check-label" for="inscricoes_abertas">
-                                <strong>Abrir para inscrições</strong>
-                            </label>
-                        </div>
-                        <small class="text-muted">
-                            <i class="fas fa-info-circle me-1"></i>
-                            Se marcado, os usuários poderão solicitar participação no torneio através da página de visualização.
-                        </small>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>

@@ -106,20 +106,28 @@ try {
             $class2 = ['vitorias' => 0, 'derrotas' => 0, 'empates' => 0, 'pontos_pro' => 0, 'pontos_contra' => 0];
         }
         
-        // Recalcular todas as estatísticas do torneio
+        // Recalcular todas as estatísticas do torneio (incluindo jogos eliminatórios)
+        // Usar UNION para combinar dados de torneio_partidas e torneio_chaves_times
         $sql_recalc = "SELECT 
             tc.time_id,
-            COUNT(CASE WHEN tp.vencedor_id = tc.time_id THEN 1 END) as vitorias,
-            COUNT(CASE WHEN tp.vencedor_id IS NOT NULL AND tp.vencedor_id != tc.time_id AND (tp.time1_id = tc.time_id OR tp.time2_id = tc.time_id) THEN 1 END) as derrotas,
-            COUNT(CASE WHEN tp.vencedor_id IS NULL AND tp.status = 'Finalizada' AND (tp.time1_id = tc.time_id OR tp.time2_id = tc.time_id) THEN 1 END) as empates,
-            SUM(CASE WHEN tp.time1_id = tc.time_id THEN tp.pontos_time1 ELSE 0 END) + 
-            SUM(CASE WHEN tp.time2_id = tc.time_id THEN tp.pontos_time2 ELSE 0 END) as pontos_pro,
-            SUM(CASE WHEN tp.time1_id = tc.time_id THEN tp.pontos_time2 ELSE 0 END) + 
-            SUM(CASE WHEN tp.time2_id = tc.time_id THEN tp.pontos_time1 ELSE 0 END) as pontos_contra
+            COUNT(CASE WHEN jogo.vencedor_id = tc.time_id THEN 1 END) as vitorias,
+            COUNT(CASE WHEN jogo.vencedor_id IS NOT NULL AND jogo.vencedor_id != tc.time_id AND (jogo.time1_id = tc.time_id OR jogo.time2_id = tc.time_id) THEN 1 END) as derrotas,
+            COUNT(CASE WHEN jogo.vencedor_id IS NULL AND jogo.status = 'Finalizada' AND (jogo.time1_id = tc.time_id OR jogo.time2_id = tc.time_id) THEN 1 END) as empates,
+            SUM(CASE WHEN jogo.time1_id = tc.time_id THEN jogo.pontos_time1 ELSE 0 END) + 
+            SUM(CASE WHEN jogo.time2_id = tc.time_id THEN jogo.pontos_time2 ELSE 0 END) as pontos_pro,
+            SUM(CASE WHEN jogo.time1_id = tc.time_id THEN jogo.pontos_time2 ELSE 0 END) + 
+            SUM(CASE WHEN jogo.time2_id = tc.time_id THEN jogo.pontos_time1 ELSE 0 END) as pontos_contra
         FROM torneio_classificacao tc
-        LEFT JOIN torneio_partidas tp ON (tp.time1_id = tc.time_id OR tp.time2_id = tc.time_id) 
-            AND tp.torneio_id = tc.torneio_id 
-            AND tp.status = 'Finalizada'
+        LEFT JOIN (
+            SELECT time1_id, time2_id, vencedor_id, pontos_time1, pontos_time2, status, torneio_id
+            FROM torneio_partidas
+            WHERE status = 'Finalizada'
+            UNION ALL
+            SELECT time1_id, time2_id, vencedor_id, pontos_time1, pontos_time2, status, torneio_id
+            FROM torneio_chaves_times
+            WHERE status = 'Finalizada'
+        ) jogo ON (jogo.time1_id = tc.time_id OR jogo.time2_id = tc.time_id) 
+            AND jogo.torneio_id = tc.torneio_id
         WHERE tc.torneio_id = ?
         GROUP BY tc.time_id";
         

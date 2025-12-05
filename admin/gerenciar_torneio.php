@@ -191,9 +191,12 @@ include '../includes/header.php';
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informações do Torneio</h5>
+                <div class="d-flex align-items-center gap-2" style="cursor: pointer;" onclick="toggleSecaoInformacoes()">
+                    <i class="fas fa-chevron-down" id="iconeSecaoInformacoes"></i>
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informações do Torneio</h5>
+                </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="corpoSecaoInformacoes">
                 <div class="row">
                     <div class="col-md-3">
                         <strong>Data:</strong><br>
@@ -234,9 +237,12 @@ include '../includes/header.php';
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Configurações do Torneio</h5>
+                <div class="d-flex align-items-center gap-2" style="cursor: pointer;" onclick="toggleSecaoConfiguracoes()">
+                    <i class="fas fa-chevron-down" id="iconeSecaoConfiguracoes"></i>
+                    <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Configurações do Torneio</h5>
+                </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="corpoSecaoConfiguracoes">
                 <form id="formConfigTorneio">
                     <input type="hidden" name="torneio_id" value="<?php echo $torneio_id; ?>">
                     <div class="row">
@@ -802,6 +808,8 @@ let timeAtualNumero = null;
 let maxParticipantesTorneio = <?php echo (int)($torneio['quantidade_participantes'] ?? $torneio['max_participantes'] ?? 0); ?>;
 let totalParticipantesAtual = <?php echo count($participantes); ?>;
 let listaParticipantesExpandida = false; // Começa fechada
+let secaoInformacoesExpandida = true; // Começa expandida
+let secaoConfiguracoesExpandida = true; // Começa expandida
 
 // Estilos CSS para drag and drop
 const style = document.createElement('style');
@@ -860,6 +868,44 @@ function toggleListaParticipantes() {
             icone.classList.remove('fa-chevron-right');
             icone.classList.add('fa-chevron-down');
             listaParticipantesExpandida = true;
+        }
+    }
+}
+
+function toggleSecaoInformacoes() {
+    const corpo = document.getElementById('corpoSecaoInformacoes');
+    const icone = document.getElementById('iconeSecaoInformacoes');
+    
+    if (corpo && icone) {
+        if (secaoInformacoesExpandida) {
+            corpo.style.display = 'none';
+            icone.classList.remove('fa-chevron-down');
+            icone.classList.add('fa-chevron-right');
+            secaoInformacoesExpandida = false;
+        } else {
+            corpo.style.display = 'block';
+            icone.classList.remove('fa-chevron-right');
+            icone.classList.add('fa-chevron-down');
+            secaoInformacoesExpandida = true;
+        }
+    }
+}
+
+function toggleSecaoConfiguracoes() {
+    const corpo = document.getElementById('corpoSecaoConfiguracoes');
+    const icone = document.getElementById('iconeSecaoConfiguracoes');
+    
+    if (corpo && icone) {
+        if (secaoConfiguracoesExpandida) {
+            corpo.style.display = 'none';
+            icone.classList.remove('fa-chevron-down');
+            icone.classList.add('fa-chevron-right');
+            secaoConfiguracoesExpandida = false;
+        } else {
+            corpo.style.display = 'block';
+            icone.classList.remove('fa-chevron-right');
+            icone.classList.add('fa-chevron-down');
+            secaoConfiguracoesExpandida = true;
         }
     }
 }
@@ -1123,23 +1169,47 @@ function adicionarParticipanteAoTimeSelecionado(participanteId, nome, foto) {
             }
         });
     } else {
-        // Se o time ainda não existe, apenas adicionar ao DOM (será salvo quando clicar em Salvar Times)
-        const participanteHtml = criarHtmlParticipante(participanteId, nome, foto);
-        timeContainer.insertAdjacentHTML('beforeend', participanteHtml);
-        
-        // Atualizar visibilidade do botão
-        if (timeNumero) {
-            atualizarVisibilidadeBotaoAdicionar(timeNumero);
-        }
-        
-        // Remover da lista de disponíveis no modal (mesmo que não esteja salvo ainda)
-        const modalBody = document.querySelector('#modalAdicionarIntegrante .modal-body');
-        if (modalBody) {
-            const itemParticipante = modalBody.querySelector('[onclick*="' + participanteId + '"]');
-            if (itemParticipante) {
-                itemParticipante.remove();
+        // Se o time ainda não existe, criar o time primeiro e depois adicionar o participante
+        $.ajax({
+            url: '../ajax/adicionar_integrante_time.php',
+            method: 'POST',
+            data: {
+                time_id: 0,
+                participante_id: parseInt(participanteId),
+                torneio_id: <?php echo $torneio_id; ?>,
+                time_numero: parseInt(timeNumero)
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    // Atualizar o data-time-id do card com o ID retornado
+                    if (response.time_id && timeCard) {
+                        timeCard.setAttribute('data-time-id', response.time_id);
+                        // Atualizar o ID do container também
+                        timeContainer.id = 'time-' + response.time_id;
+                    }
+                    
+                    // Adicionar participante ao DOM
+                    const participanteHtml = criarHtmlParticipante(participanteId, nome, foto);
+                    timeContainer.insertAdjacentHTML('beforeend', participanteHtml);
+                    
+                    // Atualizar visibilidade do botão
+                    if (timeNumero) {
+                        atualizarVisibilidadeBotaoAdicionar(timeNumero);
+                    }
+                    
+                    // Recarregar lista de participantes disponíveis no modal
+                    recarregarListaParticipantesDisponiveis();
+                    
+                    showAlert('Participante adicionado ao time!', 'success');
+                } else {
+                    showAlert(response.message || 'Erro ao adicionar participante.', 'danger');
+                }
+            },
+            error: function() {
+                showAlert('Erro ao adicionar participante ao time.', 'danger');
             }
-        }
+        });
     }
 }
 

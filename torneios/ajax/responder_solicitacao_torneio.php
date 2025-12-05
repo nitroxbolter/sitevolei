@@ -51,31 +51,99 @@ $sql_check_status = "SELECT status FROM torneio_solicitacoes WHERE id = ?";
 $stmt_check_status = executeQuery($pdo, $sql_check_status, [$solicitacao_id]);
 $status_atual = $stmt_check_status ? $stmt_check_status->fetch()['status'] : null;
 
+// Se a solicitação não está pendente, verificar se o usuário ainda está participando
+// Se não estiver, permitir aprovar novamente (usuário foi removido e solicitou novamente)
 if (empty($status_atual) || trim($status_atual) !== 'Pendente') {
-    echo json_encode(['success' => false, 'message' => 'Esta solicitação já foi respondida.']);
-    exit();
+    // Verificar se o usuário ainda está participando do torneio
+    $sql_check_participante = "SELECT id FROM torneio_participantes WHERE torneio_id = ? AND usuario_id = ?";
+    $stmt_check_participante = executeQuery($pdo, $sql_check_participante, [$solicitacao['torneio_id'], $solicitacao['usuario_id']]);
+    $ainda_participa = $stmt_check_participante && $stmt_check_participante->fetch();
+    
+    if ($ainda_participa) {
+        // Usuário ainda está participando, não pode aprovar novamente
+        echo json_encode(['success' => false, 'message' => 'Esta solicitação já foi respondida e o usuário já está participando do torneio.']);
+        exit();
+    } else {
+        // Usuário foi removido, permitir aprovar novamente
+        // Atualizar o status para Pendente para permitir a aprovação
+        $sql_reset = "UPDATE torneio_solicitacoes SET status = 'Pendente' WHERE id = ?";
+        executeQuery($pdo, $sql_reset, [$solicitacao_id]);
+        $status_atual = 'Pendente';
+    }
 }
 
 $pdo->beginTransaction();
 try {
+    // Verificar quais colunas existem na tabela e criar as que faltam
+    $columnsQuery = $pdo->query("SHOW COLUMNS FROM torneio_solicitacoes");
+    $columns = $columnsQuery->fetchAll(PDO::FETCH_COLUMN);
+    $tem_data_resposta = in_array('data_resposta', $columns);
+    $tem_respondido_por = in_array('respondido_por', $columns);
+    
+    // Criar colunas que faltam
+    if (!$tem_data_resposta) {
+        try {
+            $pdo->exec("ALTER TABLE torneio_solicitacoes ADD COLUMN data_resposta timestamp NULL DEFAULT NULL");
+            $tem_data_resposta = true;
+            error_log("Coluna data_resposta criada na tabela torneio_solicitacoes");
+        } catch (Exception $e) {
+            error_log("Erro ao criar coluna data_resposta: " . $e->getMessage());
+        }
+    }
+    
+    if (!$tem_respondido_por) {
+        try {
+            $pdo->exec("ALTER TABLE torneio_solicitacoes ADD COLUMN respondido_por int(11) DEFAULT NULL");
+            $tem_respondido_por = true;
+            error_log("Coluna respondido_por criada na tabela torneio_solicitacoes");
+        } catch (Exception $e) {
+            error_log("Erro ao criar coluna respondido_por: " . $e->getMessage());
+        }
+    }
+    
     // Verificar novamente o status dentro da transação para evitar race condition
     $sql_check_status_trans = "SELECT status FROM torneio_solicitacoes WHERE id = ? FOR UPDATE";
     $stmt_check_status_trans = executeQuery($pdo, $sql_check_status_trans, [$solicitacao_id]);
     $status_trans = $stmt_check_status_trans ? $stmt_check_status_trans->fetch()['status'] : null;
     
+    // Se não está pendente, verificar se usuário ainda participa
     if (empty($status_trans) || trim($status_trans) !== 'Pendente') {
-        $pdo->rollBack();
-        echo json_encode(['success' => false, 'message' => 'Esta solicitação já foi respondida.']);
-        exit();
+        $sql_check_participante_trans = "SELECT id FROM torneio_participantes WHERE torneio_id = ? AND usuario_id = ?";
+        $stmt_check_participante_trans = executeQuery($pdo, $sql_check_participante_trans, [$solicitacao['torneio_id'], $solicitacao['usuario_id']]);
+        $ainda_participa_trans = $stmt_check_participante_trans && $stmt_check_participante_trans->fetch();
+        
+        if ($ainda_participa_trans) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Esta solicitação já foi respondida e o usuário já está participando do torneio.']);
+            exit();
+        } else {
+            // Usuário foi removido, resetar status para permitir aprovação
+            $sql_reset_trans = "UPDATE torneio_solicitacoes SET status = 'Pendente' WHERE id = ?";
+            executeQuery($pdo, $sql_reset_trans, [$solicitacao_id]);
+            $status_trans = 'Pendente';
+        }
     }
     
     $novo_status = $acao === 'aprovar' ? 'Aprovada' : 'Rejeitada';
     
+    // Montar SQL de atualização baseado nas colunas existentes
+    $sql_update = "UPDATE torneio_solicitacoes SET status = ?";
+    $valores_update = [$novo_status];
+    
+    if ($tem_data_resposta) {
+        $sql_update .= ", data_resposta = NOW()";
+    }
+    
+    if ($tem_respondido_por) {
+        $sql_update .= ", respondido_por = ?";
+        $valores_update[] = $_SESSION['user_id'];
+    }
+    
+    $sql_update .= " WHERE id = ? AND status = 'Pendente'";
+    $valores_update[] = $solicitacao_id;
+    
     // Atualizar solicitação
-    $sql_update = "UPDATE torneio_solicitacoes 
-                   SET status = ?, data_resposta = NOW(), respondido_por = ?
-                   WHERE id = ? AND status = 'Pendente'";
-    $stmt_update = executeQuery($pdo, $sql_update, [$novo_status, $_SESSION['user_id'], $solicitacao_id]);
+    $stmt_update = executeQuery($pdo, $sql_update, $valores_update);
     
     // Verificar se a atualização foi bem-sucedida
     if (!$stmt_update || $stmt_update->rowCount() === 0) {

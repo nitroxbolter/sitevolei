@@ -254,12 +254,6 @@ include 'includes/header.php';
                             </select>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="quantidade_participantes" class="form-label">Quantidade de Participantes *</label>
-                        <input type="number" class="form-control" id="quantidade_participantes" name="quantidade_participantes" 
-                               min="2" required placeholder="Ex: 16, 20, 24...">
-                        <small class="text-muted">Defina quantas pessoas participarão do torneio</small>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>

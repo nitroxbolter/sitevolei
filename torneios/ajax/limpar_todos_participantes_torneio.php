@@ -50,6 +50,11 @@ if ($total_participantes == 0) {
     exit();
 }
 
+// Buscar todos os usuario_id dos participantes antes de remover para enviar notificações
+$sql_usuarios = "SELECT DISTINCT usuario_id FROM torneio_participantes WHERE torneio_id = ? AND usuario_id IS NOT NULL";
+$stmt_usuarios = executeQuery($pdo, $sql_usuarios, [$torneio_id]);
+$usuarios_removidos = $stmt_usuarios ? $stmt_usuarios->fetchAll(PDO::FETCH_COLUMN) : [];
+
 // Iniciar transação
 $pdo->beginTransaction();
 
@@ -67,6 +72,30 @@ try {
     $pdo->commit();
     
     if ($result) {
+        // Enviar notificações para todos os usuários removidos
+        if (!empty($usuarios_removidos)) {
+            try {
+                $st = executeQuery($pdo, "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notificacoes'");
+                if ($st && $st->fetch()) {
+                    $titulo = 'Você foi removido do torneio';
+                    $msg = 'Você foi removido do torneio "' . htmlspecialchars($torneio['nome']) . '" pelo administrador.';
+                    
+                    foreach ($usuarios_removidos as $usuario_id) {
+                        if ($usuario_id > 0) {
+                            try {
+                                executeQuery($pdo, "INSERT INTO notificacoes (usuario_id, titulo, mensagem, lida) VALUES (?, ?, ?, 0)", [$usuario_id, $titulo, $msg]);
+                            } catch (Exception $e) {
+                                error_log("Erro ao criar notificação para usuário {$usuario_id}: " . $e->getMessage());
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                // Erro ao criar notificações não deve impedir a remoção
+                error_log("Erro ao criar notificações de remoção: " . $e->getMessage());
+            }
+        }
+        
         echo json_encode([
             'success' => true, 
             'message' => "Todos os participantes ({$total_participantes}) foram removidos com sucesso!"

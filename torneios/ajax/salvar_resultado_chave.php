@@ -88,6 +88,96 @@ try {
                    WHERE id = ?";
     executeQuery($pdo, $sql_update, [$pontos_time1, $pontos_time2, $vencedor_id, $status, $chave_id]);
     
+    // Se a chave foi finalizada, atualizar classificação
+    if ($status === 'Finalizada') {
+        // Buscar classificação atual dos times
+        $sql_class1 = "SELECT * FROM torneio_classificacao WHERE torneio_id = ? AND time_id = ?";
+        $stmt_class1 = executeQuery($pdo, $sql_class1, [$chave['torneio_id'], $chave['time1_id']]);
+        $class1 = $stmt_class1 ? $stmt_class1->fetch() : false;
+        
+        $sql_class2 = "SELECT * FROM torneio_classificacao WHERE torneio_id = ? AND time_id = ?";
+        $stmt_class2 = executeQuery($pdo, $sql_class2, [$chave['torneio_id'], $chave['time2_id']]);
+        $class2 = $stmt_class2 ? $stmt_class2->fetch() : false;
+        
+        // Se não existir, criar
+        if (!$class1 && $chave['time1_id']) {
+            $sql_insert = "INSERT INTO torneio_classificacao (torneio_id, time_id, vitorias, derrotas, empates, pontos_pro, pontos_contra, saldo_pontos, average, pontos_total)
+                          VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0.00, 0)";
+            executeQuery($pdo, $sql_insert, [$chave['torneio_id'], $chave['time1_id']]);
+        }
+        
+        if (!$class2 && $chave['time2_id']) {
+            $sql_insert = "INSERT INTO torneio_classificacao (torneio_id, time_id, vitorias, derrotas, empates, pontos_pro, pontos_contra, saldo_pontos, average, pontos_total)
+                          VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0.00, 0)";
+            executeQuery($pdo, $sql_insert, [$chave['torneio_id'], $chave['time2_id']]);
+        }
+        
+        // Recalcular todas as estatísticas do torneio (incluindo jogos eliminatórios)
+        // Usar UNION para combinar dados de torneio_partidas e torneio_chaves_times
+        $sql_recalc = "SELECT 
+            tc.time_id,
+            COUNT(CASE WHEN jogo.vencedor_id = tc.time_id THEN 1 END) as vitorias,
+            COUNT(CASE WHEN jogo.vencedor_id IS NOT NULL AND jogo.vencedor_id != tc.time_id AND (jogo.time1_id = tc.time_id OR jogo.time2_id = tc.time_id) THEN 1 END) as derrotas,
+            COUNT(CASE WHEN jogo.vencedor_id IS NULL AND jogo.status = 'Finalizada' AND (jogo.time1_id = tc.time_id OR jogo.time2_id = tc.time_id) THEN 1 END) as empates,
+            SUM(CASE WHEN jogo.time1_id = tc.time_id THEN jogo.pontos_time1 ELSE 0 END) + 
+            SUM(CASE WHEN jogo.time2_id = tc.time_id THEN jogo.pontos_time2 ELSE 0 END) as pontos_pro,
+            SUM(CASE WHEN jogo.time1_id = tc.time_id THEN jogo.pontos_time2 ELSE 0 END) + 
+            SUM(CASE WHEN jogo.time2_id = tc.time_id THEN jogo.pontos_time1 ELSE 0 END) as pontos_contra
+        FROM torneio_classificacao tc
+        LEFT JOIN (
+            SELECT time1_id, time2_id, vencedor_id, pontos_time1, pontos_time2, status, torneio_id
+            FROM torneio_partidas
+            WHERE status = 'Finalizada'
+            UNION ALL
+            SELECT time1_id, time2_id, vencedor_id, pontos_time1, pontos_time2, status, torneio_id
+            FROM torneio_chaves_times
+            WHERE status = 'Finalizada'
+        ) jogo ON (jogo.time1_id = tc.time_id OR jogo.time2_id = tc.time_id) 
+            AND jogo.torneio_id = tc.torneio_id
+        WHERE tc.torneio_id = ?
+        GROUP BY tc.time_id";
+        
+        $stmt_recalc = executeQuery($pdo, $sql_recalc, [$chave['torneio_id']]);
+        $recalcs = $stmt_recalc ? $stmt_recalc->fetchAll() : [];
+        
+        foreach ($recalcs as $recalc) {
+            $saldo = (int)$recalc['pontos_pro'] - (int)$recalc['pontos_contra'];
+            $average = (int)$recalc['pontos_contra'] > 0 ? (float)$recalc['pontos_pro'] / (float)$recalc['pontos_contra'] : ((int)$recalc['pontos_pro'] > 0 ? 999.99 : 0.00);
+            $pontos_total = ((int)$recalc['vitorias'] * 3) + ((int)$recalc['empates'] * 1);
+            
+            $sql_update_class = "UPDATE torneio_classificacao 
+                                SET vitorias = ?, derrotas = ?, empates = ?, 
+                                    pontos_pro = ?, pontos_contra = ?, saldo_pontos = ?, 
+                                    average = ?, pontos_total = ?
+                                WHERE torneio_id = ? AND time_id = ?";
+            executeQuery($pdo, $sql_update_class, [
+                (int)$recalc['vitorias'],
+                (int)$recalc['derrotas'],
+                (int)$recalc['empates'],
+                (int)$recalc['pontos_pro'],
+                (int)$recalc['pontos_contra'],
+                $saldo,
+                $average,
+                $pontos_total,
+                $chave['torneio_id'],
+                $recalc['time_id']
+            ]);
+        }
+        
+        // Atualizar posições
+        $sql_pos = "SELECT time_id FROM torneio_classificacao 
+                   WHERE torneio_id = ? 
+                   ORDER BY pontos_total DESC, vitorias DESC, average DESC, saldo_pontos DESC";
+        $stmt_pos = executeQuery($pdo, $sql_pos, [$chave['torneio_id']]);
+        $posicoes = $stmt_pos ? $stmt_pos->fetchAll() : [];
+        
+        $posicao = 1;
+        foreach ($posicoes as $pos) {
+            $sql_update_pos = "UPDATE torneio_classificacao SET posicao = ? WHERE torneio_id = ? AND time_id = ?";
+            executeQuery($pdo, $sql_update_pos, [$posicao++, $chave['torneio_id'], $pos['time_id']]);
+        }
+    }
+    
     // Se a chave foi finalizada e tem vencedor, atualizar próxima fase
     if ($status === 'Finalizada' && $vencedor_id) {
         // Se for semi-final, atualizar final ou 3º lugar
