@@ -399,6 +399,11 @@ footer h5 {
 /* Main Content */
 .main-content {
     min-height: calc(100vh - 200px);
+    padding-top: 80px; /* Espaçamento para compensar navbar fixo */
+}
+
+.main-content .container {
+    padding-top: 1rem !important;
 }
 
 /* Custom Scrollbar */

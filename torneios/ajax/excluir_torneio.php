@@ -16,8 +16,38 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $torneio_id = (int)($_POST['torneio_id'] ?? 0);
+$debug_ids = [
+    'post' => $_POST['torneio_id'] ?? null,
+    'get' => $_GET['torneio_id'] ?? null,
+    'request' => $_REQUEST['torneio_id'] ?? null
+];
+
+// Fallback: tentar obter do raw input (JSON ou querystring)
 if ($torneio_id <= 0) {
-    echo json_encode(['success' => false, 'message' => 'Torneio inválido.']);
+    $raw = file_get_contents('php://input');
+    if ($raw) {
+        $parsed = json_decode($raw, true);
+        if (is_array($parsed) && isset($parsed['torneio_id'])) {
+            $torneio_id = (int)$parsed['torneio_id'];
+            $debug_ids['raw_json'] = $parsed['torneio_id'];
+        } else {
+            parse_str($raw, $parsed_qs);
+            if (isset($parsed_qs['torneio_id'])) {
+                $torneio_id = (int)$parsed_qs['torneio_id'];
+                $debug_ids['raw_qs'] = $parsed_qs['torneio_id'];
+            }
+        }
+    }
+}
+
+if ($torneio_id <= 0) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Torneio inválido.',
+        'debug' => [
+            'ids_recebidos' => $debug_ids
+        ]
+    ]);
     exit();
 }
 

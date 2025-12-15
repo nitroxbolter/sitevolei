@@ -15,13 +15,56 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-$torneio_id = (int)($_POST['torneio_id'] ?? 0);
+// Capturar torneio_id de múltiplas fontes para garantir que seja encontrado
+$torneio_id = 0;
+if (isset($_POST['torneio_id']) && $_POST['torneio_id'] > 0) {
+    $torneio_id = (int)$_POST['torneio_id'];
+} elseif (isset($_GET['torneio_id']) && $_GET['torneio_id'] > 0) {
+    $torneio_id = (int)$_GET['torneio_id'];
+} elseif (isset($_REQUEST['torneio_id']) && $_REQUEST['torneio_id'] > 0) {
+    $torneio_id = (int)$_REQUEST['torneio_id'];
+} else {
+    // Tentar pegar do raw input (JSON)
+    $rawInput = file_get_contents('php://input');
+    if ($rawInput) {
+        $parsed = json_decode($rawInput, true);
+        if (isset($parsed['torneio_id']) && $parsed['torneio_id'] > 0) {
+            $torneio_id = (int)$parsed['torneio_id'];
+        }
+    }
+}
+
 $max_participantes = isset($_POST['max_participantes']) ? (int)$_POST['max_participantes'] : null;
 $quantidade_times = isset($_POST['quantidade_times']) ? (int)$_POST['quantidade_times'] : null;
-$integrantes_por_time = isset($_POST['integrantes_por_time']) ? (int)$_POST['integrantes_por_time'] : null;
+$integrantes_por_time = isset($_POST['integrantes_por_time']) && $_POST['integrantes_por_time'] !== '' ? (int)$_POST['integrantes_por_time'] : null;
+
+// Debug sempre (para identificar o problema)
+error_log("=== DEBUG CONFIGURAR TORNEIO ===");
+error_log("POST completo: " . print_r($_POST, true));
+error_log("GET completo: " . print_r($_GET, true));
+error_log("REQUEST completo: " . print_r($_REQUEST, true));
+error_log("torneio_id capturado: " . $torneio_id);
+error_log("max_participantes: " . ($max_participantes ?? 'null'));
+error_log("quantidade_times: " . ($quantidade_times ?? 'null'));
+error_log("integrantes_por_time: " . ($integrantes_por_time ?? 'null'));
 
 if ($torneio_id <= 0) {
-    echo json_encode(['success' => false, 'message' => 'Torneio inválido.']);
+    $rawInput = file_get_contents('php://input');
+    error_log("Raw input: " . $rawInput);
+    
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Torneio inválido. ID não foi encontrado ou é inválido.',
+        'error_code' => 'TORNEIO_ID_INVALIDO',
+        'debug' => [
+            'post_completo' => $_POST,
+            'get_completo' => $_GET,
+            'request_completo' => $_REQUEST,
+            'torneio_id_recebido' => $torneio_id,
+            'raw_input' => $rawInput,
+            'sugestao' => 'Verifique se o campo hidden torneio_id está presente no formulário e se está sendo enviado corretamente.'
+        ]
+    ]);
     exit();
 }
 
@@ -33,7 +76,16 @@ $sql = "SELECT t.*, g.administrador_id
 $stmt = executeQuery($pdo, $sql, [$torneio_id]);
 $torneio = $stmt ? $stmt->fetch() : false;
 if (!$torneio) {
-    echo json_encode(['success' => false, 'message' => 'Torneio não encontrado.']);
+    error_log("Configurar torneio - Torneio não encontrado no banco. ID buscado: " . $torneio_id);
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Torneio não encontrado no banco de dados.',
+        'error_code' => 'TORNEIO_NAO_ENCONTRADO',
+        'debug' => [
+            'torneio_id_buscado' => $torneio_id,
+            'sugestao' => 'Verifique se o torneio existe e se você tem permissão para editá-lo.'
+        ]
+    ]);
     exit();
 }
 

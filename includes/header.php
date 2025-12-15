@@ -94,7 +94,49 @@
                 <ul class="navbar-nav">
                     <?php if (isLoggedIn()): ?>
                         <?php
-                        $usuario = getUserById($pdo, $_SESSION['user_id']);
+                        // Verificar se $pdo está disponível
+                        $pdo_disponivel = isset($pdo) && $pdo instanceof PDO;
+                        
+                        // Se $pdo não estiver disponível, tentar incluir db_connect novamente
+                        if (!$pdo_disponivel) {
+                            // Tentar diferentes caminhos possíveis
+                            $possible_paths = [
+                                dirname(__DIR__) . '/includes/db_connect.php',
+                                __DIR__ . '/db_connect.php',
+                                '../includes/db_connect.php',
+                                '../../includes/db_connect.php'
+                            ];
+                            foreach ($possible_paths as $db_connect_path) {
+                                if (file_exists($db_connect_path)) {
+                                    require_once $db_connect_path;
+                                    $pdo_disponivel = isset($pdo) && $pdo instanceof PDO;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Garantir que temos um user_id válido na sessão
+                        $user_id_session = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+                        $usuario = false;
+                        
+                        if ($user_id_session > 0 && $pdo_disponivel) {
+                            $usuario = getUserById($pdo, $user_id_session);
+                            
+                            // Se não encontrou o usuário (pode estar inativo), tentar buscar sem filtro de ativo
+                            if (!$usuario || !is_array($usuario)) {
+                                $sql_fallback = "SELECT * FROM usuarios WHERE id = ?";
+                                $stmt_fallback = executeQuery($pdo, $sql_fallback, [$user_id_session]);
+                                if ($stmt_fallback) {
+                                    $usuario = $stmt_fallback->fetch();
+                                    $stmt_fallback->closeCursor();
+                                }
+                            }
+                        }
+                        
+                        // Se ainda não encontrou, usar valores padrão
+                        if (!$usuario || !is_array($usuario)) {
+                            $usuario = ['nome' => 'Usuário', 'reputacao' => 0];
+                        }
                         // Contagem de notificações não lidas (se tabela existir)
                         $notifCount = 0;
                         try {
@@ -105,7 +147,7 @@
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="fas fa-user me-1"></i>
-                                <?php echo htmlspecialchars($usuario['nome']); ?>
+                                <?php echo htmlspecialchars($usuario['nome'] ?? 'Usuário'); ?>
                                 <?php 
                                     $repHeader = (int)($usuario['reputacao'] ?? 0);
                                     $repHeaderClass = 'bg-danger';
@@ -157,7 +199,7 @@
     
     <!-- Conteúdo principal -->
     <main class="main-content">
-        <div class="container mt-5 pt-4">
+        <div class="container mt-5 pt-5">
             <?php if (isset($_SESSION['mensagem'])): ?>
                 <div class="alert alert-<?php echo $_SESSION['tipo_mensagem']; ?> alert-dismissible fade show" role="alert">
                     <?php echo $_SESSION['mensagem']; ?>

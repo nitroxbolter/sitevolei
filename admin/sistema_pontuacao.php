@@ -219,12 +219,17 @@ include '../includes/header.php';
                                                     <span class="badge bg-info"><?php echo $totalPontos; ?> jogadores</span>
                                                 </td>
                                                 <td>
-                                                    <button class="btn btn-sm btn-primary" onclick="abrirModalPontos(<?php echo $jogo['id']; ?>, <?php echo $jogo['numero_jogo']; ?>)">
-                                                        <i class="fas fa-edit me-1"></i>Gerenciar Pontos
-                                                    </button>
-                                                    <button class="btn btn-sm btn-danger" onclick="excluirJogo(<?php echo $jogo['id']; ?>)">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
+                                                    <div class="btn-group" role="group">
+                                                        <button class="btn btn-sm btn-primary" onclick="abrirModalPontos(<?php echo $jogo['id']; ?>, <?php echo $jogo['numero_jogo']; ?>)" title="Gerenciar Pontos">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-info" onclick="abrirModalParticipantes(<?php echo $jogo['id']; ?>, <?php echo $jogo['numero_jogo']; ?>)" title="Gerenciar Participantes">
+                                                            <i class="fas fa-users"></i>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-danger" onclick="excluirJogo(<?php echo $jogo['id']; ?>)" title="Excluir Jogo">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -343,6 +348,11 @@ include '../includes/header.php';
                             <i class="fas fa-users me-1"></i>Times
                         </button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="participantes-tab" data-bs-toggle="tab" data-bs-target="#participantes" type="button" role="tab">
+                            <i class="fas fa-user-friends me-1"></i>Participantes
+                        </button>
+                    </li>
                 </ul>
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="pontos" role="tabpanel">
@@ -360,6 +370,24 @@ include '../includes/header.php';
                             </div>
                             <div id="listaTimes">
                                 <p class="text-muted">Carregando times...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="participantes" role="tabpanel">
+                        <div id="formParticipantes">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="mb-3">Participantes do Jogo</h6>
+                                    <div id="listaParticipantesJogo" class="border rounded p-3" style="max-height: 400px; overflow-y: auto;">
+                                        <p class="text-muted">Carregando participantes...</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="mb-3">Membros Disponíveis do Grupo</h6>
+                                    <div id="listaMembrosDisponiveis" class="border rounded p-3" style="max-height: 400px; overflow-y: auto;">
+                                        <p class="text-muted">Carregando membros...</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -498,8 +526,182 @@ function abrirModalPontos(jogoId, numeroJogo) {
     // Carregar times
     carregarTimes(jogoId);
     
+    // Carregar participantes
+    carregarParticipantes(jogoId);
+    
     const modal = new bootstrap.Modal(document.getElementById('modalGerenciarPontos'));
     modal.show();
+}
+
+function abrirModalParticipantes(jogoId, numeroJogo) {
+    jogoAtualId = jogoId;
+    
+    // Abrir modal primeiro
+    const modal = new bootstrap.Modal(document.getElementById('modalGerenciarPontos'));
+    modal.show();
+    
+    // Aguardar o modal abrir completamente antes de ativar a aba
+    setTimeout(function() {
+        document.getElementById('numeroJogoModal').textContent = numeroJogo;
+        
+        // Ativar aba de participantes
+        const participantesTab = document.getElementById('participantes-tab');
+        if (participantesTab) {
+            const tab = new bootstrap.Tab(participantesTab);
+            tab.show();
+        }
+        
+        // Carregar participantes
+        carregarParticipantes(jogoId);
+    }, 300);
+}
+
+function carregarParticipantes(jogoId) {
+    // Carregar participantes do jogo
+    $.ajax({
+        url: '../ajax/listar_participantes_jogo_pontuacao.php',
+        method: 'GET',
+        data: { jogo_id: jogoId },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                let html = '';
+                if (response.participantes.length === 0) {
+                    html = '<p class="text-muted mb-0">Nenhum participante no jogo.</p>';
+                } else {
+                    response.participantes.forEach(function(participante) {
+                        var avatar = '../assets/arquivos/logo.png';
+                        if (participante.foto_perfil) {
+                            var foto = participante.foto_perfil;
+                            if (foto.indexOf('http') === 0 || foto.indexOf('/') === 0) {
+                                avatar = foto;
+                            } else if (foto.indexOf('assets/') === 0) {
+                                avatar = '../' + foto;
+                            } else {
+                                avatar = '../assets/arquivos/' + foto;
+                            }
+                        }
+                        
+                        html += '<div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">';
+                        html += '<div class="d-flex align-items-center gap-2">';
+                        html += '<img src="' + avatar + '" class="rounded-circle" width="32" height="32" style="object-fit:cover;">';
+                        html += '<span><strong>' + participante.nome + '</strong></span>';
+                        html += '</div>';
+                        html += '<button class="btn btn-sm btn-danger" onclick="removerParticipanteJogo(' + participante.usuario_id + ')">';
+                        html += '<i class="fas fa-times"></i> Remover';
+                        html += '</button>';
+                        html += '</div>';
+                    });
+                }
+                document.getElementById('listaParticipantesJogo').innerHTML = html;
+            } else {
+                document.getElementById('listaParticipantesJogo').innerHTML = '<p class="text-danger">Erro ao carregar participantes</p>';
+            }
+        },
+        error: function() {
+            document.getElementById('listaParticipantesJogo').innerHTML = '<p class="text-danger">Erro ao carregar participantes</p>';
+        }
+    });
+    
+    // Carregar membros disponíveis
+    $.ajax({
+        url: '../ajax/listar_membros_disponiveis_jogo_pontuacao.php',
+        method: 'GET',
+        data: { jogo_id: jogoId, grupo_id: <?php echo $grupo_id; ?> },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                let html = '';
+                if (response.membros.length === 0) {
+                    html = '<p class="text-muted mb-0">Todos os membros já são participantes.</p>';
+                } else {
+                    response.membros.forEach(function(membro) {
+                        var avatar = '../assets/arquivos/logo.png';
+                        if (membro.foto_perfil) {
+                            var foto = membro.foto_perfil;
+                            if (foto.indexOf('http') === 0 || foto.indexOf('/') === 0) {
+                                avatar = foto;
+                            } else if (foto.indexOf('assets/') === 0) {
+                                avatar = '../' + foto;
+                            } else {
+                                avatar = '../assets/arquivos/' + foto;
+                            }
+                        }
+                        
+                        html += '<div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">';
+                        html += '<div class="d-flex align-items-center gap-2">';
+                        html += '<img src="' + avatar + '" class="rounded-circle" width="32" height="32" style="object-fit:cover;">';
+                        html += '<span><strong>' + membro.nome + '</strong></span>';
+                        html += '</div>';
+                        html += '<button class="btn btn-sm btn-success" onclick="adicionarParticipanteJogo(' + membro.id + ')">';
+                        html += '<i class="fas fa-plus"></i> Adicionar';
+                        html += '</button>';
+                        html += '</div>';
+                    });
+                }
+                document.getElementById('listaMembrosDisponiveis').innerHTML = html;
+            } else {
+                document.getElementById('listaMembrosDisponiveis').innerHTML = '<p class="text-danger">Erro ao carregar membros</p>';
+            }
+        },
+        error: function() {
+            document.getElementById('listaMembrosDisponiveis').innerHTML = '<p class="text-danger">Erro ao carregar membros</p>';
+        }
+    });
+}
+
+function adicionarParticipanteJogo(usuarioId) {
+    if (!confirm('Deseja adicionar este membro como participante do jogo?')) return;
+    
+    $.ajax({
+        url: '../ajax/adicionar_participante_jogo_pontuacao.php',
+        method: 'POST',
+        data: {
+            jogo_id: jogoAtualId,
+            usuario_id: usuarioId
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                showAlert(response.message, 'success');
+                carregarParticipantes(jogoAtualId);
+                // Recarregar pontos também para atualizar a lista
+                abrirModalPontos(jogoAtualId, document.getElementById('numeroJogoModal').textContent);
+            } else {
+                showAlert(response.message, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('Erro ao adicionar participante', 'danger');
+        }
+    });
+}
+
+function removerParticipanteJogo(usuarioId) {
+    if (!confirm('Deseja remover este participante do jogo? Os pontos registrados serão mantidos, mas o participante não aparecerá mais na lista.')) return;
+    
+    $.ajax({
+        url: '../ajax/remover_participante_jogo_pontuacao.php',
+        method: 'POST',
+        data: {
+            jogo_id: jogoAtualId,
+            usuario_id: usuarioId
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                showAlert(response.message, 'success');
+                carregarParticipantes(jogoAtualId);
+                // Recarregar pontos também para atualizar a lista
+                abrirModalPontos(jogoAtualId, document.getElementById('numeroJogoModal').textContent);
+            } else {
+                showAlert(response.message, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('Erro ao remover participante', 'danger');
+        }
+    });
 }
 
 function carregarTimes(jogoId) {

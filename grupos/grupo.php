@@ -125,6 +125,11 @@ include '../includes/header.php';
                     <i class="fas fa-trophy me-1"></i>Classificação
                 </a>
             <?php endif; ?>
+            <?php if ($usuario_e_membro || $usuario_e_admin): ?>
+                <a href="jogos_grupo.php?grupo_id=<?php echo $grupo_id; ?>" class="btn btn-success">
+                    <i class="fas fa-volleyball-ball me-1"></i>Jogos do Grupo
+                </a>
+            <?php endif; ?>
             <?php if ($usuario_e_membro && !$usuario_e_admin): ?>
                 <button class="btn btn-outline-danger" onclick="sairDoGrupo(<?php echo $grupo_id; ?>)">
                     <i class="fas fa-sign-out-alt me-1"></i>Sair do Grupo

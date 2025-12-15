@@ -94,8 +94,8 @@ error_log("Torneio ID: $torneio_id - Total de times válidos: " . count($times) 
 $modalidade = $torneio['modalidade'];
 $quantidade_grupos = $torneio['quantidade_grupos'] ?? null;
 
-// Se for modalidade todos_chaves, validar quantidade de grupos
-if ($modalidade === 'todos_chaves') {
+// Se for modalidade todos_chaves ou torneio_pro, validar quantidade de grupos
+if ($modalidade === 'todos_chaves' || $modalidade === 'torneio_pro') {
     if (!$quantidade_grupos || $quantidade_grupos < 2) {
         echo json_encode(['success' => false, 'message' => 'Configure a quantidade de chaves na modalidade.']);
         exit();
@@ -161,14 +161,33 @@ if (!$tabela_existe) {
     exit();
 }
 
+// Verificar se a coluna quadra existe na tabela torneio_partidas
+$columnsQuery = $pdo->query("SHOW COLUMNS FROM torneio_partidas LIKE 'quadra'");
+$tem_coluna_quadra = $columnsQuery && $columnsQuery->rowCount() > 0;
+
+if (!$tem_coluna_quadra) {
+    // Adicionar coluna quadra
+    try {
+        $pdo->exec("ALTER TABLE torneio_partidas ADD COLUMN quadra INT(11) DEFAULT NULL AFTER grupo_id");
+    } catch (Exception $e) {
+        error_log("Erro ao adicionar coluna quadra: " . $e->getMessage());
+    }
+}
+
+// Buscar quantidade de quadras do torneio
+$quantidade_quadras = (int)($torneio['quantidade_quadras'] ?? 1);
+if ($quantidade_quadras < 1) {
+    $quantidade_quadras = 1;
+}
+
 $pdo->beginTransaction();
 
 try {
     $total_times = count($times);
     $grupos_criados = [];
     
-    // Se for modalidade todos_chaves, criar grupos e dividir times
-    if ($modalidade === 'todos_chaves') {
+    // Se for modalidade todos_chaves ou torneio_pro, verificar se grupos já foram definidos
+    if ($modalidade === 'todos_chaves' || $modalidade === 'torneio_pro') {
         // Verificar se tabelas de grupos existem
         $columnsQuery = $pdo->query("SHOW TABLES LIKE 'torneio_grupos'");
         $tabela_grupos_existe = $columnsQuery && $columnsQuery->rowCount() > 0;
@@ -177,38 +196,74 @@ try {
             throw new Exception('Estrutura de grupos não configurada. Execute o script SQL primeiro.');
         }
         
-        // Limpar grupos existentes (se houver)
-        $sql_limpar_grupos = "DELETE FROM torneio_grupo_times WHERE grupo_id IN (SELECT id FROM torneio_grupos WHERE torneio_id = ?)";
-        executeQuery($pdo, $sql_limpar_grupos, [$torneio_id]);
-        $sql_limpar = "DELETE FROM torneio_grupos WHERE torneio_id = ?";
-        executeQuery($pdo, $sql_limpar, [$torneio_id]);
+        // Verificar se grupos já foram definidos manualmente
+        $sql_grupos_existentes = "SELECT tg.id, tg.nome, tg.ordem, COUNT(tgt.time_id) as total_times
+                                   FROM torneio_grupos tg
+                                   LEFT JOIN torneio_grupo_times tgt ON tgt.grupo_id = tg.id
+                                   WHERE tg.torneio_id = ?
+                                   GROUP BY tg.id, tg.nome, tg.ordem
+                                   ORDER BY tg.ordem ASC";
+        $stmt_grupos = executeQuery($pdo, $sql_grupos_existentes, [$torneio_id]);
+        $grupos_existentes = $stmt_grupos ? $stmt_grupos->fetchAll(PDO::FETCH_ASSOC) : [];
         
-        // Criar grupos (chaves)
-        for ($g = 1; $g <= $quantidade_grupos; $g++) {
-            $sql_grupo = "INSERT INTO torneio_grupos (torneio_id, nome, ordem) VALUES (?, ?, ?)";
-            executeQuery($pdo, $sql_grupo, [$torneio_id, "Chave " . $g, $g]);
-            $grupo_id = $pdo->lastInsertId();
-            $grupos_criados[] = ['id' => $grupo_id, 'nome' => "Chave " . $g, 'ordem' => $g];
-        }
+        // Verificar se há grupos com times já definidos
+        $grupos_com_times = array_filter($grupos_existentes, function($g) {
+            return (int)$g['total_times'] > 0;
+        });
         
-        // Dividir times igualmente entre os grupos
-        $times_por_grupo = floor($total_times / $quantidade_grupos);
-        $times_restantes = $total_times % $quantidade_grupos;
-        
-        $indice_time = 0;
-        foreach ($grupos_criados as $grupo) {
-            // Calcular quantos times vão para este grupo
-            $qtd_times_grupo = $times_por_grupo;
-            if ($times_restantes > 0) {
-                $qtd_times_grupo++;
-                $times_restantes--;
+        if (!empty($grupos_com_times)) {
+            // Grupos já foram definidos manualmente, usar os existentes
+            error_log("Grupos já definidos manualmente. Usando grupos existentes.");
+            foreach ($grupos_existentes as $grupo) {
+                $grupos_criados[] = [
+                    'id' => (int)$grupo['id'],
+                    'nome' => $grupo['nome'],
+                    'ordem' => (int)$grupo['ordem']
+                ];
+            }
+        } else {
+            // Grupos não foram definidos, criar automaticamente
+            error_log("Grupos não definidos. Criando automaticamente.");
+            
+            // Limpar grupos existentes vazios (se houver)
+            $sql_limpar_grupos = "DELETE FROM torneio_grupo_times WHERE grupo_id IN (SELECT id FROM torneio_grupos WHERE torneio_id = ?)";
+            executeQuery($pdo, $sql_limpar_grupos, [$torneio_id]);
+            $sql_limpar = "DELETE FROM torneio_grupos WHERE torneio_id = ?";
+            executeQuery($pdo, $sql_limpar, [$torneio_id]);
+            
+            // Função para converter número em letra (1 -> A, 2 -> B, etc.)
+            $numeroParaLetra = function($numero) {
+                return chr(64 + $numero); // 65 = 'A', 66 = 'B', etc.
+            };
+            
+            // Criar grupos
+            for ($g = 1; $g <= $quantidade_grupos; $g++) {
+                $letra_grupo = $numeroParaLetra($g);
+                $sql_grupo = "INSERT INTO torneio_grupos (torneio_id, nome, ordem) VALUES (?, ?, ?)";
+                executeQuery($pdo, $sql_grupo, [$torneio_id, "Grupo " . $letra_grupo, $g]);
+                $grupo_id = $pdo->lastInsertId();
+                $grupos_criados[] = ['id' => $grupo_id, 'nome' => "Grupo " . $letra_grupo, 'ordem' => $g];
             }
             
-            // Adicionar times ao grupo
-            for ($t = 0; $t < $qtd_times_grupo && $indice_time < $total_times; $t++) {
-                $sql_add_time = "INSERT INTO torneio_grupo_times (grupo_id, time_id) VALUES (?, ?)";
-                executeQuery($pdo, $sql_add_time, [$grupo['id'], $times[$indice_time]['id']]);
-                $indice_time++;
+            // Dividir times igualmente entre os grupos
+            $times_por_grupo = floor($total_times / $quantidade_grupos);
+            $times_restantes = $total_times % $quantidade_grupos;
+            
+            $indice_time = 0;
+            foreach ($grupos_criados as $grupo) {
+                // Calcular quantos times vão para este grupo
+                $qtd_times_grupo = $times_por_grupo;
+                if ($times_restantes > 0) {
+                    $qtd_times_grupo++;
+                    $times_restantes--;
+                }
+                
+                // Adicionar times ao grupo
+                for ($t = 0; $t < $qtd_times_grupo && $indice_time < $total_times; $t++) {
+                    $sql_add_time = "INSERT INTO torneio_grupo_times (grupo_id, time_id) VALUES (?, ?)";
+                    executeQuery($pdo, $sql_add_time, [$grupo['id'], $times[$indice_time]['id']]);
+                    $indice_time++;
+                }
             }
         }
     }
@@ -241,7 +296,7 @@ try {
                 ];
             }
         }
-    } else if ($modalidade === 'todos_chaves') {
+    } else if ($modalidade === 'todos_chaves' || $modalidade === 'torneio_pro') {
         // Todos contra todos dentro de cada grupo
         foreach ($grupos_criados as $grupo) {
             // Buscar times do grupo
@@ -274,8 +329,19 @@ try {
         $partidas_por_grupo[$grupo_key][] = $partida;
     }
     
-    // Para cada grupo (ou geral), distribuir em rodadas
+        // Para cada grupo (ou geral), distribuir em rodadas
     $partidas_inseridas = 0;
+    
+    // Mapear grupos para quadras (se houver grupos)
+    $grupos_para_quadras = [];
+    if (($modalidade === 'todos_chaves' || $modalidade === 'torneio_pro') && !empty($grupos_criados)) {
+        // Distribuir quadras entre os grupos/chaves
+        foreach ($grupos_criados as $index => $grupo) {
+            $quadra_atribuida = ($index % $quantidade_quadras) + 1;
+            $grupos_para_quadras[$grupo['id']] = $quadra_atribuida;
+        }
+    }
+    
     foreach ($partidas_por_grupo as $grupo_key => $partidas_grupo) {
         // Calcular quantos times estão neste grupo
         $times_grupo = [];
@@ -339,6 +405,20 @@ try {
         // Inserir partidas nas rodadas
         foreach ($rodadas as $rodada_num => $partidas_rodada) {
             foreach ($partidas_rodada as $partida) {
+                // Atribuir quadra baseada no grupo/chave
+                $quadra_atribuida = null;
+                if ($quantidade_quadras > 1) {
+                    if (($modalidade === 'todos_chaves' || $modalidade === 'torneio_pro') && isset($partida['grupo_id']) && isset($grupos_para_quadras[$partida['grupo_id']])) {
+                        // Se for modalidade com chaves, usar a quadra atribuída ao grupo
+                        $quadra_atribuida = $grupos_para_quadras[$partida['grupo_id']];
+                    } else {
+                        // Se for todos contra todos sem chaves, distribuir sequencialmente
+                        // Mas como não há grupos, vamos usar um contador geral
+                        static $contador_quadra_geral = 0;
+                        $quadra_atribuida = ($contador_quadra_geral % $quantidade_quadras) + 1;
+                        $contador_quadra_geral++;
+                    }
+                }
                 // Validar IDs antes de inserir
                 $time1_id = (int)($partida['time1_id'] ?? 0);
                 $time2_id = (int)($partida['time2_id'] ?? 0);
@@ -374,7 +454,29 @@ try {
                 // Usar grupo_id da partida (pode ser null para todos_contra_todos)
                 $grupo_id_inserir = isset($partida['grupo_id']) && $partida['grupo_id'] !== null ? $partida['grupo_id'] : null;
                 
-                if ($grupo_id_column_exists) {
+                // Verificar se a coluna quadra existe
+                static $quadra_column_exists = null;
+                if ($quadra_column_exists === null) {
+                    try {
+                        $check_quadra = $pdo->query("SHOW COLUMNS FROM torneio_partidas LIKE 'quadra'");
+                        $quadra_column_exists = $check_quadra && $check_quadra->rowCount() > 0;
+                    } catch (Exception $e) {
+                        $quadra_column_exists = false;
+                    }
+                }
+                
+                if ($grupo_id_column_exists && $quadra_column_exists) {
+                    $sql_insert = "INSERT INTO torneio_partidas (torneio_id, time1_id, time2_id, fase, rodada, grupo_id, quadra, status) 
+                                  VALUES (?, ?, ?, 'Grupos', ?, ?, ?, 'Agendada')";
+                    $params_insert = [
+                        $torneio_id, 
+                        $time1_id, 
+                        $time2_id, 
+                        $rodada_num,
+                        $grupo_id_inserir,
+                        $quadra_atribuida
+                    ];
+                } elseif ($grupo_id_column_exists) {
                     $sql_insert = "INSERT INTO torneio_partidas (torneio_id, time1_id, time2_id, fase, rodada, grupo_id, status) 
                                   VALUES (?, ?, ?, 'Grupos', ?, ?, 'Agendada')";
                     $params_insert = [
@@ -384,8 +486,18 @@ try {
                         $rodada_num,
                         $grupo_id_inserir
                     ];
+                } elseif ($quadra_column_exists) {
+                    $sql_insert = "INSERT INTO torneio_partidas (torneio_id, time1_id, time2_id, fase, rodada, quadra, status) 
+                                  VALUES (?, ?, ?, 'Grupos', ?, ?, 'Agendada')";
+                    $params_insert = [
+                        $torneio_id, 
+                        $time1_id, 
+                        $time2_id, 
+                        $rodada_num,
+                        $quadra_atribuida
+                    ];
                 } else {
-                    // Se a coluna não existe, inserir sem grupo_id
+                    // Se nenhuma das colunas existe, inserir sem grupo_id e sem quadra
                     $sql_insert = "INSERT INTO torneio_partidas (torneio_id, time1_id, time2_id, fase, rodada, status) 
                                   VALUES (?, ?, ?, 'Grupos', ?, 'Agendada')";
                     $params_insert = [
@@ -413,11 +525,45 @@ try {
     }
     
     // Inicializar classificação para todos os times
+    // Verificar se a coluna grupo_id existe na tabela torneio_classificacao
+    $columnsQuery = $pdo->query("SHOW COLUMNS FROM torneio_classificacao LIKE 'grupo_id'");
+    $tem_grupo_id_classificacao = $columnsQuery && $columnsQuery->rowCount() > 0;
+    
+    if (!$tem_grupo_id_classificacao) {
+        try {
+            $pdo->exec("ALTER TABLE torneio_classificacao ADD COLUMN grupo_id INT(11) DEFAULT NULL AFTER time_id");
+        } catch (Exception $e) {
+            error_log("Erro ao adicionar coluna grupo_id em torneio_classificacao: " . $e->getMessage());
+        }
+    }
+    
+    // Buscar grupo_id de cada time se for modalidade com chaves
+    $times_por_grupo = [];
+    if ($modalidade === 'todos_chaves' || $modalidade === 'torneio_pro') {
+        foreach ($grupos_criados as $grupo) {
+            $sql_times_grupo = "SELECT time_id FROM torneio_grupo_times WHERE grupo_id = ?";
+            $stmt_times_grupo = executeQuery($pdo, $sql_times_grupo, [$grupo['id']]);
+            $times_grupo_ids = $stmt_times_grupo ? $stmt_times_grupo->fetchAll(PDO::FETCH_COLUMN) : [];
+            foreach ($times_grupo_ids as $time_id_grupo) {
+                $times_por_grupo[$time_id_grupo] = $grupo['id'];
+            }
+        }
+    }
+    
     foreach ($times as $time) {
-        $sql_class = "INSERT INTO torneio_classificacao (torneio_id, time_id, vitorias, derrotas, empates, pontos_pro, pontos_contra, saldo_pontos, average, pontos_total)
-                     VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0.00, 0)
-                     ON DUPLICATE KEY UPDATE time_id = time_id";
-        executeQuery($pdo, $sql_class, [$torneio_id, $time['id']]);
+        $grupo_id_time = $times_por_grupo[$time['id']] ?? null;
+        
+        if ($tem_grupo_id_classificacao && $grupo_id_time) {
+            $sql_class = "INSERT INTO torneio_classificacao (torneio_id, time_id, grupo_id, vitorias, derrotas, empates, pontos_pro, pontos_contra, saldo_pontos, average, pontos_total)
+                         VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0.00, 0)
+                         ON DUPLICATE KEY UPDATE time_id = time_id, grupo_id = ?";
+            executeQuery($pdo, $sql_class, [$torneio_id, $time['id'], $grupo_id_time, $grupo_id_time]);
+        } else {
+            $sql_class = "INSERT INTO torneio_classificacao (torneio_id, time_id, vitorias, derrotas, empates, pontos_pro, pontos_contra, saldo_pontos, average, pontos_total)
+                         VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0.00, 0)
+                         ON DUPLICATE KEY UPDATE time_id = time_id";
+            executeQuery($pdo, $sql_class, [$torneio_id, $time['id']]);
+        }
     }
     
     $pdo->commit();

@@ -179,9 +179,6 @@ include '../includes/header.php';
             <a href="../torneios.php" class="btn btn-outline-primary">
                 <i class="fas fa-arrow-left me-1"></i>Voltar
             </a>
-            <button class="btn btn-danger" onclick="excluirTorneio(<?php echo $torneio_id; ?>)">
-                <i class="fas fa-trash me-1"></i>Excluir Torneio
-            </button>
         </div>
     </div>
 </div>
@@ -190,43 +187,91 @@ include '../includes/header.php';
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center gap-2" style="cursor: pointer;" onclick="toggleSecaoInformacoes()">
                     <i class="fas fa-chevron-down" id="iconeSecaoInformacoes"></i>
                     <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informações do Torneio</h5>
                 </div>
+                <button class="btn btn-sm btn-primary" id="btnEditarInformacoes" onclick="event.stopPropagation(); editarInformacoesTorneio();">
+                    <i class="fas fa-edit me-1"></i>Editar
+                </button>
             </div>
             <div class="card-body" id="corpoSecaoInformacoes">
-                <div class="row">
-                    <div class="col-md-3">
-                        <strong>Data:</strong><br>
-                        <?php 
-                        $dataTorneio = $torneio['data_torneio'] ?? $torneio['data_inicio'] ?? '';
-                        echo $dataTorneio ? date('d/m/Y', strtotime($dataTorneio)) : 'N/A';
-                        ?>
-                    </div>
-                    <div class="col-md-3">
-                        <strong>Tipo:</strong><br>
-                        <?php 
-                        if (isset($torneio['tipo'])) {
-                            echo $torneio['tipo'] === 'grupo' ? 'Torneio do Grupo' : 'Torneio Avulso';
-                        } else {
-                            echo $torneio['grupo_id'] ? 'Torneio do Grupo' : 'Torneio Avulso';
-                        }
-                        ?>
-                    </div>
-                    <div class="col-md-3">
-                        <strong>Grupo:</strong><br>
-                        <?php echo $torneio['grupo_nome'] ? htmlspecialchars($torneio['grupo_nome']) : 'N/A'; ?>
-                    </div>
-                    <div class="col-md-3">
-                        <strong>Participantes:</strong><br>
-                        <?php 
-                        $maxParticipantes = $torneio['quantidade_participantes'] ?? $torneio['max_participantes'] ?? 0;
-                        echo count($participantes); ?> / <?php echo (int)$maxParticipantes; 
-                        ?>
+                <!-- Display das informações (modo visualização) -->
+                <div id="displayInformacoesTorneio">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <strong>Nome do Torneio:</strong><br>
+                            <?php echo htmlspecialchars($torneio['nome']); ?>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <strong>Data:</strong><br>
+                            <?php 
+                            $dataTorneio = $torneio['data_torneio'] ?? $torneio['data_inicio'] ?? '';
+                            echo $dataTorneio ? date('d/m/Y', strtotime($dataTorneio)) : 'N/A';
+                            ?>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <strong>Descrição:</strong><br>
+                            <?php echo htmlspecialchars($torneio['descricao'] ?? 'N/A'); ?>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <strong>Quantidade Máxima de Participantes:</strong><br>
+                            <?php 
+                            $maxParticipantes = $torneio['max_participantes'] ?? $torneio['quantidade_participantes'] ?? 0;
+                            echo (int)$maxParticipantes;
+                            ?><br>
+                            <small class="text-muted">Atual: <?php echo count($participantes); ?> participantes</small>
+                        </div>
                     </div>
                 </div>
+                
+                <!-- Formulário de edição inline -->
+                <form id="formEditarInformacoesTorneio" style="display: none;">
+                    <input type="hidden" name="torneio_id" value="<?php echo $torneio_id; ?>">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_nome_torneio_inline" class="form-label"><strong>Nome do Torneio:</strong></label>
+                            <input type="text" class="form-control" id="edit_nome_torneio_inline" name="nome" 
+                                   value="<?php echo htmlspecialchars($torneio['nome']); ?>" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_data_torneio_inline" class="form-label"><strong>Data do Torneio:</strong></label>
+                            <input type="date" class="form-control" id="edit_data_torneio_inline" name="data_torneio" 
+                                   value="<?php 
+                                   $dataTorneio = $torneio['data_torneio'] ?? $torneio['data_inicio'] ?? '';
+                                   echo $dataTorneio ? date('Y-m-d', strtotime($dataTorneio)) : '';
+                                   ?>" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_descricao_torneio_inline" class="form-label"><strong>Descrição:</strong></label>
+                            <textarea class="form-control" id="edit_descricao_torneio_inline" name="descricao" rows="3"><?php echo htmlspecialchars($torneio['descricao'] ?? ''); ?></textarea>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_max_participantes_inline" class="form-label"><strong>Quantidade Máxima de Participantes:</strong></label>
+                            <?php 
+                            $quantidadeTimes = (int)($torneio['quantidade_times'] ?? 0);
+                            $integrantesPorTime = (int)($torneio['integrantes_por_time'] ?? 0);
+                            $maxParticipantesCalculado = ($quantidadeTimes > 0 && $integrantesPorTime > 0) ? ($quantidadeTimes * $integrantesPorTime) : 0;
+                            $maxParticipantesInicial = $maxParticipantesCalculado > 0 ? $maxParticipantesCalculado : (int)($torneio['max_participantes'] ?? $torneio['quantidade_participantes'] ?? 0);
+                            ?>
+                            <input type="number" class="form-control" id="edit_max_participantes_inline" name="max_participantes" 
+                                   min="1" value="<?php echo $maxParticipantesInicial; ?>" required>
+                            <small class="text-muted">Atual: <?php echo count($participantes); ?> participantes</small>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="fas fa-save me-1"></i>Salvar
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="cancelarEdicaoInformacoes()">
+                                <i class="fas fa-times me-1"></i>Cancelar
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="excluirTorneio(<?php echo $torneio_id; ?>);">
+                                <i class="fas fa-trash me-1"></i>Excluir Torneio
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -775,6 +820,103 @@ if ($quantidadeTimes > 0):
 </div>
 
 <script>
+// Definir funções globalmente ANTES de qualquer uso
+let valoresOriginaisFormulario = {}; // Para armazenar os valores originais ao iniciar a edição
+
+// Função para habilitar/desabilitar edição inline das informações do torneio
+function editarInformacoesTorneio() {
+    console.log('editarInformacoesTorneio chamada');
+    const display = document.getElementById('displayInformacoesTorneio');
+    const form = document.getElementById('formEditarInformacoesTorneio');
+    const btnEditar = document.getElementById('btnEditarInformacoes');
+
+    console.log('Elementos encontrados:', { display: !!display, form: !!form, btnEditar: !!btnEditar });
+
+    if (display && form && btnEditar) {
+        // Armazenar valores originais
+        valoresOriginaisFormulario = {
+            nome: form.querySelector('#edit_nome_torneio_inline').value,
+            data_torneio: form.querySelector('#edit_data_torneio_inline').value,
+            descricao: form.querySelector('#edit_descricao_torneio_inline').value,
+            max_participantes: form.querySelector('#edit_max_participantes_inline').value
+        };
+
+        display.style.display = 'none';
+        form.style.display = 'block';
+        btnEditar.style.display = 'none'; // Ocultar botão editar enquanto edita
+        console.log('Edição ativada com sucesso');
+    } else {
+        console.error('Elementos de display ou formulário não encontrados para edição inline.', {
+            display: display,
+            form: form,
+            btnEditar: btnEditar
+        });
+    }
+}
+
+// Garantir que a função esteja disponível globalmente
+window.editarInformacoesTorneio = editarInformacoesTorneio;
+
+// Função para cancelar edição
+function cancelarEdicaoInformacoes() {
+    const display = document.getElementById('displayInformacoesTorneio');
+    const form = document.getElementById('formEditarInformacoesTorneio');
+    const btnEditar = document.getElementById('btnEditarInformacoes');
+
+    if (display && form && btnEditar) {
+        // Restaurar valores originais
+        form.querySelector('#edit_nome_torneio_inline').value = valoresOriginaisFormulario.nome || '';
+        form.querySelector('#edit_data_torneio_inline').value = valoresOriginaisFormulario.data_torneio || '';
+        form.querySelector('#edit_descricao_torneio_inline').value = valoresOriginaisFormulario.descricao || '';
+        form.querySelector('#edit_max_participantes_inline').value = valoresOriginaisFormulario.max_participantes || '';
+
+        // Limpar validações e mensagens de erro
+        $(form).find('.is-invalid').removeClass('is-invalid');
+        $(form).find('.invalid-feedback').remove();
+        $(form).removeClass('was-validated'); // Remover classe de validação do Bootstrap
+
+        // Reabilitar botão de submit se estiver desabilitado
+        $(form).find('button[type="submit"]').prop('disabled', false).html('<i class="fas fa-save me-1"></i>Salvar');
+
+        form.style.display = 'none';
+        display.style.display = 'block';
+        btnEditar.style.display = 'inline-block'; // Mostrar botão editar novamente
+    } else {
+        console.error('Elementos de display ou formulário não encontrados para cancelar edição inline.');
+    }
+}
+
+// Garantir que a função esteja disponível globalmente
+window.cancelarEdicaoInformacoes = cancelarEdicaoInformacoes;
+
+// Função para excluir torneio
+function excluirTorneio(torneioId) {
+    if (!confirm('Tem certeza que deseja excluir este torneio?\n\nEsta ação não pode ser desfeita e excluirá todos os participantes e times associados.')) return;
+    
+    $.ajax({
+        url: '../ajax/excluir_torneio.php',
+        method: 'POST',
+        data: { torneio_id: torneioId },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                showAlert(response.message, 'success');
+                setTimeout(function() {
+                    window.location.href = '../torneios.php';
+                }, 1000);
+            } else {
+                showAlert(response.message, 'danger');
+            }
+        },
+        error: function() {
+            showAlert('Erro ao excluir torneio', 'danger');
+        }
+    });
+}
+
+// Garantir que a função esteja disponível globalmente
+window.excluirTorneio = excluirTorneio;
+
 // Fallback para showAlert
 if (typeof showAlert === 'undefined') {
     function showAlert(message, type) {
@@ -1918,29 +2060,7 @@ function excluirTime(timeId) {
     });
 }
 
-function excluirTorneio(torneioId) {
-    if (!confirm('Tem certeza que deseja excluir este torneio?\n\nEsta ação não pode ser desfeita e excluirá todos os participantes e times associados.')) return;
-    
-    $.ajax({
-        url: '../ajax/excluir_torneio.php',
-        method: 'POST',
-        data: { torneio_id: torneioId },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                showAlert(response.message, 'success');
-                setTimeout(function() {
-                    window.location.href = '../torneios.php';
-                }, 1000);
-            } else {
-                showAlert(response.message, 'danger');
-            }
-        },
-        error: function() {
-            showAlert('Erro ao excluir torneio', 'danger');
-        }
-    });
-}
+// Função excluirTorneio já está definida no IIFE acima
 
 // Formulário adicionar participante
 $('#formAdicionarParticipante').on('submit', function(e) {
@@ -2001,6 +2121,51 @@ $(document).on('change', '.participante-checkbox', function() {
         checkboxMarcarTodos.checked = (totalMarcados === totalCheckboxes && totalCheckboxes > 0);
         checkboxMarcarTodos.indeterminate = (totalMarcados > 0 && totalMarcados < totalCheckboxes);
     }
+});
+
+// Formulário editar informações do torneio (inline)
+$('#formEditarInformacoesTorneio').on('submit', function(e) {
+    e.preventDefault();
+    
+    const form = $(this);
+    const btnSubmit = form.find('button[type="submit"]');
+    const originalText = btnSubmit.html();
+    
+    // Desabilitar botão durante o envio
+    btnSubmit.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>Salvando...');
+    
+    $.ajax({
+        url: '../torneios/ajax/editar_torneio.php',
+        method: 'POST',
+        data: form.serialize(),
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                showAlert(response.message, 'success');
+                // Atualizar display com novos valores
+                const display = document.getElementById('displayInformacoesTorneio');
+                if (display) {
+                    // Recarregar a página para mostrar os dados atualizados
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    // Se não recarregar, ocultar formulário e mostrar display
+                    form.hide();
+                    document.getElementById('displayInformacoesTorneio').style.display = 'block';
+                    document.getElementById('btnEditarInformacoes').style.display = 'inline-block';
+                }
+            } else {
+                showAlert(response.message || 'Erro ao salvar informações do torneio.', 'danger');
+                btnSubmit.prop('disabled', false).html(originalText);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Erro ao editar torneio:', error);
+            showAlert('Erro ao salvar informações do torneio. Tente novamente.', 'danger');
+            btnSubmit.prop('disabled', false).html(originalText);
+        }
+    });
 });
 
 // Formulário configurar torneio (inclui participantes, times, etc)

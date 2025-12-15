@@ -18,13 +18,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $torneio_id = (int)($_POST['torneio_id'] ?? 0);
 $modalidade = $_POST['modalidade'] ?? '';
 $quantidade_grupos = isset($_POST['quantidade_grupos']) ? (int)$_POST['quantidade_grupos'] : null;
+$quantidade_quadras = isset($_POST['quantidade_quadras']) ? (int)$_POST['quantidade_quadras'] : 1;
 
 if ($torneio_id <= 0) {
     echo json_encode(['success' => false, 'message' => 'Torneio inválido.']);
     exit();
 }
 
-if (!in_array($modalidade, ['todos_contra_todos', 'todos_chaves'])) {
+if (!in_array($modalidade, ['todos_contra_todos', 'todos_chaves', 'torneio_pro'])) {
     echo json_encode(['success' => false, 'message' => 'Modalidade inválida.']);
     exit();
 }
@@ -94,9 +95,19 @@ $tem_modalidade = $columnsQuery && $columnsQuery->rowCount() > 0;
 if (!$tem_modalidade) {
     // Adicionar coluna modalidade
     try {
-        $pdo->exec("ALTER TABLE torneios ADD COLUMN modalidade ENUM('todos_contra_todos', 'todos_chaves') DEFAULT NULL AFTER integrantes_por_time");
+        $pdo->exec("ALTER TABLE torneios ADD COLUMN modalidade ENUM('todos_contra_todos', 'todos_chaves', 'torneio_pro') DEFAULT NULL AFTER integrantes_por_time");
     } catch (Exception $e) {
         error_log("Erro ao adicionar coluna modalidade: " . $e->getMessage());
+    }
+} else {
+    // Verificar se o enum já inclui 'torneio_pro'
+    $column_info = $columnsQuery->fetch(PDO::FETCH_ASSOC);
+    if (isset($column_info['Type']) && strpos($column_info['Type'], 'torneio_pro') === false) {
+        try {
+            $pdo->exec("ALTER TABLE torneios MODIFY COLUMN modalidade ENUM('todos_contra_todos', 'todos_chaves', 'torneio_pro') DEFAULT NULL");
+        } catch (Exception $e) {
+            error_log("Erro ao atualizar enum modalidade: " . $e->getMessage());
+        }
     }
 }
 
@@ -113,14 +124,27 @@ if (!$tem_quantidade_grupos) {
     }
 }
 
+// Verificar se a coluna quantidade_quadras existe
+$columnsQuery = $pdo->query("SHOW COLUMNS FROM torneios LIKE 'quantidade_quadras'");
+$tem_quantidade_quadras = $columnsQuery && $columnsQuery->rowCount() > 0;
+
+if (!$tem_quantidade_quadras) {
+    // Adicionar coluna quantidade_quadras
+    try {
+        $pdo->exec("ALTER TABLE torneios ADD COLUMN quantidade_quadras INT(11) DEFAULT 1 AFTER quantidade_grupos");
+    } catch (Exception $e) {
+        error_log("Erro ao adicionar coluna quantidade_quadras: " . $e->getMessage());
+    }
+}
+
 // Se a modalidade mudou, limpar jogos existentes
 $sql_modalidade_atual = "SELECT modalidade FROM torneios WHERE id = ?";
 $stmt_modalidade = executeQuery($pdo, $sql_modalidade_atual, [$torneio_id]);
 $modalidade_atual = $stmt_modalidade ? $stmt_modalidade->fetch()['modalidade'] : null;
 
-// Atualizar modalidade e quantidade_grupos
-$sql = "UPDATE torneios SET modalidade = ?, quantidade_grupos = ? WHERE id = ?";
-$result = executeQuery($pdo, $sql, [$modalidade, $quantidade_grupos, $torneio_id]);
+// Atualizar modalidade, quantidade_grupos e quantidade_quadras
+$sql = "UPDATE torneios SET modalidade = ?, quantidade_grupos = ?, quantidade_quadras = ? WHERE id = ?";
+$result = executeQuery($pdo, $sql, [$modalidade, $quantidade_grupos, $quantidade_quadras, $torneio_id]);
 
 // Se a modalidade mudou, limpar jogos, grupos e classificação
 if ($modalidade_atual && $modalidade_atual !== $modalidade) {

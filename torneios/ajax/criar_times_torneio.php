@@ -15,9 +15,31 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-$torneio_id = (int)($_POST['torneio_id'] ?? 0);
+// Capturar torneio_id de múltiplas fontes para garantir que seja encontrado
+$torneio_id = 0;
+if (isset($_POST['torneio_id']) && $_POST['torneio_id'] > 0) {
+    $torneio_id = (int)$_POST['torneio_id'];
+} elseif (isset($_GET['torneio_id']) && $_GET['torneio_id'] > 0) {
+    $torneio_id = (int)$_GET['torneio_id'];
+} elseif (isset($_REQUEST['torneio_id']) && $_REQUEST['torneio_id'] > 0) {
+    $torneio_id = (int)$_REQUEST['torneio_id'];
+} else {
+    // Tentar pegar do raw input (JSON)
+    $rawInput = file_get_contents('php://input');
+    if ($rawInput) {
+        $parsed = json_decode($rawInput, true);
+        if (isset($parsed['torneio_id']) && $parsed['torneio_id'] > 0) {
+            $torneio_id = (int)$parsed['torneio_id'];
+        }
+    }
+}
+
 if ($torneio_id <= 0) {
-    echo json_encode(['success' => false, 'message' => 'Torneio inválido.']);
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Torneio inválido. ID não foi encontrado ou é inválido.',
+        'error_code' => 'TORNEIO_ID_INVALIDO'
+    ]);
     exit();
 }
 

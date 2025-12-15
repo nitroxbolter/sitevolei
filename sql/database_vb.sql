@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Tempo de geração: 05/12/2025 às 19:16
+-- Tempo de geração: 15/12/2025 às 15:40
 -- Versão do servidor: 10.4.32-MariaDB
 -- Versão do PHP: 8.0.30
 
@@ -167,6 +167,150 @@ INSERT INTO `grupos` (`id`, `nome`, `logo_id`, `descricao`, `nivel`, `administra
 -- --------------------------------------------------------
 
 --
+-- Estrutura para tabela `grupo_jogos`
+--
+
+CREATE TABLE `grupo_jogos` (
+  `id` int(11) NOT NULL,
+  `grupo_id` int(11) NOT NULL,
+  `nome` varchar(100) NOT NULL,
+  `descricao` text DEFAULT NULL,
+  `data_jogo` datetime NOT NULL,
+  `local` varchar(200) DEFAULT NULL,
+  `modalidade` enum('Dupla','Trio','Quarteto','Quinteto') DEFAULT NULL,
+  `quantidade_times` int(11) DEFAULT NULL,
+  `integrantes_por_time` int(11) DEFAULT NULL,
+  `lista_aberta` tinyint(1) DEFAULT 1 COMMENT '1 = lista aberta, 0 = lista fechada',
+  `status` enum('Criado','Lista Aberta','Lista Fechada','Times Criados','Em Andamento','Finalizado','Arquivado') DEFAULT 'Criado',
+  `criado_por` int(11) NOT NULL,
+  `data_criacao` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Despejando dados para a tabela `grupo_jogos`
+--
+
+INSERT INTO `grupo_jogos` (`id`, `grupo_id`, `nome`, `descricao`, `data_jogo`, `local`, `modalidade`, `quantidade_times`, `integrantes_por_time`, `lista_aberta`, `status`, `criado_por`, `data_criacao`) VALUES
+(4, 15, 'tetsad', 'asdasd', '2025-12-05 17:30:00', '8000 Sports', 'Quarteto', 3, 4, 1, 'Times Criados', 21, '2025-12-05 20:30:03');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `grupo_jogo_classificacao`
+--
+
+CREATE TABLE `grupo_jogo_classificacao` (
+  `id` int(11) NOT NULL,
+  `jogo_id` int(11) NOT NULL,
+  `time_id` int(11) NOT NULL,
+  `vitorias` int(11) DEFAULT 0,
+  `derrotas` int(11) DEFAULT 0,
+  `pontos_pro` int(11) DEFAULT 0,
+  `pontos_contra` int(11) DEFAULT 0,
+  `saldo_pontos` int(11) DEFAULT 0,
+  `average` decimal(10,2) DEFAULT 0.00,
+  `pontos_total` int(11) DEFAULT 0,
+  `posicao` int(11) DEFAULT NULL,
+  `data_atualizacao` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `grupo_jogo_participantes`
+--
+
+CREATE TABLE `grupo_jogo_participantes` (
+  `id` int(11) NOT NULL,
+  `jogo_id` int(11) NOT NULL,
+  `usuario_id` int(11) NOT NULL,
+  `data_inscricao` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Despejando dados para a tabela `grupo_jogo_participantes`
+--
+
+INSERT INTO `grupo_jogo_participantes` (`id`, `jogo_id`, `usuario_id`, `data_inscricao`) VALUES
+(2, 4, 36, '2025-12-05 20:35:23'),
+(3, 4, 29, '2025-12-05 20:35:26'),
+(5, 4, 22, '2025-12-05 21:01:49'),
+(6, 4, 21, '2025-12-05 21:01:51'),
+(7, 4, 28, '2025-12-05 21:01:54'),
+(8, 4, 2, '2025-12-05 21:01:59'),
+(10, 4, 23, '2025-12-05 21:02:04'),
+(11, 4, 25, '2025-12-05 21:02:05'),
+(12, 4, 24, '2025-12-05 21:02:08'),
+(14, 4, 35, '2025-12-06 11:53:29'),
+(15, 4, 27, '2025-12-06 12:13:11'),
+(16, 4, 34, '2025-12-06 12:13:13');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `grupo_jogo_partidas`
+--
+
+CREATE TABLE `grupo_jogo_partidas` (
+  `id` int(11) NOT NULL,
+  `jogo_id` int(11) NOT NULL,
+  `time1_id` int(11) NOT NULL,
+  `time2_id` int(11) NOT NULL,
+  `pontos_time1` int(11) DEFAULT 0,
+  `pontos_time2` int(11) DEFAULT 0,
+  `vencedor_id` int(11) DEFAULT NULL,
+  `rodada` int(11) DEFAULT 1,
+  `status` enum('Agendada','Em Andamento','Finalizada') DEFAULT 'Agendada',
+  `data_partida` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `grupo_jogo_times`
+--
+
+CREATE TABLE `grupo_jogo_times` (
+  `id` int(11) NOT NULL,
+  `jogo_id` int(11) NOT NULL,
+  `nome` varchar(50) NOT NULL,
+  `cor` varchar(7) DEFAULT '#007bff',
+  `ordem` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Despejando dados para a tabela `grupo_jogo_times`
+--
+
+INSERT INTO `grupo_jogo_times` (`id`, `jogo_id`, `nome`, `cor`, `ordem`) VALUES
+(28, 4, 'Time 1', '#007bff', 1),
+(29, 4, 'Time 2', '#28a745', 2),
+(30, 4, 'Time 3', '#dc3545', 3);
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `grupo_jogo_time_integrantes`
+--
+
+CREATE TABLE `grupo_jogo_time_integrantes` (
+  `id` int(11) NOT NULL,
+  `time_id` int(11) NOT NULL,
+  `participante_id` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Despejando dados para a tabela `grupo_jogo_time_integrantes`
+--
+
+INSERT INTO `grupo_jogo_time_integrantes` (`id`, `time_id`, `participante_id`) VALUES
+(58, 3, 5),
+(61, 3, 6),
+(60, 3, 11);
+
+-- --------------------------------------------------------
+
+--
 -- Estrutura para tabela `grupo_membros`
 --
 
@@ -203,7 +347,8 @@ INSERT INTO `grupo_membros` (`id`, `grupo_id`, `usuario_id`, `data_entrada`, `at
 (33, 15, 35, '2025-11-14 19:55:48', 1),
 (34, 15, 36, '2025-11-14 19:56:39', 1),
 (35, 15, 37, '2025-11-14 19:58:33', 1),
-(36, 15, 39, '2025-11-14 20:00:11', 1);
+(36, 15, 39, '2025-11-14 20:00:11', 1),
+(37, 14, 21, '2025-12-07 02:10:22', 0);
 
 -- --------------------------------------------------------
 
@@ -358,12 +503,14 @@ INSERT INTO `notificacoes` (`id`, `usuario_id`, `titulo`, `mensagem`, `lida`, `c
 (47, 36, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:33'),
 (48, 35, 'Solicitação de grupo aprovada', 'Sua entrada no grupo #15 foi aprovada.', 0, '2025-11-14 20:00:34'),
 (49, 37, 'Solicitação de participação no jogo', 'Você recebeu uma solicitação de entrada no seu jogo #26.', 1, '2025-12-05 02:59:06'),
-(50, 21, 'Você foi aceito no jogo', 'Sua solicitação para o jogo #26 foi aprovada pelo criador.', 0, '2025-12-05 02:59:25'),
+(50, 21, 'Você foi aceito no jogo', 'Sua solicitação para o jogo #26 foi aprovada pelo criador.', 1, '2025-12-05 02:59:25'),
 (51, 37, 'Solicitação de participação aprovada', 'Sua solicitação de participação no torneio \"Verao 2026\" foi aprovada!', 1, '2025-12-05 17:08:32'),
 (52, 37, 'Solicitação de participação aprovada', 'Sua solicitação de participação no torneio \"Verao 2026\" foi aprovada!', 1, '2025-12-05 17:11:07'),
 (53, 37, 'Solicitação de participação aprovada', 'Sua solicitação de participação no torneio \"Verao 2026\" foi aprovada!', 1, '2025-12-05 17:16:20'),
 (54, 37, 'Você foi removido do torneio', 'Você foi removido do torneio \"Verao 2026\" pelo administrador.', 1, '2025-12-05 17:16:27'),
-(55, 37, 'Solicitação de participação aprovada', 'Sua solicitação de participação no torneio \"Verao 2026\" foi aprovada!', 0, '2025-12-05 17:17:34');
+(55, 37, 'Solicitação de participação aprovada', 'Sua solicitação de participação no torneio \"Verao 2026\" foi aprovada!', 0, '2025-12-05 17:17:34'),
+(56, 28, 'Você foi removido do torneio', 'Você foi removido do torneio \"Unidos pelo Volei\" pelo administrador.', 0, '2025-12-07 01:38:13'),
+(57, 24, 'Nova solicitação no grupo', 'Você recebeu uma solicitação de entrada no grupo #14.', 0, '2025-12-07 02:10:22');
 
 -- --------------------------------------------------------
 
@@ -403,6 +550,157 @@ CREATE TABLE `partidas` (
   `data_inicio` datetime DEFAULT NULL,
   `data_fim` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `partidas_2fase_classificacao`
+--
+
+CREATE TABLE `partidas_2fase_classificacao` (
+  `id` int(11) NOT NULL,
+  `torneio_id` int(11) NOT NULL COMMENT 'ID do torneio',
+  `time_id` int(11) NOT NULL COMMENT 'ID do time',
+  `grupo_id` int(11) NOT NULL COMMENT 'ID do grupo da 2ª fase (Ouro A, Ouro B, Prata A, Prata B, Bronze A, Bronze B)',
+  `vitorias` int(11) DEFAULT 0 COMMENT 'Número de vitórias',
+  `derrotas` int(11) DEFAULT 0 COMMENT 'Número de derrotas',
+  `empates` int(11) DEFAULT 0 COMMENT 'Número de empates',
+  `pontos_pro` int(11) DEFAULT 0 COMMENT 'Pontos marcados',
+  `pontos_contra` int(11) DEFAULT 0 COMMENT 'Pontos sofridos',
+  `saldo_pontos` int(11) DEFAULT 0 COMMENT 'Saldo de pontos (pontos_pro - pontos_contra)',
+  `average` decimal(10,2) DEFAULT 0.00 COMMENT 'Average = pontos_pro / pontos_contra (quando pontos_contra > 0)',
+  `pontos_total` int(11) DEFAULT 0 COMMENT 'Pontos totais (3 vitórias, 1 empate, 0 derrota)',
+  `posicao` int(11) DEFAULT NULL COMMENT 'Posição na classificação do grupo',
+  `data_atualizacao` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp() COMMENT 'Data da última atualização'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Classificação dos grupos da 2ª fase (Ouro A, Ouro B, Prata A, Prata B, Bronze A, Bronze B)';
+
+--
+-- Despejando dados para a tabela `partidas_2fase_classificacao`
+--
+
+INSERT INTO `partidas_2fase_classificacao` (`id`, `torneio_id`, `time_id`, `grupo_id`, `vitorias`, `derrotas`, `empates`, `pontos_pro`, `pontos_contra`, `saldo_pontos`, `average`, `pontos_total`, `posicao`, `data_atualizacao`) VALUES
+(523, 33, 639, 1937, 2, 1, 0, 51, 39, 12, 1.31, 6, 1, '2025-12-14 17:36:46'),
+(524, 33, 647, 1937, 1, 2, 0, 46, 50, -4, 0.92, 3, 3, '2025-12-14 17:36:29'),
+(525, 33, 655, 1937, 1, 2, 0, 40, 50, -10, 0.80, 3, 4, '2025-12-14 17:36:29'),
+(526, 33, 656, 1937, 2, 1, 0, 50, 48, 2, 1.04, 6, 2, '2025-12-14 17:36:46'),
+(527, 33, 640, 1938, 3, 0, 0, 54, 28, 26, 1.93, 9, 1, '2025-12-14 17:34:02'),
+(528, 33, 643, 1938, 1, 2, 0, 43, 53, -10, 0.81, 3, 3, '2025-12-14 17:34:16'),
+(529, 33, 654, 1938, 0, 3, 0, 28, 55, -27, 0.51, 0, 4, '2025-12-14 17:34:16'),
+(530, 33, 663, 1938, 2, 1, 0, 46, 35, 11, 1.31, 6, 2, '2025-12-14 17:33:40'),
+(531, 33, 636, 1939, 0, 0, 0, 0, 0, 0, 0.00, 0, 1, '2025-12-14 17:17:32'),
+(532, 33, 653, 1939, 0, 0, 0, 0, 0, 0, 0.00, 0, 2, '2025-12-14 17:17:32'),
+(533, 33, 661, 1939, 0, 0, 0, 0, 0, 0, 0.00, 0, 3, '2025-12-14 17:17:32'),
+(534, 33, 664, 1939, 0, 0, 0, 0, 0, 0, 0.00, 0, 4, '2025-12-14 17:17:32'),
+(535, 33, 635, 1940, 0, 0, 0, 0, 0, 0, 0.00, 0, 1, '2025-12-14 17:17:32'),
+(536, 33, 641, 1940, 0, 0, 0, 0, 0, 0, 0.00, 0, 2, '2025-12-14 17:17:32'),
+(537, 33, 646, 1940, 0, 0, 0, 0, 0, 0, 0.00, 0, 3, '2025-12-14 17:17:32'),
+(538, 33, 657, 1940, 0, 0, 0, 0, 0, 0, 0.00, 0, 4, '2025-12-14 17:17:32'),
+(539, 33, 638, 1941, 2, 1, 0, 42, 45, -3, 0.93, 6, 3, '2025-12-14 17:24:37'),
+(540, 33, 648, 1941, 2, 1, 0, 52, 38, 14, 1.37, 6, 1, '2025-12-14 17:24:37'),
+(541, 33, 649, 1941, 2, 1, 0, 49, 51, -2, 0.96, 6, 2, '2025-12-14 17:24:37'),
+(542, 33, 659, 1941, 0, 3, 0, 46, 55, -9, 0.84, 0, 4, '2025-12-14 17:24:21'),
+(543, 33, 644, 1942, 3, 0, 0, 56, 40, 16, 1.40, 9, 1, '2025-12-14 17:29:47'),
+(544, 33, 650, 1942, 1, 2, 0, 53, 46, 7, 1.15, 3, 3, '2025-12-14 17:21:25'),
+(545, 33, 652, 1942, 0, 3, 0, 25, 54, -29, 0.46, 0, 4, '2025-12-14 17:29:47'),
+(546, 33, 660, 1942, 2, 1, 0, 53, 47, 6, 1.13, 6, 2, '2025-12-14 17:29:47');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `partidas_2fase_eliminatorias`
+--
+
+CREATE TABLE `partidas_2fase_eliminatorias` (
+  `id` int(11) NOT NULL,
+  `torneio_id` int(11) NOT NULL COMMENT 'ID do torneio',
+  `time1_id` int(11) NOT NULL COMMENT 'ID do time 1',
+  `time2_id` int(11) NOT NULL COMMENT 'ID do time 2',
+  `serie` enum('Ouro','Ouro A','Ouro B','Prata','Prata A','Prata B','Bronze','Bronze A','Bronze B') NOT NULL COMMENT 'Série da eliminatória (Ouro, Prata, Bronze para semi-finais/finais; Ouro A, Ouro B, etc. para outras fases)',
+  `tipo_eliminatoria` enum('Semi-Final','Final','3º Lugar') NOT NULL COMMENT 'Tipo de eliminatória',
+  `rodada` int(11) DEFAULT 1 COMMENT 'Número da rodada',
+  `quadra` int(11) DEFAULT NULL COMMENT 'Número da quadra',
+  `pontos_time1` int(11) DEFAULT 0 COMMENT 'Pontos do time 1',
+  `pontos_time2` int(11) DEFAULT 0 COMMENT 'Pontos do time 2',
+  `vencedor_id` int(11) DEFAULT NULL COMMENT 'ID do time vencedor',
+  `status` enum('Agendada','Em Andamento','Finalizada') DEFAULT 'Agendada' COMMENT 'Status da partida',
+  `data_partida` datetime DEFAULT NULL COMMENT 'Data e hora da partida',
+  `data_criacao` timestamp NOT NULL DEFAULT current_timestamp() COMMENT 'Data de criação do registro'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Jogos eliminatórios da 2ª fase (semi-finais, finais, 3º lugar)';
+
+--
+-- Despejando dados para a tabela `partidas_2fase_eliminatorias`
+--
+
+INSERT INTO `partidas_2fase_eliminatorias` (`id`, `torneio_id`, `time1_id`, `time2_id`, `serie`, `tipo_eliminatoria`, `rodada`, `quadra`, `pontos_time1`, `pontos_time2`, `vencedor_id`, `status`, `data_partida`, `data_criacao`) VALUES
+(84, 33, 648, 644, 'Bronze', 'Semi-Final', 1, 1, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:24:38'),
+(85, 33, 649, 660, 'Bronze', 'Semi-Final', 1, 1, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:24:38'),
+(86, 33, 639, 663, 'Ouro', 'Semi-Final', 1, 1, 10, 18, 663, 'Finalizada', NULL, '2025-12-14 17:36:46'),
+(87, 33, 656, 640, 'Ouro', 'Semi-Final', 1, 1, 9, 18, 640, 'Finalizada', NULL, '2025-12-14 17:36:46'),
+(88, 33, 663, 640, 'Ouro', 'Final', 1, 1, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:40:14');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `partidas_2fase_torneio`
+--
+
+CREATE TABLE `partidas_2fase_torneio` (
+  `id` int(11) NOT NULL,
+  `torneio_id` int(11) NOT NULL COMMENT 'ID do torneio',
+  `time1_id` int(11) NOT NULL COMMENT 'ID do time 1',
+  `time2_id` int(11) NOT NULL COMMENT 'ID do time 2',
+  `grupo_id` int(11) NOT NULL COMMENT 'ID do grupo da 2ª fase (Ouro A, Ouro B, Prata A, Prata B, Bronze A, Bronze B)',
+  `rodada` int(11) DEFAULT 1 COMMENT 'Número da rodada',
+  `quadra` int(11) DEFAULT NULL COMMENT 'Número da quadra',
+  `pontos_time1` int(11) DEFAULT 0 COMMENT 'Pontos do time 1',
+  `pontos_time2` int(11) DEFAULT 0 COMMENT 'Pontos do time 2',
+  `vencedor_id` int(11) DEFAULT NULL COMMENT 'ID do time vencedor',
+  `status` enum('Agendada','Em Andamento','Finalizada') DEFAULT 'Agendada' COMMENT 'Status da partida',
+  `data_partida` datetime DEFAULT NULL COMMENT 'Data e hora da partida',
+  `data_criacao` timestamp NOT NULL DEFAULT current_timestamp() COMMENT 'Data de criação do registro'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Jogos todos contra todos da 2ª fase do torneio';
+
+--
+-- Despejando dados para a tabela `partidas_2fase_torneio`
+--
+
+INSERT INTO `partidas_2fase_torneio` (`id`, `torneio_id`, `time1_id`, `time2_id`, `grupo_id`, `rodada`, `quadra`, `pontos_time1`, `pontos_time2`, `vencedor_id`, `status`, `data_partida`, `data_criacao`) VALUES
+(901, 33, 639, 647, 1937, 1, 1, 18, 13, 639, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(902, 33, 655, 656, 1937, 1, 1, 18, 14, 655, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(903, 33, 639, 655, 1937, 2, 1, 18, 8, 639, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(904, 33, 647, 656, 1937, 2, 1, 15, 18, 656, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(905, 33, 647, 655, 1937, 3, 1, 18, 14, 647, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(906, 33, 639, 656, 1937, 3, 1, 15, 18, 656, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(907, 33, 643, 654, 1938, 1, 2, 19, 17, 643, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(908, 33, 640, 663, 1938, 1, 2, 18, 10, 640, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(909, 33, 640, 654, 1938, 2, 2, 18, 5, 640, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(910, 33, 643, 663, 1938, 2, 2, 11, 18, 663, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(911, 33, 654, 663, 1938, 3, 2, 6, 18, 663, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(912, 33, 640, 643, 1938, 3, 2, 18, 13, 640, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(913, 33, 661, 664, 1939, 1, 3, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(914, 33, 636, 653, 1939, 1, 3, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(915, 33, 653, 661, 1939, 2, 3, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(916, 33, 636, 664, 1939, 2, 3, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(917, 33, 636, 661, 1939, 3, 3, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(918, 33, 653, 664, 1939, 3, 3, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(919, 33, 635, 641, 1940, 1, 4, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(920, 33, 646, 657, 1940, 1, 4, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(921, 33, 641, 646, 1940, 2, 4, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(922, 33, 635, 657, 1940, 2, 4, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(923, 33, 635, 646, 1940, 3, 4, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(924, 33, 641, 657, 1940, 3, 4, 0, 0, NULL, 'Agendada', NULL, '2025-12-14 17:17:32'),
+(925, 33, 638, 649, 1941, 1, 5, 18, 12, 638, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(926, 33, 648, 659, 1941, 1, 5, 18, 14, 648, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(927, 33, 638, 648, 1941, 2, 5, 6, 18, 648, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(928, 33, 649, 659, 1941, 2, 5, 19, 17, 649, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(929, 33, 638, 659, 1941, 3, 5, 18, 15, 638, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(930, 33, 648, 649, 1941, 3, 5, 16, 18, 649, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(931, 33, 644, 650, 1942, 1, 6, 20, 18, 644, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(932, 33, 652, 660, 1942, 1, 6, 12, 18, 660, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(933, 33, 650, 652, 1942, 2, 6, 18, 7, 650, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(934, 33, 644, 660, 1942, 2, 6, 18, 16, 644, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(935, 33, 650, 660, 1942, 3, 6, 17, 19, 660, 'Finalizada', NULL, '2025-12-14 17:17:32'),
+(936, 33, 644, 652, 1942, 3, 6, 18, 6, 644, 'Finalizada', NULL, '2025-12-14 17:17:32');
 
 -- --------------------------------------------------------
 
@@ -665,8 +963,9 @@ CREATE TABLE `torneios` (
   `max_participantes` int(11) DEFAULT 16,
   `quantidade_times` int(11) DEFAULT NULL,
   `integrantes_por_time` int(11) DEFAULT NULL,
-  `modalidade` enum('todos_contra_todos','todos_chaves') DEFAULT NULL,
+  `modalidade` enum('todos_contra_todos','todos_chaves','torneio_pro') DEFAULT NULL,
   `quantidade_grupos` int(11) DEFAULT NULL,
+  `quantidade_quadras` int(11) DEFAULT 1,
   `status` enum('Criado','Inscrições Abertas','Em Andamento','Finalizado','Cancelado') DEFAULT 'Criado',
   `criado_por` int(11) NOT NULL,
   `data_criacao` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -677,9 +976,8 @@ CREATE TABLE `torneios` (
 -- Despejando dados para a tabela `torneios`
 --
 
-INSERT INTO `torneios` (`id`, `nome`, `descricao`, `grupo_id`, `tipo`, `data_inicio`, `data_fim`, `max_participantes`, `quantidade_times`, `integrantes_por_time`, `modalidade`, `quantidade_grupos`, `status`, `criado_por`, `data_criacao`, `inscricoes_abertas`) VALUES
-(21, 'Verao 2026', NULL, NULL, 'avulso', '2025-12-31 00:00:00', NULL, 32, 8, 4, 'todos_chaves', 2, 'Criado', 21, '2025-12-05 17:02:20', 1),
-(22, 'Unidos pelo Volei', NULL, 15, 'grupo', '2025-12-31 00:00:00', NULL, 16, 4, 4, 'todos_contra_todos', 2, 'Criado', 21, '2025-12-05 18:05:31', 0);
+INSERT INTO `torneios` (`id`, `nome`, `descricao`, `grupo_id`, `tipo`, `data_inicio`, `data_fim`, `max_participantes`, `quantidade_times`, `integrantes_por_time`, `modalidade`, `quantidade_grupos`, `quantidade_quadras`, `status`, `criado_por`, `data_criacao`, `inscricoes_abertas`) VALUES
+(33, 'Diretoria Do Volei', '2º Torneio de volei da diretoria 2025', NULL, 'avulso', '2025-12-31 00:00:00', NULL, 120, 30, 4, 'torneio_pro', 6, 6, 'Criado', 21, '2025-12-13 22:49:24', 0);
 
 -- --------------------------------------------------------
 
@@ -721,16 +1019,6 @@ CREATE TABLE `torneio_chaves_times` (
   `data_criacao` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Despejando dados para a tabela `torneio_chaves_times`
---
-
-INSERT INTO `torneio_chaves_times` (`id`, `torneio_id`, `fase`, `chave_numero`, `time1_id`, `time2_id`, `vencedor_id`, `pontos_time1`, `pontos_time2`, `data_partida`, `status`, `data_criacao`) VALUES
-(1, 21, 'Semi', 1, 261, 265, 261, 15, 14, NULL, 'Finalizada', '2025-12-05 17:57:20'),
-(2, 21, 'Semi', 2, 264, 260, 260, 12, 15, NULL, 'Finalizada', '2025-12-05 17:57:20'),
-(3, 21, 'Final', 1, 261, 260, 260, 14, 15, NULL, 'Finalizada', '2025-12-05 17:57:20'),
-(4, 21, '3º Lugar', 1, 265, 264, 264, 13, 15, NULL, 'Finalizada', '2025-12-05 17:57:20');
-
 -- --------------------------------------------------------
 
 --
@@ -741,6 +1029,7 @@ CREATE TABLE `torneio_classificacao` (
   `id` int(11) NOT NULL,
   `torneio_id` int(11) NOT NULL,
   `time_id` int(11) NOT NULL,
+  `grupo_id` int(11) DEFAULT NULL,
   `vitorias` int(11) DEFAULT 0,
   `derrotas` int(11) DEFAULT 0,
   `empates` int(11) DEFAULT 0,
@@ -757,19 +1046,37 @@ CREATE TABLE `torneio_classificacao` (
 -- Despejando dados para a tabela `torneio_classificacao`
 --
 
-INSERT INTO `torneio_classificacao` (`id`, `torneio_id`, `time_id`, `vitorias`, `derrotas`, `empates`, `pontos_pro`, `pontos_contra`, `saldo_pontos`, `average`, `pontos_total`, `posicao`, `data_atualizacao`) VALUES
-(97, 21, 259, 1, 2, 0, 35, 43, -8, 0.81, 3, 5, '2025-12-05 17:56:41'),
-(98, 21, 260, 4, 1, 0, 72, 62, 10, 1.16, 12, 3, '2025-12-05 18:01:11'),
-(99, 21, 261, 4, 1, 0, 74, 61, 13, 1.21, 12, 2, '2025-12-05 18:01:11'),
-(100, 21, 262, 0, 3, 0, 34, 45, -11, 0.76, 0, 7, '2025-12-05 17:57:07'),
-(101, 21, 263, 0, 3, 0, 26, 45, -19, 0.58, 0, 8, '2025-12-05 17:57:07'),
-(102, 21, 264, 4, 1, 0, 72, 44, 28, 1.64, 12, 1, '2025-12-05 18:01:37'),
-(103, 21, 265, 2, 3, 0, 63, 66, -3, 0.95, 6, 4, '2025-12-05 18:01:37'),
-(104, 21, 266, 1, 2, 0, 32, 42, -10, 0.76, 3, 6, '2025-12-05 17:57:07'),
-(105, 22, 267, 3, 0, 0, 45, 32, 13, 1.41, 9, 1, '2025-12-05 18:09:32'),
-(106, 22, 268, 2, 1, 0, 40, 29, 11, 1.38, 6, 2, '2025-12-05 18:09:38'),
-(107, 22, 269, 0, 3, 0, 31, 45, -14, 0.69, 0, 4, '2025-12-05 18:09:38'),
-(108, 22, 270, 1, 2, 0, 32, 42, -10, 0.76, 3, 3, '2025-12-05 18:09:32');
+INSERT INTO `torneio_classificacao` (`id`, `torneio_id`, `time_id`, `grupo_id`, `vitorias`, `derrotas`, `empates`, `pontos_pro`, `pontos_contra`, `saldo_pontos`, `average`, `pontos_total`, `posicao`, `data_atualizacao`) VALUES
+(15485, 33, 635, 1919, 2, 2, 0, 63, 50, 13, 1.26, 6, 2, '2025-12-14 12:50:33'),
+(15486, 33, 636, 1919, 2, 2, 0, 71, 60, 11, 1.18, 6, 3, '2025-12-14 13:23:13'),
+(15487, 33, 637, 1919, 1, 3, 0, 33, 67, -34, 0.49, 3, 5, '2025-12-14 13:23:13'),
+(15488, 33, 638, 1919, 1, 3, 0, 57, 72, -15, 0.79, 3, 4, '2025-12-14 13:23:35'),
+(15489, 33, 639, 1919, 4, 0, 0, 73, 48, 25, 1.52, 12, 1, '2025-12-14 13:23:35'),
+(15490, 33, 640, 1920, 4, 0, 0, 72, 39, 33, 1.85, 12, 1, '2025-12-14 13:36:01'),
+(15491, 33, 641, 1920, 2, 2, 0, 59, 61, -2, 0.97, 6, 3, '2025-12-14 13:36:30'),
+(15492, 33, 642, 1920, 0, 4, 0, 41, 72, -31, 0.57, 0, 5, '2025-12-14 13:36:30'),
+(15493, 33, 643, 1920, 3, 1, 0, 63, 57, 6, 1.11, 9, 2, '2025-12-14 13:36:46'),
+(15494, 33, 644, 1920, 1, 3, 0, 53, 59, -6, 0.90, 3, 4, '2025-12-14 13:36:46'),
+(15495, 33, 645, 1921, 1, 3, 0, 47, 66, -19, 0.71, 3, 5, '2025-12-14 13:27:53'),
+(15496, 33, 646, 1921, 2, 2, 0, 69, 48, 21, 1.44, 6, 2, '2025-12-14 13:28:30'),
+(15497, 33, 647, 1921, 4, 0, 0, 73, 56, 17, 1.30, 12, 1, '2025-12-14 13:28:30'),
+(15498, 33, 648, 1921, 2, 2, 0, 57, 68, -11, 0.84, 6, 3, '2025-12-14 13:27:53'),
+(15499, 33, 649, 1921, 1, 3, 0, 54, 62, -8, 0.87, 3, 4, '2025-12-14 13:28:13'),
+(15500, 33, 650, 1922, 1, 3, 0, 57, 63, -6, 0.90, 3, 4, '2025-12-14 13:08:00'),
+(15501, 33, 651, 1922, 1, 3, 0, 56, 67, -11, 0.84, 3, 5, '2025-12-14 13:08:39'),
+(15502, 33, 652, 1922, 1, 3, 0, 59, 65, -6, 0.91, 3, 3, '2025-12-14 13:08:39'),
+(15503, 33, 653, 1922, 3, 1, 0, 63, 64, -1, 0.98, 9, 2, '2025-12-14 13:09:27'),
+(15504, 33, 654, 1922, 4, 0, 0, 72, 48, 24, 1.50, 12, 1, '2025-12-14 13:09:27'),
+(15505, 33, 655, 1923, 3, 1, 0, 66, 47, 19, 1.40, 9, 2, '2025-12-14 13:15:37'),
+(15506, 33, 656, 1923, 3, 1, 0, 61, 33, 28, 1.85, 9, 1, '2025-12-14 13:14:59'),
+(15507, 33, 657, 1923, 2, 2, 0, 57, 63, -6, 0.90, 6, 3, '2025-12-14 13:16:01'),
+(15508, 33, 658, 1923, 1, 3, 0, 47, 70, -23, 0.67, 3, 5, '2025-12-14 13:20:24'),
+(15509, 33, 659, 1923, 1, 3, 0, 52, 70, -18, 0.74, 3, 4, '2025-12-14 13:20:24'),
+(15510, 33, 660, 1924, 2, 2, 0, 55, 65, -10, 0.85, 6, 4, '2025-12-14 13:30:10'),
+(15511, 33, 661, 1924, 2, 2, 0, 69, 54, 15, 1.28, 6, 2, '2025-12-14 13:30:10'),
+(15512, 33, 662, 1924, 0, 4, 0, 39, 72, -33, 0.54, 0, 5, '2025-12-14 13:30:10'),
+(15513, 33, 663, 1924, 4, 0, 0, 72, 42, 30, 1.71, 12, 1, '2025-12-14 13:30:25'),
+(15514, 33, 664, 1924, 2, 2, 0, 61, 63, -2, 0.97, 6, 3, '2025-12-14 13:30:25');
 
 -- --------------------------------------------------------
 
@@ -780,7 +1087,7 @@ INSERT INTO `torneio_classificacao` (`id`, `torneio_id`, `time_id`, `vitorias`, 
 CREATE TABLE `torneio_grupos` (
   `id` int(11) NOT NULL,
   `torneio_id` int(11) NOT NULL,
-  `nome` varchar(10) NOT NULL COMMENT 'Nome do grupo (A, B, C, etc.)',
+  `nome` varchar(50) NOT NULL,
   `ordem` int(11) DEFAULT 1 COMMENT 'Ordem de exibição do grupo',
   `data_criacao` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Grupos do torneio (A, B, C, etc.)';
@@ -790,8 +1097,24 @@ CREATE TABLE `torneio_grupos` (
 --
 
 INSERT INTO `torneio_grupos` (`id`, `torneio_id`, `nome`, `ordem`, `data_criacao`) VALUES
-(29, 21, 'Chave 1', 1, '2025-12-05 17:52:28'),
-(30, 21, 'Chave 2', 2, '2025-12-05 17:52:28');
+(1919, 33, 'Grupo A', 1, '2025-12-14 04:00:37'),
+(1920, 33, 'Grupo B', 2, '2025-12-14 04:00:37'),
+(1921, 33, 'Grupo C', 3, '2025-12-14 04:00:37'),
+(1922, 33, 'Grupo D', 4, '2025-12-14 04:00:37'),
+(1923, 33, 'Grupo E', 5, '2025-12-14 04:00:37'),
+(1924, 33, 'Grupo F', 6, '2025-12-14 04:00:37'),
+(1937, 33, '2ª Fase - Ouro A', 100, '2025-12-14 17:16:52'),
+(1938, 33, '2ª Fase - Ouro B', 101, '2025-12-14 17:16:52'),
+(1939, 33, '2ª Fase - Prata A', 102, '2025-12-14 17:16:52'),
+(1940, 33, '2ª Fase - Prata B', 103, '2025-12-14 17:16:52'),
+(1941, 33, '2ª Fase - Bronze A', 104, '2025-12-14 17:16:52'),
+(1942, 33, '2ª Fase - Bronze B', 105, '2025-12-14 17:16:52'),
+(1943, 33, '2ª Fase - Ouro - Classificação', 150, '2025-12-14 17:17:32'),
+(1944, 33, '2ª Fase - Ouro - Chaves', 200, '2025-12-14 17:17:32'),
+(1945, 33, '2ª Fase - Prata - Classificação', 150, '2025-12-14 17:17:32'),
+(1946, 33, '2ª Fase - Prata - Chaves', 200, '2025-12-14 17:17:32'),
+(1947, 33, '2ª Fase - Bronze - Classificação', 150, '2025-12-14 17:17:32'),
+(1948, 33, '2ª Fase - Bronze - Chaves', 200, '2025-12-14 17:17:32');
 
 -- --------------------------------------------------------
 
@@ -811,14 +1134,60 @@ CREATE TABLE `torneio_grupo_times` (
 --
 
 INSERT INTO `torneio_grupo_times` (`id`, `grupo_id`, `time_id`, `data_criacao`) VALUES
-(153, 29, 259, '2025-12-05 17:52:28'),
-(154, 29, 260, '2025-12-05 17:52:28'),
-(155, 29, 261, '2025-12-05 17:52:28'),
-(156, 29, 262, '2025-12-05 17:52:28'),
-(157, 30, 263, '2025-12-05 17:52:28'),
-(158, 30, 264, '2025-12-05 17:52:28'),
-(159, 30, 265, '2025-12-05 17:52:28'),
-(160, 30, 266, '2025-12-05 17:52:28');
+(6047, 1919, 635, '2025-12-14 04:00:37'),
+(6048, 1919, 636, '2025-12-14 04:00:37'),
+(6049, 1919, 637, '2025-12-14 04:00:37'),
+(6050, 1919, 638, '2025-12-14 04:00:37'),
+(6051, 1919, 639, '2025-12-14 04:00:37'),
+(6052, 1920, 640, '2025-12-14 04:00:37'),
+(6053, 1920, 641, '2025-12-14 04:00:37'),
+(6054, 1920, 642, '2025-12-14 04:00:37'),
+(6055, 1920, 643, '2025-12-14 04:00:37'),
+(6056, 1920, 644, '2025-12-14 04:00:37'),
+(6057, 1921, 645, '2025-12-14 04:00:37'),
+(6058, 1921, 646, '2025-12-14 04:00:37'),
+(6059, 1921, 647, '2025-12-14 04:00:37'),
+(6060, 1921, 648, '2025-12-14 04:00:37'),
+(6061, 1921, 649, '2025-12-14 04:00:37'),
+(6062, 1922, 650, '2025-12-14 04:00:37'),
+(6063, 1922, 651, '2025-12-14 04:00:37'),
+(6064, 1922, 652, '2025-12-14 04:00:37'),
+(6065, 1922, 653, '2025-12-14 04:00:37'),
+(6066, 1922, 654, '2025-12-14 04:00:37'),
+(6067, 1923, 655, '2025-12-14 04:00:37'),
+(6068, 1923, 656, '2025-12-14 04:00:37'),
+(6069, 1923, 657, '2025-12-14 04:00:37'),
+(6070, 1923, 658, '2025-12-14 04:00:37'),
+(6071, 1923, 659, '2025-12-14 04:00:37'),
+(6072, 1924, 660, '2025-12-14 04:00:37'),
+(6073, 1924, 661, '2025-12-14 04:00:37'),
+(6074, 1924, 662, '2025-12-14 04:00:37'),
+(6075, 1924, 663, '2025-12-14 04:00:37'),
+(6076, 1924, 664, '2025-12-14 04:00:37'),
+(6101, 1937, 639, '2025-12-14 17:16:52'),
+(6102, 1937, 647, '2025-12-14 17:16:52'),
+(6103, 1937, 656, '2025-12-14 17:16:52'),
+(6104, 1937, 655, '2025-12-14 17:16:52'),
+(6105, 1938, 640, '2025-12-14 17:16:52'),
+(6106, 1938, 654, '2025-12-14 17:16:52'),
+(6107, 1938, 663, '2025-12-14 17:16:52'),
+(6108, 1938, 643, '2025-12-14 17:16:52'),
+(6109, 1939, 653, '2025-12-14 17:16:52'),
+(6110, 1939, 661, '2025-12-14 17:16:52'),
+(6111, 1939, 636, '2025-12-14 17:16:52'),
+(6112, 1939, 664, '2025-12-14 17:16:52'),
+(6113, 1940, 646, '2025-12-14 17:16:52'),
+(6114, 1940, 635, '2025-12-14 17:16:52'),
+(6115, 1940, 641, '2025-12-14 17:16:52'),
+(6116, 1940, 657, '2025-12-14 17:16:52'),
+(6117, 1941, 648, '2025-12-14 17:16:52'),
+(6118, 1941, 638, '2025-12-14 17:16:52'),
+(6119, 1941, 649, '2025-12-14 17:16:52'),
+(6120, 1941, 659, '2025-12-14 17:16:52'),
+(6121, 1942, 652, '2025-12-14 17:16:52'),
+(6122, 1942, 644, '2025-12-14 17:16:52'),
+(6123, 1942, 650, '2025-12-14 17:16:52'),
+(6124, 1942, 660, '2025-12-14 17:16:52');
 
 -- --------------------------------------------------------
 
@@ -893,54 +1262,123 @@ CREATE TABLE `torneio_participantes` (
 --
 
 INSERT INTO `torneio_participantes` (`id`, `torneio_id`, `usuario_id`, `nome_avulso`, `ordem`, `data_inscricao`, `posicao_final`) VALUES
-(250, 21, 37, NULL, 1, '2025-12-05 17:17:34', NULL),
-(251, 21, NULL, 'Lúcio', 2, '2025-12-05 17:17:53', NULL),
-(252, 21, NULL, 'Marina', 3, '2025-12-05 17:17:53', NULL),
-(253, 21, NULL, 'Valmir', 4, '2025-12-05 17:17:53', NULL),
-(254, 21, NULL, 'Jéssica', 5, '2025-12-05 17:17:53', NULL),
-(255, 21, NULL, 'Renato', 6, '2025-12-05 17:17:53', NULL),
-(256, 21, NULL, 'Bianca', 7, '2025-12-05 17:17:53', NULL),
-(257, 21, NULL, 'César', 8, '2025-12-05 17:17:53', NULL),
-(258, 21, NULL, 'Tainá', 9, '2025-12-05 17:17:53', NULL),
-(259, 21, NULL, 'Mauro', 10, '2025-12-05 17:17:53', NULL),
-(260, 21, NULL, 'Patrícia', 11, '2025-12-05 17:17:53', NULL),
-(261, 21, NULL, 'Álvaro', 12, '2025-12-05 17:17:53', NULL),
-(262, 21, NULL, 'Camila', 13, '2025-12-05 17:17:53', NULL),
-(263, 21, NULL, 'Edson', 14, '2025-12-05 17:17:53', NULL),
-(264, 21, NULL, 'Larissa', 15, '2025-12-05 17:17:53', NULL),
-(265, 21, NULL, 'Fábio', 16, '2025-12-05 17:17:53', NULL),
-(266, 21, NULL, 'Viviane', 17, '2025-12-05 17:17:53', NULL),
-(267, 21, NULL, 'Ricardo', 18, '2025-12-05 17:17:53', NULL),
-(268, 21, NULL, 'Tereza', 19, '2025-12-05 17:18:16', NULL),
-(269, 21, NULL, 'Daniel', 20, '2025-12-05 17:18:16', NULL),
-(270, 21, NULL, 'Natália', 21, '2025-12-05 17:18:16', NULL),
-(271, 21, NULL, 'Gustavo', 22, '2025-12-05 17:18:16', NULL),
-(272, 21, NULL, 'João', 23, '2025-12-05 17:18:16', NULL),
-(273, 21, NULL, 'Sabrina', 24, '2025-12-05 17:18:16', NULL),
-(274, 21, NULL, 'Ícaro', 25, '2025-12-05 17:18:16', NULL),
-(275, 21, NULL, 'Melissa', 26, '2025-12-05 17:18:16', NULL),
-(276, 21, NULL, 'Raul', 27, '2025-12-05 17:18:16', NULL),
-(277, 21, NULL, 'Sâmia', 28, '2025-12-05 17:18:16', NULL),
-(278, 21, NULL, 'Breno', 29, '2025-12-05 17:18:16', NULL),
-(279, 21, NULL, 'Eloá', 30, '2025-12-05 17:18:16', NULL),
-(280, 21, NULL, 'Henrique', 31, '2025-12-05 17:18:16', NULL),
-(281, 21, NULL, 'Taís', 32, '2025-12-05 17:18:16', NULL),
-(282, 22, 36, NULL, 1, '2025-12-05 18:05:51', NULL),
-(283, 22, 29, NULL, 2, '2025-12-05 18:05:51', NULL),
-(284, 22, 35, NULL, 3, '2025-12-05 18:05:51', NULL),
-(285, 22, 22, NULL, 4, '2025-12-05 18:05:51', NULL),
-(286, 22, 21, NULL, 5, '2025-12-05 18:05:51', NULL),
-(287, 22, 28, NULL, 6, '2025-12-05 18:05:51', NULL),
-(288, 22, 27, NULL, 7, '2025-12-05 18:05:51', NULL),
-(289, 22, 34, NULL, 8, '2025-12-05 18:05:51', NULL),
-(290, 22, 2, NULL, 9, '2025-12-05 18:05:51', NULL),
-(291, 22, 31, NULL, 10, '2025-12-05 18:05:51', NULL),
-(292, 22, 23, NULL, 11, '2025-12-05 18:05:51', NULL),
-(293, 22, 25, NULL, 12, '2025-12-05 18:05:51', NULL),
-(294, 22, 39, NULL, 13, '2025-12-05 18:05:51', NULL),
-(295, 22, 24, NULL, 14, '2025-12-05 18:05:51', NULL),
-(296, 22, 33, NULL, 15, '2025-12-05 18:05:51', NULL),
-(297, 22, 37, NULL, 16, '2025-12-05 18:05:51', NULL);
+(1290, 33, NULL, 'marcos machado', 1, '2025-12-13 22:51:55', NULL),
+(1291, 33, NULL, 'rodrigo kunz', 2, '2025-12-13 22:51:55', NULL),
+(1292, 33, NULL, 'carla indiele', 3, '2025-12-13 22:51:55', NULL),
+(1293, 33, NULL, 'michele flores', 4, '2025-12-13 22:51:55', NULL),
+(1294, 33, NULL, 'pâmela claussen', 5, '2025-12-13 22:51:55', NULL),
+(1295, 33, NULL, 'camila martins', 6, '2025-12-13 22:51:55', NULL),
+(1296, 33, NULL, 'edenílson gomes', 7, '2025-12-13 22:51:55', NULL),
+(1297, 33, NULL, 'júlio césar', 8, '2025-12-13 22:51:55', NULL),
+(1298, 33, NULL, 'pâmella souza', 9, '2025-12-13 22:51:55', NULL),
+(1299, 33, NULL, 'evelyn lucas', 10, '2025-12-13 22:51:55', NULL),
+(1300, 33, NULL, 'iuri aguiar', 11, '2025-12-13 22:51:55', NULL),
+(1301, 33, NULL, 'gustavo santos', 12, '2025-12-13 22:51:55', NULL),
+(1302, 33, NULL, 'samuel bombonatti', 13, '2025-12-13 22:51:55', NULL),
+(1303, 33, NULL, 'diego wouters', 14, '2025-12-13 22:51:55', NULL),
+(1304, 33, NULL, 'bruna gonçalves', 15, '2025-12-13 22:51:55', NULL),
+(1305, 33, NULL, 'nadine sacerdote', 16, '2025-12-13 22:51:55', NULL),
+(1306, 33, NULL, 'renan garlet', 17, '2025-12-13 22:51:55', NULL),
+(1307, 33, NULL, 'renato', 18, '2025-12-13 22:51:55', NULL),
+(1308, 33, NULL, 'andréia', 19, '2025-12-13 22:51:55', NULL),
+(1309, 33, NULL, 'josé', 20, '2025-12-13 22:51:55', NULL),
+(1310, 33, NULL, 'cristina', 21, '2025-12-13 22:51:55', NULL),
+(1311, 33, NULL, 'joão pedro alvez', 22, '2025-12-13 22:51:55', NULL),
+(1312, 33, NULL, 'henrique fagan', 23, '2025-12-13 22:51:55', NULL),
+(1313, 33, NULL, 'jhennifer porto', 24, '2025-12-13 22:51:55', NULL),
+(1314, 33, NULL, 'ana camila', 25, '2025-12-13 22:51:55', NULL),
+(1315, 33, NULL, 'igor rodrigues', 26, '2025-12-13 22:51:55', NULL),
+(1316, 33, NULL, 'thalis rodrigues', 27, '2025-12-13 22:51:55', NULL),
+(1317, 33, NULL, 'alice weber', 28, '2025-12-13 22:51:55', NULL),
+(1318, 33, NULL, 'antonela chiochet', 29, '2025-12-13 22:51:55', NULL),
+(1319, 33, NULL, 'henrique bones', 30, '2025-12-13 22:51:55', NULL),
+(1320, 33, NULL, 'bruno jardim', 31, '2025-12-13 22:51:55', NULL),
+(1321, 33, NULL, 'eduarda limberger', 32, '2025-12-13 22:51:55', NULL),
+(1322, 33, NULL, 'manu mello', 33, '2025-12-13 22:51:55', NULL),
+(1323, 33, NULL, 'clayton bertazzo', 34, '2025-12-13 22:51:55', NULL),
+(1324, 33, NULL, 'emelin ferreira', 35, '2025-12-13 22:51:55', NULL),
+(1325, 33, NULL, 'marinho santos', 36, '2025-12-13 22:51:55', NULL),
+(1326, 33, NULL, 'denize trindade', 37, '2025-12-13 22:51:55', NULL),
+(1327, 33, NULL, 'juliano garcia', 38, '2025-12-13 22:51:55', NULL),
+(1328, 33, NULL, 'ana julia', 39, '2025-12-13 22:51:55', NULL),
+(1329, 33, NULL, 'daniel severo', 40, '2025-12-13 22:51:55', NULL),
+(1330, 33, NULL, 'luis miguel', 41, '2025-12-13 22:51:55', NULL),
+(1331, 33, NULL, 'rafaela severo', 42, '2025-12-13 22:51:55', NULL),
+(1332, 33, NULL, 'dagoberto pereira', 43, '2025-12-13 22:51:55', NULL),
+(1333, 33, NULL, 'janaína anschau', 44, '2025-12-13 22:51:55', NULL),
+(1334, 33, NULL, 'douglas da rosa', 45, '2025-12-13 22:51:55', NULL),
+(1335, 33, NULL, 'júlia aguette', 46, '2025-12-13 22:51:55', NULL),
+(1336, 33, NULL, 'luis henrique coden', 47, '2025-12-13 22:51:55', NULL),
+(1337, 33, NULL, 'lurdes queiroz', 48, '2025-12-13 22:51:55', NULL),
+(1338, 33, NULL, 'samanta corrêa', 49, '2025-12-13 22:51:55', NULL),
+(1339, 33, NULL, 'gilberto tormes', 50, '2025-12-13 22:51:55', NULL),
+(1340, 33, NULL, 'fábio almeida', 51, '2025-12-13 22:51:55', NULL),
+(1341, 33, NULL, 'yuri rodrigues', 52, '2025-12-13 22:51:55', NULL),
+(1342, 33, NULL, 'giovana padoin', 53, '2025-12-13 22:51:55', NULL),
+(1343, 33, NULL, 'jhenniffer lopes', 54, '2025-12-13 22:51:55', NULL),
+(1344, 33, NULL, 'kauê zago', 55, '2025-12-13 22:51:55', NULL),
+(1345, 33, NULL, 'gustavo adam', 56, '2025-12-13 22:51:55', NULL),
+(1346, 33, NULL, 'thyago lucas', 57, '2025-12-13 22:51:55', NULL),
+(1347, 33, NULL, 'adriéli zago', 58, '2025-12-13 22:51:55', NULL),
+(1348, 33, NULL, 'izadora hoffmann', 59, '2025-12-13 22:51:55', NULL),
+(1349, 33, NULL, 'manuel netto', 60, '2025-12-13 22:51:55', NULL),
+(1350, 33, NULL, 'núria brum', 61, '2025-12-13 22:51:55', NULL),
+(1351, 33, NULL, 'lidiane marques leal', 62, '2025-12-13 22:51:55', NULL),
+(1352, 33, NULL, 'roberto barcelos', 63, '2025-12-13 22:51:55', NULL),
+(1353, 33, NULL, 'jamerson caldeira', 64, '2025-12-13 22:51:55', NULL),
+(1354, 33, NULL, 'licinara caldeira', 65, '2025-12-13 22:51:55', NULL),
+(1355, 33, NULL, 'william werlang', 66, '2025-12-13 22:51:55', NULL),
+(1356, 33, NULL, 'fernanda mativi', 67, '2025-12-13 22:51:55', NULL),
+(1357, 33, NULL, 'sérgio chimini', 68, '2025-12-13 22:51:55', NULL),
+(1358, 33, NULL, 'aline pagel', 69, '2025-12-13 22:51:55', NULL),
+(1359, 33, NULL, 'gabriel lopes', 70, '2025-12-13 22:51:55', NULL),
+(1360, 33, NULL, 'sabrina chimini', 71, '2025-12-13 22:51:55', NULL),
+(1361, 33, NULL, 'felipe moreira', 72, '2025-12-13 22:51:55', NULL),
+(1362, 33, NULL, 'thalles de oliveira', 73, '2025-12-13 22:51:55', NULL),
+(1363, 33, NULL, 'anelise campos', 74, '2025-12-13 22:51:55', NULL),
+(1364, 33, NULL, 'júlia mello', 75, '2025-12-13 22:51:55', NULL),
+(1365, 33, NULL, 'daniel fumaça', 76, '2025-12-13 22:51:55', NULL),
+(1366, 33, NULL, 'michael andrey', 77, '2025-12-13 22:51:55', NULL),
+(1367, 33, NULL, 'gabrieli martini', 78, '2025-12-13 22:51:55', NULL),
+(1368, 33, NULL, 'eduarda gripa', 79, '2025-12-13 22:51:55', NULL),
+(1369, 33, NULL, 'maria izalanski', 80, '2025-12-13 22:51:55', NULL),
+(1370, 33, NULL, 'andressa kleist', 81, '2025-12-13 22:51:55', NULL),
+(1371, 33, NULL, 'fernando campos', 82, '2025-12-13 22:51:55', NULL),
+(1372, 33, NULL, 'matheus souto', 83, '2025-12-13 22:51:55', NULL),
+(1373, 33, NULL, 'bruno ennes', 84, '2025-12-13 22:51:55', NULL),
+(1374, 33, NULL, 'jefersson souza', 85, '2025-12-13 22:51:55', NULL),
+(1375, 33, NULL, 'aline giacomazzo', 86, '2025-12-13 22:51:55', NULL),
+(1376, 33, NULL, 'juliane cheron', 87, '2025-12-13 22:51:55', NULL),
+(1377, 33, NULL, 'priscilla morais', 88, '2025-12-13 22:51:55', NULL),
+(1378, 33, NULL, 'gabriel fontana', 89, '2025-12-13 22:51:55', NULL),
+(1379, 33, NULL, 'anderson dos santos', 90, '2025-12-13 22:51:55', NULL),
+(1380, 33, NULL, 'gilce plate', 91, '2025-12-13 22:51:55', NULL),
+(1381, 33, NULL, 'rodrigo carvalho', 92, '2025-12-13 22:51:55', NULL),
+(1382, 33, NULL, 'alberson soares', 93, '2025-12-13 22:51:55', NULL),
+(1383, 33, NULL, 'katiusci lehnhard', 94, '2025-12-13 22:51:55', NULL),
+(1384, 33, NULL, 'tiago bremm', 95, '2025-12-13 22:51:55', NULL),
+(1385, 33, NULL, 'cris bremm', 96, '2025-12-13 22:51:55', NULL),
+(1386, 33, NULL, 'junior gomes', 97, '2025-12-13 22:51:55', NULL),
+(1387, 33, NULL, 'laura moro', 98, '2025-12-13 22:51:55', NULL),
+(1388, 33, NULL, 'luciellen ribas', 99, '2025-12-13 22:51:55', NULL),
+(1389, 33, NULL, 'hércules gonçalves', 100, '2025-12-13 22:51:55', NULL),
+(1390, 33, NULL, 'maria julia ventura', 101, '2025-12-13 22:51:55', NULL),
+(1391, 33, NULL, 'lavínia jesuíno', 102, '2025-12-13 22:51:55', NULL),
+(1392, 33, NULL, 'henry de oliveira', 103, '2025-12-13 22:51:55', NULL),
+(1393, 33, NULL, 'eduardo menegaes', 104, '2025-12-13 22:51:55', NULL),
+(1394, 33, NULL, 'lary severo', 105, '2025-12-13 22:51:55', NULL),
+(1395, 33, NULL, 'adrian kralik', 106, '2025-12-13 22:51:55', NULL),
+(1396, 33, NULL, 'vinicios rodrigues', 107, '2025-12-13 22:51:55', NULL),
+(1397, 33, NULL, 'renata visentini', 108, '2025-12-13 22:51:55', NULL),
+(1398, 33, NULL, 'jonathan wouters', 109, '2025-12-13 22:51:55', NULL),
+(1399, 33, NULL, 'joice roque', 110, '2025-12-13 22:51:55', NULL),
+(1400, 33, NULL, 'guilherme turna', 111, '2025-12-13 22:51:55', NULL),
+(1401, 33, NULL, 'nathalia adam', 112, '2025-12-13 22:51:55', NULL),
+(1402, 33, NULL, 'thaís rosa', 113, '2025-12-13 22:51:55', NULL),
+(1403, 33, NULL, 'maurício bueno', 114, '2025-12-13 22:51:55', NULL),
+(1404, 33, NULL, 'daiana siqueira', 115, '2025-12-13 22:51:55', NULL),
+(1405, 33, NULL, 'diego lorensi', 116, '2025-12-13 22:51:55', NULL),
+(1406, 33, NULL, 'morgana bevilacqua', 117, '2025-12-13 22:51:55', NULL);
 
 -- --------------------------------------------------------
 
@@ -953,9 +1391,10 @@ CREATE TABLE `torneio_partidas` (
   `torneio_id` int(11) NOT NULL,
   `time1_id` int(11) NOT NULL,
   `time2_id` int(11) NOT NULL,
-  `fase` enum('Grupos','Quartas','Semi','Final','3º Lugar') DEFAULT 'Grupos',
+  `fase` enum('Grupos','Quartas','Semi','Final','3º Lugar','2ª Fase') DEFAULT 'Grupos',
   `rodada` int(11) DEFAULT 1 COMMENT 'Número da rodada na fase',
   `grupo_id` int(11) DEFAULT NULL COMMENT 'ID do grupo (para modalidade todos_chaves)',
+  `quadra` int(11) DEFAULT NULL,
   `pontos_time1` int(11) DEFAULT 0,
   `pontos_time2` int(11) DEFAULT 0,
   `vencedor_id` int(11) DEFAULT NULL,
@@ -968,25 +1407,67 @@ CREATE TABLE `torneio_partidas` (
 -- Despejando dados para a tabela `torneio_partidas`
 --
 
-INSERT INTO `torneio_partidas` (`id`, `torneio_id`, `time1_id`, `time2_id`, `fase`, `rodada`, `grupo_id`, `pontos_time1`, `pontos_time2`, `vencedor_id`, `data_partida`, `status`, `data_criacao`) VALUES
-(137, 21, 259, 260, 'Grupos', 1, 29, 12, 15, 260, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(138, 21, 261, 262, 'Grupos', 1, 29, 15, 12, 261, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(139, 21, 259, 261, 'Grupos', 2, 29, 8, 15, 261, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(140, 21, 260, 262, 'Grupos', 2, 29, 15, 9, 260, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(141, 21, 259, 262, 'Grupos', 3, 29, 15, 13, 259, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(142, 21, 260, 261, 'Grupos', 3, 29, 12, 15, 261, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(143, 21, 263, 264, 'Grupos', 1, 30, 5, 15, 264, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(144, 21, 265, 266, 'Grupos', 1, 30, 15, 12, 265, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(145, 21, 263, 265, 'Grupos', 2, 30, 9, 15, 265, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(146, 21, 264, 266, 'Grupos', 2, 30, 15, 5, 264, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(147, 21, 263, 266, 'Grupos', 3, 30, 12, 15, 266, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(148, 21, 264, 265, 'Grupos', 3, 30, 15, 6, 264, NULL, 'Finalizada', '2025-12-05 17:52:28'),
-(149, 22, 267, 268, 'Grupos', 1, NULL, 15, 10, 267, NULL, 'Finalizada', '2025-12-05 18:08:09'),
-(150, 22, 269, 270, 'Grupos', 1, NULL, 12, 15, 270, NULL, 'Finalizada', '2025-12-05 18:08:09'),
-(151, 22, 267, 269, 'Grupos', 2, NULL, 15, 10, 267, NULL, 'Finalizada', '2025-12-05 18:08:09'),
-(152, 22, 268, 270, 'Grupos', 2, NULL, 15, 5, 268, NULL, 'Finalizada', '2025-12-05 18:08:09'),
-(153, 22, 267, 270, 'Grupos', 3, NULL, 15, 12, 267, NULL, 'Finalizada', '2025-12-05 18:08:09'),
-(154, 22, 268, 269, 'Grupos', 3, NULL, 15, 9, 268, NULL, 'Finalizada', '2025-12-05 18:08:09');
+INSERT INTO `torneio_partidas` (`id`, `torneio_id`, `time1_id`, `time2_id`, `fase`, `rodada`, `grupo_id`, `quadra`, `pontos_time1`, `pontos_time2`, `vencedor_id`, `data_partida`, `status`, `data_criacao`) VALUES
+(6941, 33, 635, 636, 'Grupos', 1, 1919, 1, 15, 18, 636, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6942, 33, 636, 639, 'Grupos', 1, 1919, 1, 17, 19, 639, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6943, 33, 637, 638, 'Grupos', 1, 1919, 1, 18, 13, 637, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6944, 33, 635, 637, 'Grupos', 2, 1919, 1, 18, 2, 635, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6945, 33, 636, 638, 'Grupos', 2, 1919, 1, 18, 20, 638, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6946, 33, 637, 639, 'Grupos', 2, 1919, 1, 7, 18, 639, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6947, 33, 635, 638, 'Grupos', 3, 1919, 1, 18, 12, 635, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6948, 33, 636, 637, 'Grupos', 3, 1919, 1, 18, 6, 636, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6949, 33, 638, 639, 'Grupos', 3, 1919, 1, 12, 18, 639, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6950, 33, 635, 639, 'Grupos', 4, 1919, 1, 12, 18, 639, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6951, 33, 640, 641, 'Grupos', 1, 1920, 2, 18, 9, 640, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6952, 33, 641, 644, 'Grupos', 1, 1920, 2, 18, 12, 641, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6953, 33, 642, 643, 'Grupos', 1, 1920, 2, 11, 18, 643, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6954, 33, 640, 642, 'Grupos', 2, 1920, 2, 18, 12, 640, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6955, 33, 641, 643, 'Grupos', 2, 1920, 2, 14, 18, 643, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6956, 33, 642, 644, 'Grupos', 2, 1920, 2, 5, 18, 644, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6957, 33, 640, 643, 'Grupos', 3, 1920, 2, 18, 9, 640, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6958, 33, 641, 642, 'Grupos', 3, 1920, 2, 18, 13, 641, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6959, 33, 643, 644, 'Grupos', 3, 1920, 2, 18, 14, 643, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6960, 33, 640, 644, 'Grupos', 4, 1920, 2, 18, 9, 640, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6961, 33, 645, 646, 'Grupos', 1, 1921, 3, 0, 18, 646, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6962, 33, 646, 649, 'Grupos', 1, 1921, 3, 18, 11, 646, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6963, 33, 647, 648, 'Grupos', 1, 1921, 3, 18, 13, 647, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6964, 33, 645, 647, 'Grupos', 2, 1921, 3, 13, 18, 647, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6965, 33, 646, 648, 'Grupos', 2, 1921, 3, 16, 18, 648, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6966, 33, 647, 649, 'Grupos', 2, 1921, 3, 18, 13, 647, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6967, 33, 645, 648, 'Grupos', 3, 1921, 3, 16, 18, 648, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6968, 33, 646, 647, 'Grupos', 3, 1921, 3, 17, 19, 647, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6969, 33, 648, 649, 'Grupos', 3, 1921, 3, 8, 18, 649, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6970, 33, 645, 649, 'Grupos', 4, 1921, 3, 18, 12, 645, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6971, 33, 650, 651, 'Grupos', 1, 1922, 4, 13, 18, 651, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6972, 33, 651, 654, 'Grupos', 1, 1922, 4, 12, 18, 654, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6973, 33, 652, 653, 'Grupos', 1, 1922, 4, 16, 18, 653, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6974, 33, 650, 652, 'Grupos', 2, 1922, 4, 18, 9, 650, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6975, 33, 651, 653, 'Grupos', 2, 1922, 4, 15, 18, 653, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6976, 33, 652, 654, 'Grupos', 2, 1922, 4, 16, 18, 654, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6977, 33, 650, 653, 'Grupos', 3, 1922, 4, 15, 18, 653, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6978, 33, 651, 652, 'Grupos', 3, 1922, 4, 11, 18, 652, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6979, 33, 653, 654, 'Grupos', 3, 1922, 4, 9, 18, 654, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6980, 33, 650, 654, 'Grupos', 4, 1922, 4, 11, 18, 654, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6981, 33, 655, 656, 'Grupos', 1, 1923, 5, 18, 7, 655, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6982, 33, 656, 659, 'Grupos', 1, 1923, 5, 18, 8, 656, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6983, 33, 657, 658, 'Grupos', 1, 1923, 5, 18, 15, 657, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6984, 33, 655, 657, 'Grupos', 2, 1923, 5, 12, 18, 657, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6985, 33, 656, 658, 'Grupos', 2, 1923, 5, 18, 2, 656, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6986, 33, 657, 659, 'Grupos', 2, 1923, 5, 16, 18, 659, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6987, 33, 655, 658, 'Grupos', 3, 1923, 5, 18, 12, 655, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6988, 33, 656, 657, 'Grupos', 3, 1923, 5, 18, 5, 656, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6989, 33, 658, 659, 'Grupos', 3, 1923, 5, 18, 16, 658, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6990, 33, 655, 659, 'Grupos', 4, 1923, 5, 18, 10, 655, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6991, 33, 660, 661, 'Grupos', 1, 1924, 6, 12, 18, 661, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6992, 33, 661, 664, 'Grupos', 1, 1924, 6, 17, 19, 664, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6993, 33, 662, 663, 'Grupos', 1, 1924, 6, 10, 18, 663, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6994, 33, 660, 662, 'Grupos', 2, 1924, 6, 18, 14, 660, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6995, 33, 661, 663, 'Grupos', 2, 1924, 6, 16, 18, 663, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6996, 33, 662, 664, 'Grupos', 2, 1924, 6, 10, 18, 664, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6997, 33, 660, 663, 'Grupos', 3, 1924, 6, 7, 18, 663, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6998, 33, 661, 662, 'Grupos', 3, 1924, 6, 18, 5, 661, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(6999, 33, 663, 664, 'Grupos', 3, 1924, 6, 18, 9, 663, NULL, 'Finalizada', '2025-12-14 04:00:42'),
+(7000, 33, 660, 664, 'Grupos', 4, 1924, 6, 18, 15, 660, NULL, 'Finalizada', '2025-12-14 04:00:42');
 
 -- --------------------------------------------------------
 
@@ -1031,18 +1512,36 @@ CREATE TABLE `torneio_times` (
 --
 
 INSERT INTO `torneio_times` (`id`, `torneio_id`, `nome`, `cor`, `ordem`, `data_criacao`) VALUES
-(259, 21, 'Time 1', '#007bff', 1, '2025-12-05 17:26:23'),
-(260, 21, 'Time 2', '#28a745', 2, '2025-12-05 17:26:23'),
-(261, 21, 'Time 3', '#dc3545', 3, '2025-12-05 17:26:23'),
-(262, 21, 'Time 4', '#ffc107', 4, '2025-12-05 17:26:23'),
-(263, 21, 'Time 5', '#17a2b8', 5, '2025-12-05 17:26:23'),
-(264, 21, 'Time 6', '#6f42c1', 6, '2025-12-05 17:26:23'),
-(265, 21, 'Time 7', '#e83e8c', 7, '2025-12-05 17:26:23'),
-(266, 21, 'Time 8', '#fd7e14', 8, '2025-12-05 17:26:23'),
-(267, 22, 'Time 1', '#007bff', 1, '2025-12-05 18:05:58'),
-(268, 22, 'Time 2', '#28a745', 2, '2025-12-05 18:05:58'),
-(269, 22, 'Time 3', '#dc3545', 3, '2025-12-05 18:05:58'),
-(270, 22, 'Time 4', '#ffc107', 4, '2025-12-05 18:05:58');
+(635, 33, 'Farpas', '#007bff', 1, '2025-12-13 22:49:47'),
+(636, 33, 'UPG', '#28a745', 2, '2025-12-13 22:49:47'),
+(637, 33, 'F5 doVolei', '#dc3545', 3, '2025-12-13 22:49:47'),
+(638, 33, 'AVM Volei', '#ffc107', 4, '2025-12-13 22:49:47'),
+(639, 33, 'Shadow Blitz', '#17a2b8', 5, '2025-12-13 22:49:47'),
+(640, 33, 'Saca No pior', '#6f42c1', 6, '2025-12-13 22:49:47'),
+(641, 33, 'Rangers Supreme', '#e83e8c', 7, '2025-12-13 22:49:47'),
+(642, 33, 'Danger', '#fd7e14', 8, '2025-12-13 22:49:47'),
+(643, 33, 'Quarteto Fantastico', '#20c997', 9, '2025-12-13 22:49:47'),
+(644, 33, 'AVM Amigos', '#6610f2', 10, '2025-12-13 22:49:47'),
+(645, 33, '4 Tons de Volei', '#343a40', 11, '2025-12-13 22:49:47'),
+(646, 33, 'Um time Duvidoso', '#6c757d', 12, '2025-12-13 22:49:47'),
+(647, 33, 'Santo Volei B', '#007bff', 13, '2025-12-13 22:49:47'),
+(648, 33, 'Bar Sem Lona', '#28a745', 14, '2025-12-13 22:49:47'),
+(649, 33, 'Diretoria', '#dc3545', 15, '2025-12-13 22:49:47'),
+(650, 33, 'Aleatorio Volei', '#ffc107', 16, '2025-12-13 22:49:47'),
+(651, 33, 'Os 4 Elementos', '#17a2b8', 17, '2025-12-13 22:49:47'),
+(652, 33, 'Prime 4', '#6f42c1', 18, '2025-12-13 22:49:47'),
+(653, 33, 'AAAFAS', '#e83e8c', 19, '2025-12-13 22:49:47'),
+(654, 33, 'Trupe', '#fd7e14', 20, '2025-12-13 22:49:47'),
+(655, 33, 'Vai que Da', '#20c997', 21, '2025-12-13 22:49:47'),
+(656, 33, 'Vai que da Diretoria', '#6610f2', 22, '2025-12-13 22:49:47'),
+(657, 33, 'Marte Volei', '#343a40', 23, '2025-12-13 22:49:47'),
+(658, 33, 'NVS', '#6c757d', 24, '2025-12-13 22:49:47'),
+(659, 33, 'Os Pertubados', '#007bff', 25, '2025-12-13 22:49:47'),
+(660, 33, 'Dinos 1', '#28a745', 26, '2025-12-13 22:49:47'),
+(661, 33, 'Santo Volei A', '#dc3545', 27, '2025-12-13 22:49:47'),
+(662, 33, 'Dinos 2', '#ffc107', 28, '2025-12-13 22:49:47'),
+(663, 33, 'Os Cansados', '#17a2b8', 29, '2025-12-13 22:49:47'),
+(664, 33, 'Rangers', '#6f42c1', 30, '2025-12-13 22:49:47');
 
 -- --------------------------------------------------------
 
@@ -1061,54 +1560,115 @@ CREATE TABLE `torneio_time_integrantes` (
 --
 
 INSERT INTO `torneio_time_integrantes` (`id`, `time_id`, `participante_id`) VALUES
-(820, 259, 256),
-(819, 259, 268),
-(821, 259, 276),
-(822, 259, 281),
-(825, 260, 250),
-(824, 260, 263),
-(823, 260, 277),
-(849, 260, 279),
-(828, 261, 254),
-(829, 261, 259),
-(826, 261, 260),
-(827, 261, 267),
-(833, 262, 261),
-(832, 262, 262),
-(830, 262, 271),
-(831, 262, 274),
-(850, 263, 251),
-(835, 263, 257),
-(836, 263, 265),
-(834, 263, 278),
-(839, 264, 252),
-(837, 264, 253),
-(840, 264, 255),
-(838, 264, 269),
-(841, 265, 270),
-(842, 265, 272),
-(843, 265, 273),
-(844, 265, 280),
-(845, 266, 258),
-(847, 266, 264),
-(848, 266, 266),
-(846, 266, 275),
-(901, 267, 283),
-(904, 267, 294),
-(902, 267, 296),
-(903, 267, 297),
-(905, 268, 286),
-(906, 268, 288),
-(907, 268, 289),
-(908, 268, 292),
-(909, 269, 282),
-(910, 269, 287),
-(911, 269, 290),
-(912, 269, 291),
-(913, 270, 284),
-(914, 270, 285),
-(915, 270, 293),
-(916, 270, 295);
+(3421, 635, 1344),
+(3422, 635, 1345),
+(3423, 635, 1346),
+(3424, 635, 1347),
+(3425, 636, 1357),
+(3426, 636, 1358),
+(3427, 636, 1359),
+(3428, 636, 1360),
+(3429, 637, 1377),
+(3430, 637, 1378),
+(3431, 637, 1379),
+(3432, 637, 1380),
+(3433, 638, 1328),
+(3434, 638, 1329),
+(3435, 638, 1330),
+(3436, 638, 1331),
+(3437, 640, 1361),
+(3438, 640, 1362),
+(3439, 640, 1363),
+(3440, 640, 1364),
+(3441, 641, 1332),
+(3442, 641, 1333),
+(3443, 641, 1334),
+(3444, 641, 1335),
+(3445, 642, 1373),
+(3446, 642, 1374),
+(3447, 642, 1375),
+(3448, 642, 1376),
+(3449, 643, 1340),
+(3450, 643, 1341),
+(3451, 643, 1342),
+(3452, 643, 1343),
+(3453, 644, 1394),
+(3454, 644, 1395),
+(3455, 644, 1396),
+(3456, 644, 1397),
+(3457, 645, 1390),
+(3458, 645, 1391),
+(3459, 645, 1392),
+(3460, 645, 1393),
+(3461, 646, 1402),
+(3462, 647, 1311),
+(3463, 647, 1312),
+(3464, 647, 1313),
+(3465, 647, 1314),
+(3466, 648, 1353),
+(3467, 648, 1354),
+(3468, 648, 1355),
+(3469, 648, 1356),
+(3470, 649, 1349),
+(3471, 649, 1350),
+(3472, 649, 1351),
+(3473, 649, 1352),
+(3474, 651, 1403),
+(3475, 651, 1404),
+(3476, 651, 1405),
+(3477, 651, 1406),
+(3478, 652, 1386),
+(3479, 652, 1387),
+(3480, 652, 1388),
+(3481, 652, 1389),
+(3482, 653, 1298),
+(3483, 653, 1299),
+(3484, 653, 1300),
+(3485, 653, 1301),
+(3486, 654, 1320),
+(3487, 654, 1321),
+(3488, 654, 1322),
+(3489, 654, 1323),
+(3490, 655, 1303),
+(3491, 655, 1304),
+(3492, 655, 1305),
+(3493, 655, 1306),
+(3494, 656, 1294),
+(3495, 656, 1295),
+(3496, 656, 1296),
+(3497, 656, 1297),
+(3498, 657, 1324),
+(3499, 657, 1325),
+(3500, 657, 1326),
+(3501, 657, 1327),
+(3502, 658, 1336),
+(3503, 658, 1337),
+(3504, 658, 1338),
+(3505, 658, 1339),
+(3506, 659, 1290),
+(3507, 659, 1291),
+(3508, 659, 1292),
+(3509, 659, 1293),
+(3510, 660, 1365),
+(3511, 660, 1366),
+(3512, 660, 1367),
+(3513, 660, 1368),
+(3514, 661, 1307),
+(3515, 661, 1308),
+(3516, 661, 1309),
+(3517, 661, 1310),
+(3518, 662, 1369),
+(3519, 662, 1370),
+(3520, 662, 1371),
+(3521, 662, 1372),
+(3522, 663, 1398),
+(3523, 663, 1399),
+(3524, 663, 1400),
+(3525, 663, 1401),
+(3526, 664, 1382),
+(3527, 664, 1383),
+(3528, 664, 1384),
+(3529, 664, 1385);
 
 -- --------------------------------------------------------
 
@@ -1222,6 +1782,54 @@ ALTER TABLE `grupos`
   ADD KEY `administrador_id` (`administrador_id`);
 
 --
+-- Índices de tabela `grupo_jogos`
+--
+ALTER TABLE `grupo_jogos`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `grupo_id` (`grupo_id`),
+  ADD KEY `criado_por` (`criado_por`);
+
+--
+-- Índices de tabela `grupo_jogo_classificacao`
+--
+ALTER TABLE `grupo_jogo_classificacao`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `jogo_time` (`jogo_id`,`time_id`),
+  ADD KEY `time_id` (`time_id`);
+
+--
+-- Índices de tabela `grupo_jogo_participantes`
+--
+ALTER TABLE `grupo_jogo_participantes`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `jogo_usuario` (`jogo_id`,`usuario_id`),
+  ADD KEY `usuario_id` (`usuario_id`);
+
+--
+-- Índices de tabela `grupo_jogo_partidas`
+--
+ALTER TABLE `grupo_jogo_partidas`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `jogo_id` (`jogo_id`),
+  ADD KEY `time1_id` (`time1_id`),
+  ADD KEY `time2_id` (`time2_id`);
+
+--
+-- Índices de tabela `grupo_jogo_times`
+--
+ALTER TABLE `grupo_jogo_times`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `jogo_id` (`jogo_id`);
+
+--
+-- Índices de tabela `grupo_jogo_time_integrantes`
+--
+ALTER TABLE `grupo_jogo_time_integrantes`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `time_participante` (`time_id`,`participante_id`),
+  ADD KEY `participante_id` (`participante_id`);
+
+--
 -- Índices de tabela `grupo_membros`
 --
 ALTER TABLE `grupo_membros`
@@ -1272,6 +1880,45 @@ ALTER TABLE `partidas`
   ADD KEY `jogo_id` (`jogo_id`),
   ADD KEY `time1_id` (`time1_id`),
   ADD KEY `time2_id` (`time2_id`);
+
+--
+-- Índices de tabela `partidas_2fase_classificacao`
+--
+ALTER TABLE `partidas_2fase_classificacao`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_torneio_time_grupo` (`torneio_id`,`time_id`,`grupo_id`),
+  ADD KEY `idx_torneio_id` (`torneio_id`),
+  ADD KEY `idx_grupo_id` (`grupo_id`),
+  ADD KEY `idx_time_id` (`time_id`),
+  ADD KEY `idx_posicao` (`posicao`),
+  ADD KEY `idx_torneio_grupo` (`torneio_id`,`grupo_id`);
+
+--
+-- Índices de tabela `partidas_2fase_eliminatorias`
+--
+ALTER TABLE `partidas_2fase_eliminatorias`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_torneio_id` (`torneio_id`),
+  ADD KEY `idx_serie` (`serie`),
+  ADD KEY `idx_tipo_eliminatoria` (`tipo_eliminatoria`),
+  ADD KEY `idx_time1_id` (`time1_id`),
+  ADD KEY `idx_time2_id` (`time2_id`),
+  ADD KEY `idx_vencedor_id` (`vencedor_id`),
+  ADD KEY `idx_status` (`status`),
+  ADD KEY `idx_torneio_serie_tipo` (`torneio_id`,`serie`,`tipo_eliminatoria`);
+
+--
+-- Índices de tabela `partidas_2fase_torneio`
+--
+ALTER TABLE `partidas_2fase_torneio`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_torneio_id` (`torneio_id`),
+  ADD KEY `idx_grupo_id` (`grupo_id`),
+  ADD KEY `idx_time1_id` (`time1_id`),
+  ADD KEY `idx_time2_id` (`time2_id`),
+  ADD KEY `idx_vencedor_id` (`vencedor_id`),
+  ADD KEY `idx_status` (`status`),
+  ADD KEY `idx_torneio_grupo` (`torneio_id`,`grupo_id`);
 
 --
 -- Índices de tabela `profissionais`
@@ -1535,10 +2182,46 @@ ALTER TABLE `grupos`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
+-- AUTO_INCREMENT de tabela `grupo_jogos`
+--
+ALTER TABLE `grupo_jogos`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT de tabela `grupo_jogo_classificacao`
+--
+ALTER TABLE `grupo_jogo_classificacao`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de tabela `grupo_jogo_participantes`
+--
+ALTER TABLE `grupo_jogo_participantes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+
+--
+-- AUTO_INCREMENT de tabela `grupo_jogo_partidas`
+--
+ALTER TABLE `grupo_jogo_partidas`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de tabela `grupo_jogo_times`
+--
+ALTER TABLE `grupo_jogo_times`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
+
+--
+-- AUTO_INCREMENT de tabela `grupo_jogo_time_integrantes`
+--
+ALTER TABLE `grupo_jogo_time_integrantes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=74;
+
+--
 -- AUTO_INCREMENT de tabela `grupo_membros`
 --
 ALTER TABLE `grupo_membros`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=38;
 
 --
 -- AUTO_INCREMENT de tabela `jogos`
@@ -1562,7 +2245,7 @@ ALTER TABLE `loja_produtos`
 -- AUTO_INCREMENT de tabela `notificacoes`
 --
 ALTER TABLE `notificacoes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=56;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
 
 --
 -- AUTO_INCREMENT de tabela `pagamentos`
@@ -1575,6 +2258,24 @@ ALTER TABLE `pagamentos`
 --
 ALTER TABLE `partidas`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de tabela `partidas_2fase_classificacao`
+--
+ALTER TABLE `partidas_2fase_classificacao`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=547;
+
+--
+-- AUTO_INCREMENT de tabela `partidas_2fase_eliminatorias`
+--
+ALTER TABLE `partidas_2fase_eliminatorias`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=89;
+
+--
+-- AUTO_INCREMENT de tabela `partidas_2fase_torneio`
+--
+ALTER TABLE `partidas_2fase_torneio`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=937;
 
 --
 -- AUTO_INCREMENT de tabela `profissionais`
@@ -1604,7 +2305,7 @@ ALTER TABLE `sistema_pontuacao_jogos`
 -- AUTO_INCREMENT de tabela `sistema_pontuacao_participantes`
 --
 ALTER TABLE `sistema_pontuacao_participantes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=44;
 
 --
 -- AUTO_INCREMENT de tabela `sistema_pontuacao_pontos`
@@ -1640,7 +2341,7 @@ ALTER TABLE `time_jogadores`
 -- AUTO_INCREMENT de tabela `torneios`
 --
 ALTER TABLE `torneios`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_chaves`
@@ -1658,19 +2359,19 @@ ALTER TABLE `torneio_chaves_times`
 -- AUTO_INCREMENT de tabela `torneio_classificacao`
 --
 ALTER TABLE `torneio_classificacao`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=109;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15789;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_grupos`
 --
 ALTER TABLE `torneio_grupos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1949;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_grupo_times`
 --
 ALTER TABLE `torneio_grupo_times`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=161;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6125;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_jogos`
@@ -1694,13 +2395,13 @@ ALTER TABLE `torneio_modalidades`
 -- AUTO_INCREMENT de tabela `torneio_participantes`
 --
 ALTER TABLE `torneio_participantes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=298;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1407;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_partidas`
 --
 ALTER TABLE `torneio_partidas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=155;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7001;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_solicitacoes`
@@ -1712,13 +2413,13 @@ ALTER TABLE `torneio_solicitacoes`
 -- AUTO_INCREMENT de tabela `torneio_times`
 --
 ALTER TABLE `torneio_times`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=271;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=665;
 
 --
 -- AUTO_INCREMENT de tabela `torneio_time_integrantes`
 --
 ALTER TABLE `torneio_time_integrantes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=917;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3530;
 
 --
 -- AUTO_INCREMENT de tabela `usuarios`
@@ -1788,6 +2489,33 @@ ALTER TABLE `partidas`
   ADD CONSTRAINT `partidas_ibfk_1` FOREIGN KEY (`jogo_id`) REFERENCES `jogos` (`id`),
   ADD CONSTRAINT `partidas_ibfk_2` FOREIGN KEY (`time1_id`) REFERENCES `times` (`id`),
   ADD CONSTRAINT `partidas_ibfk_3` FOREIGN KEY (`time2_id`) REFERENCES `times` (`id`);
+
+--
+-- Restrições para tabelas `partidas_2fase_classificacao`
+--
+ALTER TABLE `partidas_2fase_classificacao`
+  ADD CONSTRAINT `fk_classificacao_2fase_grupo` FOREIGN KEY (`grupo_id`) REFERENCES `torneio_grupos` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_classificacao_2fase_time` FOREIGN KEY (`time_id`) REFERENCES `torneio_times` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_classificacao_2fase_torneio` FOREIGN KEY (`torneio_id`) REFERENCES `torneios` (`id`) ON DELETE CASCADE;
+
+--
+-- Restrições para tabelas `partidas_2fase_eliminatorias`
+--
+ALTER TABLE `partidas_2fase_eliminatorias`
+  ADD CONSTRAINT `fk_eliminatorias_time1` FOREIGN KEY (`time1_id`) REFERENCES `torneio_times` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_eliminatorias_time2` FOREIGN KEY (`time2_id`) REFERENCES `torneio_times` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_eliminatorias_torneio` FOREIGN KEY (`torneio_id`) REFERENCES `torneios` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_eliminatorias_vencedor` FOREIGN KEY (`vencedor_id`) REFERENCES `torneio_times` (`id`) ON DELETE SET NULL;
+
+--
+-- Restrições para tabelas `partidas_2fase_torneio`
+--
+ALTER TABLE `partidas_2fase_torneio`
+  ADD CONSTRAINT `fk_partidas_2fase_grupo` FOREIGN KEY (`grupo_id`) REFERENCES `torneio_grupos` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_partidas_2fase_time1` FOREIGN KEY (`time1_id`) REFERENCES `torneio_times` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_partidas_2fase_time2` FOREIGN KEY (`time2_id`) REFERENCES `torneio_times` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_partidas_2fase_torneio` FOREIGN KEY (`torneio_id`) REFERENCES `torneios` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_partidas_2fase_vencedor` FOREIGN KEY (`vencedor_id`) REFERENCES `torneio_times` (`id`) ON DELETE SET NULL;
 
 --
 -- Restrições para tabelas `sistemas_pontuacao`
