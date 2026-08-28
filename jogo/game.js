@@ -355,7 +355,7 @@ function create() {
     // Sprite de ataque (pode ser o da direita ou esquerda conforme IA)
     opponentAttacker = oppLeft; 
 
-    createCourtZoneOverlay(this);
+    // Mantem apenas os raios dos jogadores visiveis; quadrantes vermelhos ficam ocultos.
     createPlayerRadiusOverlay(this);
 
     ballShadow = this.add.ellipse(0, 0, 28, 10, 0x000000, 0.28);
