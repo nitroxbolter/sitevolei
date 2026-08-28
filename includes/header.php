@@ -85,6 +85,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="/jogo/">
+                            <i class="fas fa-gamepad me-1"></i>Jogo de Vôlei
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/informacoes.php">
                             <i class="fas fa-info-circle me-1"></i>Informações
                         </a>

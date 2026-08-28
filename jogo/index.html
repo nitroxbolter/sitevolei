@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edu voley - Browser Game</title>
+    <script>
+        if (window.location.protocol === 'file:') {
+            window.location.replace('http://127.0.0.1:8080/');
+        }
+    </script>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="game-wrapper">
+        <header>
+            <h1 class="logo">Edu voley</h1>
+            <div class="scoreboard">
+                <span id="player-score">0</span> - <span id="opponent-score">0</span>
+            </div>
+        </header>
+
+        <div id="game-container"></div>
+
+        <pre id="debug-panel" style="display:none"></pre>
+
+        <div class="controls-hint">
+            <div class="key-hint"><span class="key">Setas</span> Mover</div>
+            <div class="key-hint"><span class="key">L</span> Sacar/Levantar</div>
+            <div class="key-hint"><span class="key">SPACE</span> Pular</div>
+            <div class="key-hint"><span class="key">A/K</span> Jogar: manchete no chão, ataque no ar</div>
+            <div class="key-hint"><span class="key">Q/W/E</span> Trocar jogador</div>
+        </div>
+    </div>
+
+    <script src="game.js?v=20260601-quadrantes-vermelho"></script>
+</body>
+</html>

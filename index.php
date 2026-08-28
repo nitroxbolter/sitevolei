@@ -52,10 +52,16 @@ include 'includes/header.php';
                 <a href="dashboard_guest.php" class="btn btn-light btn-lg">
                     <i class="fas fa-eye me-2"></i>Explorar como Visitante
                 </a>
+                <a href="/jogo/" class="btn btn-warning btn-lg">
+                    <i class="fas fa-gamepad me-2"></i>Jogar Vôlei
+                </a>
                 <a href="auth/login.php" class="btn btn-outline-light btn-lg">
                     <i class="fas fa-sign-in-alt me-2"></i>Entrar
                 </a>
             <?php else: ?>
+                <a href="/jogo/" class="btn btn-warning btn-lg">
+                    <i class="fas fa-gamepad me-2"></i>Jogar Vôlei
+                </a>
                 <a href="dashboard.php" class="btn btn-outline-light btn-lg">
                     <i class="fas fa-tachometer-alt me-2"></i>Meu Dashboard
                 </a>

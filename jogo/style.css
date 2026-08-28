@@ -1,0 +1,173 @@
+:root {
+    --bg-dark: #0a0a0c;
+    --primary: #ff4d4d;
+    --secondary: #4d94ff;
+    --accent: #ffd700;
+    --text: #ffffff;
+    --panel-bg: rgba(255, 255, 255, 0.05);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+.game-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 1000px;
+    padding: 20px;
+}
+
+header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel-bg);
+    padding: 15px 30px;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+h1 {
+    font-size: 1.5rem;
+    letter-spacing: 2px;
+    background: linear-gradient(45deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+}
+
+.scoreboard {
+    font-size: 2rem;
+    font-weight: 700;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+#player-score { color: var(--secondary); }
+#opponent-score { color: var(--primary); }
+
+#game-container {
+    width: min(800px, calc(100vw - 24px));
+    aspect-ratio: 4 / 3;
+    height: auto;
+    background: #000;
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    margin: 0 auto;
+    overflow: hidden;
+    border: 4px solid #333;
+}
+
+footer {
+    width: 100%;
+}
+
+.controls-hint {
+    margin-top: 20px;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: min(800px, calc(100vw - 24px));
+}
+
+#debug-panel{
+    position: absolute;
+    top: 92px;
+    right: 16px;
+    width: 300px;
+    max-height: 420px;
+    overflow: auto;
+    white-space: pre-wrap;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.25;
+    color: #e8f0ff;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 10px;
+    padding: 10px 12px;
+    z-index: 9999;
+    pointer-events: auto;
+    user-select: text;
+}
+
+.key-hint {
+    background: var(--panel-bg);
+    padding: 8px 15px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.key-hint .key {
+    background: var(--accent);
+    color: #000;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+@media (max-width: 840px) {
+    body {
+        align-items: flex-start;
+        overflow: auto;
+    }
+
+    .game-wrapper {
+        gap: 12px;
+        padding: 12px;
+    }
+
+    header {
+        padding: 10px 14px;
+        border-radius: 10px;
+    }
+
+    h1 {
+        font-size: 1.1rem;
+    }
+
+    .scoreboard {
+        font-size: 1.45rem;
+    }
+
+    .controls-hint {
+        gap: 8px;
+        margin-top: 4px;
+    }
+
+    .key-hint {
+        padding: 7px 9px;
+        font-size: 0.78rem;
+        gap: 6px;
+    }
+}
