@@ -27,24 +27,16 @@ $sql = "SELECT t.*, g.nome AS grupo_nome, u.nome AS criado_por_nome
 $stmt = executeQuery($pdo, $sql, [$torneio_id]);
 $torneio = $stmt ? $stmt->fetch() : false;
 
-// Verificar se a coluna inscricoes_abertas existe e obter o valor
-$inscricoes_abertas = 0;
-try {
-    $columnsQuery = $pdo->query("SHOW COLUMNS FROM torneios LIKE 'inscricoes_abertas'");
-    $coluna_existe = $columnsQuery && $columnsQuery->rowCount() > 0;
-    if ($coluna_existe && isset($torneio['inscricoes_abertas'])) {
-        $inscricoes_abertas = (int)$torneio['inscricoes_abertas'];
-    }
-} catch (Exception $e) {
-    // Coluna não existe ainda
-    $inscricoes_abertas = 0;
-}
-
 if (!$torneio) {
     $_SESSION['mensagem'] = 'Torneio não encontrado.';
     $_SESSION['tipo_mensagem'] = 'danger';
     header('Location: ../torneios.php');
     exit();
+}
+
+$inscricoes_abertas = (int)($torneio['inscricoes_abertas'] ?? 0);
+if (!in_array($torneio['status'], ['Criado', 'Inscrições Abertas'], true)) {
+    $inscricoes_abertas = 0;
 }
 
 // Verificar permissão
@@ -1393,7 +1385,7 @@ function criarInterfaceGrupos(times, quantidadeGrupos, gruposExistentes) {
                         <div class="list-group" id="grupo-${g}-times">
                             ${timesGrupo.map(time => `
                                 <div class="list-group-item d-flex justify-content-between align-items-center" data-time-id="${time.id}">
-                                    <span>${(time.nome || 'Time sem nome').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+                                    <span>${escapeHtml(time.nome || 'Time sem nome')}</span>
                                     <button class="btn btn-sm btn-outline-danger" onclick="removerTimeDoGrupo(${g}, ${time.id})">
                                         <i class="fas fa-times"></i>
                                     </button>
@@ -1423,14 +1415,16 @@ function criarInterfaceGrupos(times, quantidadeGrupos, gruposExistentes) {
                 <div class="card-body" style="max-height: 200px; overflow-y: auto;">
                     <div class="list-group" id="times-disponiveis">
                         ${timesDisponiveis.map(time => {
-                            const timeNome = (time.nome || 'Time sem nome').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, "\\'");
+                            const timeNome = String(time.nome || 'Time sem nome');
+                            const timeNomeHtml = escapeHtml(timeNome);
+                            const timeNomeJs = escapeInlineJs(timeNome);
                             const botoesGrupos = Array.from({length: quantidadeGrupos}, (_, i) => i + 1).map(g => {
                                 const letra = String.fromCharCode(64 + g);
-                                return `<button class="btn btn-outline-primary btn-sm" onclick="adicionarTimeAoGrupo(${g}, ${time.id}, '${timeNome}')" title="Adicionar ao Grupo ${letra}">${letra}</button>`;
+                                return `<button class="btn btn-outline-primary btn-sm" onclick="adicionarTimeAoGrupo(${g}, ${time.id}, '${timeNomeJs}')" title="Adicionar ao Grupo ${letra}">${letra}</button>`;
                             }).join('');
                             return `
                                 <div class="list-group-item d-flex justify-content-between align-items-center" data-time-id="${time.id}">
-                                    <span>${timeNome}</span>
+                                    <span>${timeNomeHtml}</span>
                                     <div class="btn-group btn-group-sm">
                                         ${botoesGrupos}
                                     </div>
@@ -1467,7 +1461,7 @@ function adicionarTimeAoGrupo(grupoOrdem, timeId, timeNome) {
     const letraGrupo = String.fromCharCode(64 + grupoOrdem);
     const itemHtml = `
         <div class="list-group-item d-flex justify-content-between align-items-center" data-time-id="${timeId}">
-            <span>${timeNome}</span>
+            <span>${escapeHtml(timeNome)}</span>
             <button class="btn btn-sm btn-outline-danger" onclick="removerTimeDoGrupo(${grupoOrdem}, ${timeId})">
                 <i class="fas fa-times"></i>
             </button>
@@ -1501,12 +1495,12 @@ function removerTimeDoGrupo(grupoOrdem, timeId) {
         const quantidadeGrupos = <?php echo (int)($torneio['quantidade_grupos'] ?? 0); ?>;
         const botoesGrupos = Array.from({length: quantidadeGrupos}, (_, i) => i + 1).map(g => {
             const letra = String.fromCharCode(64 + g);
-            return `<button class="btn btn-outline-primary btn-sm" onclick="adicionarTimeAoGrupo(${g}, ${timeId}, '${timeNome.replace(/'/g, "\\'")}')" title="Adicionar ao Grupo ${letra}">${letra}</button>`;
+            return `<button class="btn btn-outline-primary btn-sm" onclick="adicionarTimeAoGrupo(${g}, ${timeId}, '${escapeInlineJs(timeNome)}')" title="Adicionar ao Grupo ${letra}">${letra}</button>`;
         }).join('');
         
         const itemHtml = `
             <div class="list-group-item d-flex justify-content-between align-items-center" data-time-id="${timeId}">
-                <span>${timeNome}</span>
+                <span>${escapeHtml(timeNome)}</span>
                 <div class="btn-group btn-group-sm">
                     ${botoesGrupos}
                 </div>
@@ -5997,6 +5991,36 @@ endif;
 </div>
 
 <script>
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function escapeInlineJs(value) {
+    return String(value ?? '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\x22')
+        .replace(/</g, '\\x3C')
+        .replace(/>/g, '\\x3E')
+        .replace(/&/g, '\\x26')
+        .replace(/\r/g, '\\r')
+        .replace(/\n/g, '\\n');
+}
+
+function avatarSeguro(value) {
+    const fallback = '../../assets/arquivos/logo.png';
+    const avatar = String(value || '').trim();
+    if (!avatar || /^(?:javascript|data|vbscript):/i.test(avatar)) {
+        return fallback;
+    }
+    return avatar;
+}
+
 // ============================================
 // SISTEMA DE DEBUG
 // ============================================
@@ -6004,7 +6028,7 @@ endif;
     'use strict';
     
     // Configuração do debug
-    const DEBUG_ENABLED = true; // Mude para false para desabilitar
+    const DEBUG_ENABLED = false;
     const DEBUG_MAX_LOGS = 100; // Máximo de logs a manter
     
     // Container de logs
@@ -6262,7 +6286,7 @@ if (typeof showAlert === 'undefined') {
         type = type || 'info';
         var alertClass = 'alert-' + type;
         var alertHtml = '<div class="alert ' + alertClass + ' alert-dismissible fade show" role="alert">' +
-                       message +
+                       escapeHtml(message) +
                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
                        '</div>';
         var alertContainer = document.getElementById('alert-container');
@@ -7085,11 +7109,11 @@ function adicionarIntegranteTime(timeId) {
                                     fotoPerfil = '../../assets/arquivos/' + fotoPerfil;
                                 }
                             }
-                            html += '<img src="' + fotoPerfil + '" class="rounded-circle" width="24" height="24" style="object-fit:cover;">';
-                            html += '<span>' + p.nome + '</span>';
+                            html += '<img src="' + escapeHtml(avatarSeguro(fotoPerfil)) + '" class="rounded-circle" width="24" height="24" style="object-fit:cover;">';
+                            html += '<span>' + escapeHtml(p.nome) + '</span>';
                             html += '</div>';
                         } else {
-                            html += '<i class="fas fa-user me-2"></i>' + p.nome_avulso;
+                            html += '<i class="fas fa-user me-2"></i>' + escapeHtml(p.nome_avulso);
                         }
                         html += '</a>';
                     });
@@ -7132,7 +7156,7 @@ function adicionarParticipanteAoTime(timeId, timeNumero) {
                 } else {
                     html = '<div class="list-group">';
                     response.participantes.forEach(function(p) {
-                        html += '<a href="#" class="list-group-item list-group-item-action" onclick="adicionarParticipanteAoTimeSelecionado(' + p.id + ', \'' + p.nome.replace(/'/g, "\\'") + '\', \'' + (p.foto_perfil || '') + '\'); return false;">';
+                        html += '<a href="#" class="list-group-item list-group-item-action" onclick="adicionarParticipanteAoTimeSelecionado(' + Number.parseInt(p.id, 10) + ', \'' + escapeInlineJs(p.nome) + '\', \'' + escapeInlineJs(p.foto_perfil || '') + '\'); return false;">';
                         if (p.usuario_id) {
                             html += '<div class="d-flex align-items-center gap-2">';
                             var fotoPerfil = p.foto_perfil || '../../assets/arquivos/logo.png';
@@ -7151,11 +7175,11 @@ function adicionarParticipanteAoTime(timeId, timeNumero) {
                                     fotoPerfil = '../../assets/arquivos/' + fotoPerfil;
                                 }
                             }
-                            html += '<img src="' + fotoPerfil + '" class="rounded-circle" width="24" height="24" style="object-fit:cover;">';
-                            html += '<span>' + p.nome + '</span>';
+                            html += '<img src="' + escapeHtml(avatarSeguro(fotoPerfil)) + '" class="rounded-circle" width="24" height="24" style="object-fit:cover;">';
+                            html += '<span>' + escapeHtml(p.nome) + '</span>';
                             html += '</div>';
                         } else {
-                            html += '<i class="fas fa-user me-2"></i>' + p.nome_avulso;
+                            html += '<i class="fas fa-user me-2"></i>' + escapeHtml(p.nome_avulso);
                         }
                         html += '</a>';
                     });
@@ -7316,7 +7340,7 @@ function recarregarListaParticipantesDisponiveis() {
                 } else {
                     html = '<div class="list-group">';
                     response.participantes.forEach(function(p) {
-                        html += '<a href="#" class="list-group-item list-group-item-action" onclick="adicionarParticipanteAoTimeSelecionado(' + p.id + ', \'' + p.nome.replace(/'/g, "\\'") + '\', \'' + (p.foto_perfil || '') + '\'); return false;">';
+                        html += '<a href="#" class="list-group-item list-group-item-action" onclick="adicionarParticipanteAoTimeSelecionado(' + Number.parseInt(p.id, 10) + ', \'' + escapeInlineJs(p.nome) + '\', \'' + escapeInlineJs(p.foto_perfil || '') + '\'); return false;">';
                         if (p.usuario_id) {
                             html += '<div class="d-flex align-items-center gap-2">';
                             var fotoPerfil = p.foto_perfil || '../../assets/arquivos/logo.png';
@@ -7333,11 +7357,11 @@ function recarregarListaParticipantesDisponiveis() {
                                     fotoPerfil = '../../assets/arquivos/' + fotoPerfil;
                                 }
                             }
-                            html += '<img src="' + fotoPerfil + '" class="rounded-circle" width="24" height="24" style="object-fit:cover;">';
-                            html += '<span>' + p.nome + '</span>';
+                            html += '<img src="' + escapeHtml(avatarSeguro(fotoPerfil)) + '" class="rounded-circle" width="24" height="24" style="object-fit:cover;">';
+                            html += '<span>' + escapeHtml(p.nome) + '</span>';
                             html += '</div>';
                         } else {
-                            html += '<i class="fas fa-user me-2"></i>' + p.nome_avulso;
+                            html += '<i class="fas fa-user me-2"></i>' + escapeHtml(p.nome_avulso);
                         }
                         html += '</a>';
                     });
@@ -7525,13 +7549,13 @@ function carregarSolicitacoes() {
                         html += '<div class="d-flex justify-content-between align-items-center">';
                         html += '<div class="d-flex align-items-center gap-2">';
                         html += '<div style="position:relative;width:40px;height:40px;">';
-                        html += '<img src="' + avatar + '" class="rounded-circle" width="40" height="40" style="object-fit:cover;position:absolute;top:0;left:0;" alt="' + (sol.usuario_nome || '') + '" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">';
-                        html += '<div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style="width:40px;height:40px;font-weight:bold;position:absolute;top:0;left:0;display:none;" title="' + (sol.usuario_nome || '') + '">' + inicialNome + '</div>';
+                        html += '<img src="' + escapeHtml(avatarSeguro(avatar)) + '" class="rounded-circle" width="40" height="40" style="object-fit:cover;position:absolute;top:0;left:0;" alt="' + escapeHtml(sol.usuario_nome || '') + '" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">';
+                        html += '<div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style="width:40px;height:40px;font-weight:bold;position:absolute;top:0;left:0;display:none;" title="' + escapeHtml(sol.usuario_nome || '') + '">' + escapeHtml(inicialNome) + '</div>';
                         html += '</div>';
                         html += '<div>';
-                        html += '<strong>' + (sol.usuario_nome || 'Usuário') + '</strong><br>';
-                        html += '<small class="text-muted">' + (sol.email || '') + '</small><br>';
-                        html += '<small class="text-muted"><i class="fas fa-clock me-1"></i>' + new Date(sol.data_solicitacao).toLocaleString('pt-BR') + '</small>';
+                        html += '<strong>' + escapeHtml(sol.usuario_nome || 'Usuário') + '</strong><br>';
+                        html += '<small class="text-muted">' + escapeHtml(sol.email || '') + '</small><br>';
+                        html += '<small class="text-muted"><i class="fas fa-clock me-1"></i>' + escapeHtml(new Date(sol.data_solicitacao).toLocaleString('pt-BR')) + '</small>';
                         html += '</div>';
                         html += '</div>';
                         html += '<div class="d-flex gap-2">';
@@ -7553,7 +7577,7 @@ function carregarSolicitacoes() {
                 }
             } else {
                 console.error('Erro na resposta:', response.message || 'Erro desconhecido');
-                container.innerHTML = '<p class="text-danger text-center mb-0">Erro ao carregar solicitações: ' + (response.message || 'Erro desconhecido') + '</p>';
+                container.innerHTML = '<p class="text-danger text-center mb-0">Erro ao carregar solicitações: ' + escapeHtml(response.message || 'Erro desconhecido') + '</p>';
             }
         },
         error: function(xhr, status, error) {
@@ -7809,7 +7833,7 @@ function sortearTimes() {
 
 function criarHtmlParticipante(participanteId, nome, foto) {
     // Corrigir caminho da foto
-    let avatar = foto && foto !== '' ? foto : '../../assets/arquivos/logo.png';
+    let avatar = avatarSeguro(foto && foto !== '' ? foto : '../../assets/arquivos/logo.png');
     
     // Se não começa com http ou /, ajustar caminho
     if (avatar && avatar.indexOf('http') !== 0 && avatar.indexOf('/') !== 0) {
@@ -7829,12 +7853,12 @@ function criarHtmlParticipante(participanteId, nome, foto) {
     }
     
     return '<div class="participante-item mb-2 p-2 border rounded d-flex justify-content-between align-items-center" ' +
-           'data-participante-id="' + participanteId + '" onclick="event.stopPropagation(); selecionarParticipante(this, event)" ' +
+           'data-participante-id="' + Number.parseInt(participanteId, 10) + '" onclick="event.stopPropagation(); selecionarParticipante(this, event)" ' +
            'style="cursor: pointer; user-select: none; -webkit-user-select: none;" ' +
            'oncontextmenu="return false;">' +
            '<div class="d-flex align-items-center gap-2">' +
-           '<img src="' + avatar + '" class="rounded-circle" width="24" height="24" style="object-fit:cover;">' +
-           '<small>' + nome + '</small>' +
+           '<img src="' + escapeHtml(avatar) + '" class="rounded-circle" width="24" height="24" style="object-fit:cover;">' +
+           '<small>' + escapeHtml(nome) + '</small>' +
            '</div>' +
            '<button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); removerParticipanteDoTime(this)">' +
            '<i class="fas fa-times"></i>' +
@@ -8430,7 +8454,10 @@ function verPerfilUsuario(usuarioId) {
     $.ajax({
         url: '../ajax/obter_detalhes_usuario.php',
         method: 'GET',
-        data: { usuario_id: usuarioId },
+        data: {
+            usuario_id: usuarioId,
+            torneio_id: <?php echo (int)$torneio_id; ?>
+        },
         dataType: 'json',
         success: function(response) {
             if (response.success && response.usuario) {
@@ -8457,25 +8484,22 @@ function verPerfilUsuario(usuarioId) {
                 }
                 
                 const inicialNome = u.nome ? u.nome.charAt(0).toUpperCase() : '?';
-                const dataNasc = u.data_aniversario ? new Date(u.data_aniversario).toLocaleDateString('pt-BR') : 'Não informado';
                 const dataCadastro = u.data_cadastro ? new Date(u.data_cadastro).toLocaleDateString('pt-BR') : 'Não informado';
                 
                 let html = '<div class="text-center mb-4">';
                 html += '<div style="position:relative;display:inline-block;">';
-                html += '<img src="' + avatar + '" class="rounded-circle" width="100" height="100" style="object-fit:cover;border:3px solid #007bff;" alt="' + (u.nome || '') + '" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">';
-                html += '<div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style="width:100px;height:100px;font-weight:bold;font-size:2.5rem;border:3px solid #007bff;display:none;position:absolute;top:0;left:50%;transform:translateX(-50%);" title="' + (u.nome || '') + '">' + inicialNome + '</div>';
+                html += '<img src="' + escapeHtml(avatarSeguro(avatar)) + '" class="rounded-circle" width="100" height="100" style="object-fit:cover;border:3px solid #007bff;" alt="' + escapeHtml(u.nome || '') + '" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">';
+                html += '<div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white" style="width:100px;height:100px;font-weight:bold;font-size:2.5rem;border:3px solid #007bff;display:none;position:absolute;top:0;left:50%;transform:translateX(-50%);" title="' + escapeHtml(u.nome || '') + '">' + escapeHtml(inicialNome) + '</div>';
                 html += '</div>';
-                html += '<h4 class="mt-3 mb-0">' + (u.nome || 'Usuário') + '</h4>';
+                html += '<h4 class="mt-3 mb-0">' + escapeHtml(u.nome || 'Usuário') + '</h4>';
                 html += '</div>';
                 
                 html += '<div class="list-group">';
-                html += '<div class="list-group-item"><strong><i class="fas fa-envelope me-2"></i>E-mail:</strong><br>' + (u.email || 'Não informado') + '</div>';
-                html += '<div class="list-group-item"><strong><i class="fas fa-phone me-2"></i>Telefone:</strong><br>' + (u.telefone || 'Não informado') + '</div>';
-                html += '<div class="list-group-item"><strong><i class="fas fa-star me-2"></i>Nível:</strong><br>' + (u.nivel || 'Não informado') + '</div>';
-                html += '<div class="list-group-item"><strong><i class="fas fa-venus-mars me-2"></i>Gênero:</strong><br>' + (u.genero || 'Não informado') + '</div>';
-                html += '<div class="list-group-item"><strong><i class="fas fa-birthday-cake me-2"></i>Data de Nascimento:</strong><br>' + dataNasc + '</div>';
-                html += '<div class="list-group-item"><strong><i class="fas fa-trophy me-2"></i>Reputação:</strong><br>' + (u.reputacao || 0) + ' pontos</div>';
-                html += '<div class="list-group-item"><strong><i class="fas fa-calendar me-2"></i>Data de Cadastro:</strong><br>' + dataCadastro + '</div>';
+                html += '<div class="list-group-item"><strong><i class="fas fa-envelope me-2"></i>E-mail:</strong><br>' + escapeHtml(u.email || 'Não informado') + '</div>';
+                html += '<div class="list-group-item"><strong><i class="fas fa-phone me-2"></i>Telefone:</strong><br>' + escapeHtml(u.telefone || 'Não informado') + '</div>';
+                html += '<div class="list-group-item"><strong><i class="fas fa-star me-2"></i>Nível:</strong><br>' + escapeHtml(u.nivel || 'Não informado') + '</div>';
+                html += '<div class="list-group-item"><strong><i class="fas fa-trophy me-2"></i>Reputação:</strong><br>' + escapeHtml(u.reputacao || 0) + ' pontos</div>';
+                html += '<div class="list-group-item"><strong><i class="fas fa-calendar me-2"></i>Data de Cadastro:</strong><br>' + escapeHtml(dataCadastro) + '</div>';
                 html += '</div>';
                 
                 conteudo.innerHTML = html;

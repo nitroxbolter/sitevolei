@@ -19,6 +19,7 @@ function atualizarReputacao($pdo, $usuario_id) {
 
 // Função para obter próximos jogos
 function getProximosJogos($pdo, $limite = 5) {
+    $limite = max(1, (int)$limite);
     $sql = "SELECT j.*, g.nome as grupo_nome, g.local_principal,
                    COUNT(DISTINCT cp.id) as jogadores_confirmados
             FROM jogos j 
@@ -27,25 +28,28 @@ function getProximosJogos($pdo, $limite = 5) {
             WHERE j.status = 'Aberto' AND DATE(j.data_jogo) >= CURDATE()
             GROUP BY j.id, j.titulo, j.data_jogo, j.data_fim, j.local, j.max_jogadores, j.status, g.nome, g.local_principal
             ORDER BY j.data_jogo ASC 
-            LIMIT ?";
-    $stmt = executeQuery($pdo, $sql, [$limite]);
+            LIMIT $limite";
+    $stmt = executeQuery($pdo, $sql);
     return $stmt ? $stmt->fetchAll() : [];
 }
 
 // Função para obter torneios ativos
 function getTorneiosAtivos($pdo, $limite = 3) {
+    $limite = max(1, (int)$limite);
     $sql = "SELECT t.*, g.nome as grupo_nome 
             FROM torneios t 
-            JOIN grupos g ON t.grupo_id = g.id 
-            WHERE t.status IN ('Inscrições Abertas', 'Em Andamento') 
+            LEFT JOIN grupos g ON t.grupo_id = g.id
+            WHERE (t.inscricoes_abertas = 1 OR t.status IN ('Inscrições Abertas', 'Em Andamento'))
+              AND t.status NOT IN ('Finalizado', 'Cancelado')
             ORDER BY t.data_inicio ASC 
-            LIMIT ?";
-    $stmt = executeQuery($pdo, $sql, [$limite]);
+            LIMIT $limite";
+    $stmt = executeQuery($pdo, $sql);
     return $stmt ? $stmt->fetchAll() : [];
 }
 
 // Função para obter ranking de jogadores
 function getRankingJogadores($pdo, $limite = 10) {
+    $limite = max(1, (int)$limite);
     $sql = "SELECT u.id, u.nome, u.reputacao, u.posicao_preferida,
                    COUNT(cp.id) as total_jogos,
                    SUM(CASE WHEN cp.status = 'Confirmado' THEN 1 ELSE 0 END) as jogos_confirmados
@@ -55,8 +59,8 @@ function getRankingJogadores($pdo, $limite = 10) {
             WHERE u.ativo = 1 AND j.status = 'Finalizado'
             GROUP BY u.id
             ORDER BY u.reputacao DESC, jogos_confirmados DESC
-            LIMIT ?";
-    $stmt = executeQuery($pdo, $sql, [$limite]);
+            LIMIT $limite";
+    $stmt = executeQuery($pdo, $sql);
     return $stmt ? $stmt->fetchAll() : [];
 }
 
@@ -205,6 +209,59 @@ function sanitizar($dados) {
     return htmlspecialchars(strip_tags(trim($dados)));
 }
 
+// Proteção CSRF compartilhada pelas ações autenticadas do site.
+function csrfToken() {
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
+    return $_SESSION['csrf_token'];
+}
+
+function csrfTokenValido() {
+    if (session_status() !== PHP_SESSION_ACTIVE || empty($_SESSION['csrf_token'])) {
+        return false;
+    }
+
+    $token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    return is_string($token) && hash_equals($_SESSION['csrf_token'], $token);
+}
+
+function exigirCsrfToken() {
+    if (csrfTokenValido()) {
+        return;
+    }
+
+    http_response_code(403);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => false,
+        'message' => 'Sua sessão expirou. Atualize a página e tente novamente.'
+    ]);
+    exit();
+}
+
+function podeGerenciarTorneio($pdo, $torneio_id, $usuario_id) {
+    $sql = "SELECT t.criado_por, g.administrador_id
+            FROM torneios t
+            LEFT JOIN grupos g ON g.id = t.grupo_id
+            WHERE t.id = ?";
+    $stmt = executeQuery($pdo, $sql, [(int)$torneio_id]);
+    $torneio = $stmt ? $stmt->fetch() : false;
+
+    if (!$torneio) {
+        return false;
+    }
+
+    return (int)$torneio['criado_por'] === (int)$usuario_id
+        || (!empty($torneio['administrador_id']) && (int)$torneio['administrador_id'] === (int)$usuario_id)
+        || isAdmin($pdo, $usuario_id);
+}
+
 // Função para exibir mensagens de erro/sucesso
 function exibirMensagem($tipo, $mensagem) {
     $classe = $tipo === 'sucesso' ? 'alert-success' : 'alert-danger';
@@ -330,5 +387,13 @@ function uploadFoto($arquivo, $pasta = 'uploads/profile_pics/') {
     }
     
     return false;
+}
+
+// Todos os POSTs da API de torneios exigem o token enviado pelo cabeçalho comum.
+if (isset($_SERVER['REQUEST_METHOD']) && strtoupper($_SERVER['REQUEST_METHOD']) === 'POST') {
+    $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    if (strpos($script, '/torneios/ajax/') !== false) {
+        exigirCsrfToken();
+    }
 }
 ?>

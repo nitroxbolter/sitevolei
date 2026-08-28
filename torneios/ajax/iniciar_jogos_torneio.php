@@ -161,18 +161,7 @@ if (!$tabela_existe) {
     exit();
 }
 
-// Verificar se a coluna quadra existe na tabela torneio_partidas
-$columnsQuery = $pdo->query("SHOW COLUMNS FROM torneio_partidas LIKE 'quadra'");
-$tem_coluna_quadra = $columnsQuery && $columnsQuery->rowCount() > 0;
-
-if (!$tem_coluna_quadra) {
-    // Adicionar coluna quadra
-    try {
-        $pdo->exec("ALTER TABLE torneio_partidas ADD COLUMN quadra INT(11) DEFAULT NULL AFTER grupo_id");
-    } catch (Exception $e) {
-        error_log("Erro ao adicionar coluna quadra: " . $e->getMessage());
-    }
-}
+$tem_coluna_quadra = true;
 
 // Buscar quantidade de quadras do torneio
 $quantidade_quadras = (int)($torneio['quantidade_quadras'] ?? 1);
@@ -524,18 +513,8 @@ try {
         throw new Exception("Nenhuma partida foi inserida. Verifique se há times configurados.");
     }
     
-    // Inicializar classificação para todos os times
-    // Verificar se a coluna grupo_id existe na tabela torneio_classificacao
-    $columnsQuery = $pdo->query("SHOW COLUMNS FROM torneio_classificacao LIKE 'grupo_id'");
-    $tem_grupo_id_classificacao = $columnsQuery && $columnsQuery->rowCount() > 0;
-    
-    if (!$tem_grupo_id_classificacao) {
-        try {
-            $pdo->exec("ALTER TABLE torneio_classificacao ADD COLUMN grupo_id INT(11) DEFAULT NULL AFTER time_id");
-        } catch (Exception $e) {
-            error_log("Erro ao adicionar coluna grupo_id em torneio_classificacao: " . $e->getMessage());
-        }
-    }
+    // A estrutura é criada pelas migrações, nunca durante uma requisição do usuário.
+    $tem_grupo_id_classificacao = true;
     
     // Buscar grupo_id de cada time se for modalidade com chaves
     $times_por_grupo = [];
@@ -566,6 +545,12 @@ try {
         }
     }
     
+    executeQuery(
+        $pdo,
+        "UPDATE torneios SET status = 'Em Andamento', inscricoes_abertas = 0 WHERE id = ?",
+        [$torneio_id]
+    );
+
     $pdo->commit();
     
     // Usar o número real de partidas inseridas

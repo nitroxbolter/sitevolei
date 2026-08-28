@@ -21,20 +21,10 @@ if ($torneio_id <= 0) {
     exit();
 }
 
-// Verificar e aumentar o tamanho do campo nome em torneio_grupos ANTES de iniciar transação
-// (ALTER TABLE pode fazer commit automático)
-try {
-    $columnsQuery_nome = $pdo->query("SHOW COLUMNS FROM torneio_grupos LIKE 'nome'");
-    $coluna_nome = $columnsQuery_nome ? $columnsQuery_nome->fetch(PDO::FETCH_ASSOC) : null;
-    
-    if ($coluna_nome && strpos($coluna_nome['Type'], 'varchar(10)') !== false) {
-        // Aumentar para varchar(50) para suportar "2ª Fase - Ouro A"
-        error_log("DEBUG: Modificando campo nome de torneio_grupos...");
-        $pdo->exec("ALTER TABLE torneio_grupos MODIFY COLUMN nome VARCHAR(50) NOT NULL");
-        error_log("DEBUG: Campo nome modificado com sucesso!");
-    }
-} catch (Exception $e) {
-    error_log("Erro ao modificar campo nome: " . $e->getMessage());
+if (!podeGerenciarTorneio($pdo, $torneio_id, $_SESSION['user_id'])) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Sem permissão.']);
+    exit();
 }
 
 // Verificar e remover grupos existentes da 2ª fase antes de criar novos

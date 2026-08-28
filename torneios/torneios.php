@@ -7,7 +7,8 @@ $titulo = 'Torneios';
 requireLogin();
 
 // Obter todos os torneios (incluindo finalizados)
-$sql = "SELECT t.*, g.nome as grupo_nome, g.logo_id as grupo_logo_id, u.nome as criado_por_nome,
+$sql = "SELECT t.*, g.nome as grupo_nome, g.logo_id as grupo_logo_id,
+               g.administrador_id as grupo_administrador_id, u.nome as criado_por_nome,
                COUNT(tp.id) as total_inscritos
         FROM torneios t
         LEFT JOIN grupos g ON t.grupo_id = g.id
@@ -21,12 +22,7 @@ $sql = "SELECT t.*, g.nome as grupo_nome, g.logo_id as grupo_logo_id, u.nome as 
         END, t.data_inicio ASC";
 $stmt = executeQuery($pdo, $sql);
 $torneios = $stmt ? $stmt->fetchAll() : [];
-
-// Debug: verificar se há torneios
-error_log("Total de torneios encontrados: " . count($torneios));
-if (count($torneios) > 0) {
-    error_log("Primeiro torneio: " . print_r($torneios[0], true));
-}
+$usuario_admin_site = isAdmin($pdo, $_SESSION['user_id']);
 
 // Obter grupos do usuário para filtro
 $grupos_usuario = getGruposUsuario($pdo, $_SESSION['user_id']);
@@ -113,8 +109,15 @@ include '../includes/header.php';
                     // Verificar se há vagas disponíveis
                     $maxParticipantes = $torneio['max_participantes'] ?? $torneio['quantidade_participantes'] ?? 0;
                     $totalInscritos = (int)$torneio['total_inscritos'];
-                    $temVagas = ($maxParticipantes > 0 && $totalInscritos < $maxParticipantes);
+                    $temVagas = ($maxParticipantes <= 0 || $totalInscritos < $maxParticipantes);
                     $estaFinalizado = ($torneio['status'] === 'Finalizado');
+                    $inscricoesAbertas = (int)($torneio['inscricoes_abertas'] ?? 0) === 1
+                        && in_array($torneio['status'], ['Criado', 'Inscrições Abertas'], true);
+                    $statusExibido = $inscricoesAbertas ? 'Inscrições Abertas' : $torneio['status'];
+                    $souGerenciador = (int)$torneio['criado_por'] === (int)$_SESSION['user_id']
+                        || (!empty($torneio['grupo_administrador_id'])
+                            && (int)$torneio['grupo_administrador_id'] === (int)$_SESSION['user_id'])
+                        || $usuario_admin_site;
                     
                     // Aplicar estilos baseado no status
                     if ($estaFinalizado) {
@@ -136,12 +139,12 @@ include '../includes/header.php';
                                     <?php echo htmlspecialchars($torneio['nome']); ?>
                                 </h6>
                                 <span class="badge bg-<?php 
-                                    echo $torneio['status'] === 'Inscrições Abertas' ? 'success' : 
+                                    echo $inscricoesAbertas ? 'success' :
                                         ($torneio['status'] === 'Em Andamento' ? 'warning' : 
                                         ($torneio['status'] === 'Finalizado' ? 'dark' :
                                         ($torneio['status'] === 'Criado' ? 'info' : 'secondary'))); 
                                 ?>">
-                                    <?php echo htmlspecialchars($torneio['status']); ?>
+                                    <?php echo htmlspecialchars($statusExibido); ?>
                                 </span>
                             </div>
                             <div class="card-body">
@@ -208,31 +211,19 @@ include '../includes/header.php';
                                     <a href="torneio.php?id=<?php echo $torneio['id']; ?>" class="btn btn-primary btn-sm">
                                         <i class="fas fa-eye me-1"></i>Ver Detalhes
                                     </a>
-                                    <?php if ($torneio['status'] === 'Inscrições Abertas'): ?>
+                                    <?php if ($souGerenciador): ?>
+                                        <a href="admin/gerenciar_torneio.php?id=<?php echo (int)$torneio['id']; ?>" class="btn btn-info btn-sm">
+                                            <i class="fas fa-cog me-1"></i>Gerenciar
+                                        </a>
+                                    <?php elseif ($inscricoesAbertas && $temVagas): ?>
                                         <button class="btn btn-success btn-sm" 
-                                                onclick="inscreverTorneio(<?php echo $torneio['id']; ?>)">
-                                            <i class="fas fa-user-plus me-1"></i>Inscrever-se
+                                                onclick="inscreverTorneio(<?php echo (int)$torneio['id']; ?>)">
+                                            <i class="fas fa-user-plus me-1"></i>Solicitar vaga
                                         </button>
-                                    <?php elseif ($torneio['status'] === 'Criado'): ?>
-                                        <?php
-                                        $sou_criador = ((int)$torneio['criado_por'] === (int)$_SESSION['user_id']);
-                                        $sou_admin_grupo = false;
-                                        if ($torneio['grupo_id']) {
-                                            $sql_check = "SELECT administrador_id FROM grupos WHERE id = ?";
-                                            $stmt_check = executeQuery($pdo, $sql_check, [$torneio['grupo_id']]);
-                                            $grupo_check = $stmt_check ? $stmt_check->fetch() : false;
-                                            $sou_admin_grupo = $grupo_check && ((int)$grupo_check['administrador_id'] === (int)$_SESSION['user_id']);
-                                        }
-                                        if ($sou_criador || $sou_admin_grupo || isAdmin($pdo, $_SESSION['user_id'])):
-                                        ?>
-                                            <a href="admin/gerenciar_torneio.php?id=<?php echo $torneio['id']; ?>" class="btn btn-info btn-sm">
-                                                <i class="fas fa-cog me-1"></i>Gerenciar
-                                            </a>
-                                        <?php else: ?>
-                                            <span class="badge bg-info"><?php echo htmlspecialchars($torneio['status']); ?></span>
-                                        <?php endif; ?>
+                                    <?php elseif ($inscricoesAbertas): ?>
+                                        <span class="badge bg-secondary">Vagas esgotadas</span>
                                     <?php else: ?>
-                                        <span class="badge bg-warning"><?php echo htmlspecialchars($torneio['status']); ?></span>
+                                        <span class="badge bg-warning"><?php echo htmlspecialchars($statusExibido); ?></span>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -384,9 +375,9 @@ $(document).ready(function() {
 
 <script>
 function inscreverTorneio(torneioId) {
-    if (confirm('Deseja se inscrever neste torneio?')) {
+    if (confirm('Deseja solicitar uma vaga neste torneio?')) {
         $.ajax({
-            url: 'ajax/inscrever_torneio.php',
+            url: 'ajax/solicitar_participacao_torneio.php',
             method: 'POST',
             data: { torneio_id: torneioId },
             dataType: 'json',

@@ -27,24 +27,16 @@ $sql = "SELECT t.*, g.nome AS grupo_nome, g.local_principal AS grupo_local, u.no
 $stmt = executeQuery($pdo, $sql, [$torneio_id]);
 $torneio = $stmt ? $stmt->fetch() : false;
 
-// Verificar se a coluna inscricoes_abertas existe e obter o valor
-$inscricoes_abertas = 0;
-try {
-    $columnsQuery = $pdo->query("SHOW COLUMNS FROM torneios LIKE 'inscricoes_abertas'");
-    $coluna_existe = $columnsQuery && $columnsQuery->rowCount() > 0;
-    if ($coluna_existe && isset($torneio['inscricoes_abertas'])) {
-        $inscricoes_abertas = (int)$torneio['inscricoes_abertas'];
-    }
-} catch (Exception $e) {
-    // Coluna não existe ainda
-    $inscricoes_abertas = 0;
-}
-
 if (!$torneio) {
     $_SESSION['mensagem'] = 'Torneio não encontrado.';
     $_SESSION['tipo_mensagem'] = 'danger';
     header('Location: torneios.php');
     exit();
+}
+
+$inscricoes_abertas = (int)($torneio['inscricoes_abertas'] ?? 0);
+if (!in_array($torneio['status'], ['Criado', 'Inscrições Abertas'], true)) {
+    $inscricoes_abertas = 0;
 }
 
 // Buscar participantes

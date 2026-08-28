@@ -15,9 +15,21 @@ if (!isLoggedIn()) {
     exit();
 }
 
-$torneio_id = (int)($_POST['torneio_id'] ?? $_GET['torneio_id'] ?? 0);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Método não permitido.']);
+    exit();
+}
+
+$torneio_id = (int)($_POST['torneio_id'] ?? 0);
 if ($torneio_id <= 0) {
     echo json_encode(['success' => false, 'message' => 'Torneio inválido.']);
+    exit();
+}
+
+if (!podeGerenciarTorneio($pdo, $torneio_id, $_SESSION['user_id'])) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Sem permissão.']);
     exit();
 }
 

@@ -1,4 +1,8 @@
 <?php
+$query = !empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
+header('Location: /torneios/torneio.php' . $query, true, 302);
+exit();
+
 session_start();
 require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';

@@ -20,7 +20,8 @@ $grupo_id = !empty($_POST['grupo']) ? (int)$_POST['grupo'] : null;
 $status = trim($_POST['status'] ?? '');
 
 // Construir query base
-$sql = "SELECT t.*, g.nome as grupo_nome, g.logo_id as grupo_logo_id, u.nome as criado_por_nome,
+$sql = "SELECT t.*, g.nome as grupo_nome, g.logo_id as grupo_logo_id,
+               g.administrador_id as grupo_administrador_id, u.nome as criado_por_nome,
                COUNT(tp.id) as total_inscritos
         FROM torneios t
         LEFT JOIN grupos g ON t.grupo_id = g.id
@@ -44,8 +45,13 @@ if ($grupo_id) {
 
 // Filtro por status
 if ($status !== '') {
-    $sql .= " AND t.status = ?";
-    $params[] = $status;
+    if ($status === 'Inscrições Abertas') {
+        $sql .= " AND (t.status = ? OR (t.status = 'Criado' AND t.inscricoes_abertas = 1))";
+        $params[] = $status;
+    } else {
+        $sql .= " AND t.status = ?";
+        $params[] = $status;
+    }
 } else {
     // Se não especificar status, mostrar todos (incluindo finalizados)
     $sql .= " AND t.status IN ('Criado', 'Inscrições Abertas', 'Em Andamento', 'Finalizado')";
@@ -58,6 +64,7 @@ $sql .= " GROUP BY t.id ORDER BY CASE
 
 $stmt = executeQuery($pdo, $sql, $params);
 $torneios = $stmt ? $stmt->fetchAll() : [];
+$usuario_admin_site = isAdmin($pdo, $_SESSION['user_id']);
 
 // Gerar HTML dos torneios
 $html = '';
@@ -72,8 +79,15 @@ if (empty($torneios)) {
         // Verificar se há vagas disponíveis
         $maxParticipantes = $torneio['max_participantes'] ?? $torneio['quantidade_participantes'] ?? 0;
         $totalInscritos = (int)$torneio['total_inscritos'];
-        $temVagas = ($maxParticipantes > 0 && $totalInscritos < $maxParticipantes);
+        $temVagas = ($maxParticipantes <= 0 || $totalInscritos < $maxParticipantes);
         $estaFinalizado = ($torneio['status'] === 'Finalizado');
+        $inscricoesAbertas = (int)($torneio['inscricoes_abertas'] ?? 0) === 1
+            && in_array($torneio['status'], ['Criado', 'Inscrições Abertas'], true);
+        $statusExibido = $inscricoesAbertas ? 'Inscrições Abertas' : $torneio['status'];
+        $souGerenciador = (int)$torneio['criado_por'] === (int)$_SESSION['user_id']
+            || (!empty($torneio['grupo_administrador_id'])
+                && (int)$torneio['grupo_administrador_id'] === (int)$_SESSION['user_id'])
+            || $usuario_admin_site;
         
         // Aplicar estilos baseado no status
         if ($estaFinalizado) {
@@ -95,12 +109,12 @@ if (empty($torneios)) {
         $html .= htmlspecialchars($torneio['nome']);
         $html .= '</h6>';
         
-        $statusClass = $torneio['status'] === 'Inscrições Abertas' ? 'success' : 
+        $statusClass = $inscricoesAbertas ? 'success' :
                       ($torneio['status'] === 'Em Andamento' ? 'warning' : 
                       ($torneio['status'] === 'Finalizado' ? 'dark' :
                       ($torneio['status'] === 'Criado' ? 'info' : 'secondary')));
         $html .= '<span class="badge bg-' . $statusClass . '">';
-        $html .= htmlspecialchars($torneio['status']);
+        $html .= htmlspecialchars($statusExibido);
         $html .= '</span>';
         $html .= '</div>';
         
@@ -181,33 +195,18 @@ if (empty($torneios)) {
         $html .= '<i class="fas fa-eye me-1"></i>Ver Detalhes';
         $html .= '</a>';
         
-        if ($torneio['status'] === 'Inscrições Abertas') {
-            $html .= '<button class="btn btn-success btn-sm" onclick="inscreverTorneio(' . (int)$torneio['id'] . ')">';
-            $html .= '<i class="fas fa-user-plus me-1"></i>Inscrever-se';
-            $html .= '</button>';
-        } elseif ($torneio['status'] === 'Criado') {
+        if ($souGerenciador) {
             $html .= '<a href="admin/gerenciar_torneio.php?id=' . (int)$torneio['id'] . '" class="btn btn-info btn-sm">';
             $html .= '<i class="fas fa-cog me-1"></i>Gerenciar';
             $html .= '</a>';
-        } elseif ($torneio['status'] === 'Finalizado') {
-            // Verificar se é criador/admin para mostrar botão de visualizar
-            $sou_criador = ((int)$torneio['criado_por'] === (int)$_SESSION['user_id']);
-            $sou_admin_grupo = false;
-            if ($torneio['grupo_id']) {
-                $sql_check = "SELECT administrador_id FROM grupos WHERE id = ?";
-                $stmt_check = executeQuery($pdo, $sql_check, [$torneio['grupo_id']]);
-                $grupo_check = $stmt_check ? $stmt_check->fetch() : false;
-                $sou_admin_grupo = $grupo_check && ((int)$grupo_check['administrador_id'] === (int)$_SESSION['user_id']);
-            }
-            if ($sou_criador || $sou_admin_grupo || isAdmin($pdo, $_SESSION['user_id'])) {
-                $html .= '<a href="admin/gerenciar_torneio.php?id=' . (int)$torneio['id'] . '" class="btn btn-secondary btn-sm">';
-                $html .= '<i class="fas fa-eye me-1"></i>Visualizar';
-                $html .= '</a>';
-            } else {
-                $html .= '<span class="badge bg-dark">' . htmlspecialchars($torneio['status']) . '</span>';
-            }
+        } elseif ($inscricoesAbertas && $temVagas) {
+            $html .= '<button class="btn btn-success btn-sm" onclick="inscreverTorneio(' . (int)$torneio['id'] . ')">';
+            $html .= '<i class="fas fa-user-plus me-1"></i>Solicitar vaga';
+            $html .= '</button>';
+        } elseif ($inscricoesAbertas) {
+            $html .= '<span class="badge bg-secondary">Vagas esgotadas</span>';
         } else {
-            $html .= '<span class="badge bg-warning">' . htmlspecialchars($torneio['status']) . '</span>';
+            $html .= '<span class="badge bg-warning">' . htmlspecialchars($statusExibido) . '</span>';
         }
         
         $html .= '</div>';

@@ -38,7 +38,7 @@ if (!$torneio) {
 
 // Verificar se está aberto para inscrições
 $inscricoes_abertas = isset($torneio['inscricoes_abertas']) ? (int)$torneio['inscricoes_abertas'] : 0;
-if ($inscricoes_abertas != 1) {
+if ($inscricoes_abertas !== 1 || !in_array($torneio['status'], ['Criado', 'Inscrições Abertas'], true)) {
     echo json_encode(['success' => false, 'message' => 'Este torneio não está aberto para inscrições.']);
     exit();
 }
@@ -102,62 +102,26 @@ if ($maxParticipantes > 0) {
     }
 }
 
-// Criar solicitação
+// A tabela e seus índices são mantidos pelas migrações do banco.
 try {
-    // Verificar se a tabela existe e criar se necessário
-    try {
-        $check_table = $pdo->query("SHOW TABLES LIKE 'torneio_solicitacoes'");
-        if (!$check_table || $check_table->rowCount() == 0) {
-            // Criar a tabela automaticamente
-            $sql_create_table = "CREATE TABLE IF NOT EXISTS `torneio_solicitacoes` (
-                `id` int(11) NOT NULL AUTO_INCREMENT,
-                `torneio_id` int(11) NOT NULL,
-                `usuario_id` int(11) NOT NULL,
-                `status` enum('Pendente','Aprovada','Aceita','Rejeitada') DEFAULT 'Pendente',
-                `data_solicitacao` timestamp NOT NULL DEFAULT current_timestamp(),
-                `data_resposta` timestamp NULL DEFAULT NULL,
-                `respondido_por` int(11) DEFAULT NULL,
-                PRIMARY KEY (`id`),
-                KEY `torneio_id` (`torneio_id`),
-                KEY `usuario_id` (`usuario_id`),
-                KEY `status` (`status`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
-            
-            $pdo->exec($sql_create_table);
-            error_log("Tabela torneio_solicitacoes criada com sucesso");
-        }
-    } catch (PDOException $e) {
-        error_log("Erro ao verificar/criar tabela torneio_solicitacoes: " . $e->getMessage());
-        echo json_encode(['success' => false, 'message' => 'Erro ao verificar tabela: ' . $e->getMessage()]);
-        exit();
-    }
-    
     $sql_insert = "INSERT INTO torneio_solicitacoes (torneio_id, usuario_id, status) VALUES (?, ?, 'Pendente')";
     $stmt_insert = $pdo->prepare($sql_insert);
-    
-    if ($stmt_insert) {
-        $result = $stmt_insert->execute([$torneio_id, $usuario_id]);
-        
-        if ($result) {
-            echo json_encode(['success' => true, 'message' => 'Solicitação de participação enviada com sucesso! Aguarde a aprovação do administrador.']);
-        } else {
-            $error_info = $stmt_insert->errorInfo();
-            $error_msg = $error_info[2] ?? 'Erro desconhecido';
-            error_log("Erro ao inserir solicitação: " . $error_msg);
-            echo json_encode(['success' => false, 'message' => 'Erro ao enviar solicitação: ' . $error_msg]);
-        }
-    } else {
-        $error_info = $pdo->errorInfo();
-        $error_msg = $error_info[2] ?? 'Erro desconhecido';
-        error_log("Erro ao preparar query: " . $error_msg);
-        echo json_encode(['success' => false, 'message' => 'Erro ao preparar query: ' . $error_msg]);
-    }
+    $stmt_insert->execute([$torneio_id, $usuario_id]);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Solicitação de participação enviada com sucesso! Aguarde a aprovação do administrador.'
+    ]);
 } catch (PDOException $e) {
     error_log("PDOException ao enviar solicitação: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Erro ao enviar solicitação: ' . $e->getMessage()]);
+    if ($e->getCode() === '23000') {
+        echo json_encode(['success' => false, 'message' => 'Você já possui uma solicitação para este torneio.']);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Não foi possível enviar a solicitação. Tente novamente.']);
+    }
 } catch (Exception $e) {
     error_log("Exception ao enviar solicitação: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Erro ao enviar solicitação: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Não foi possível enviar a solicitação. Tente novamente.']);
 }
 ?>
 

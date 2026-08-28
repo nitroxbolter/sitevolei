@@ -1,4 +1,8 @@
 <?php
+$query = !empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '';
+header('Location: /torneios/torneios.php' . $query, true, 302);
+exit();
+
 session_start();
 require_once 'includes/db_connect.php';
 require_once 'includes/functions.php';
@@ -339,7 +343,7 @@ $('#formCriarTorneio').on('submit', function(e) {
 function inscreverTorneio(torneioId) {
     if (confirm('Deseja se inscrever neste torneio?')) {
         $.ajax({
-            url: 'ajax/inscrever_torneio.php',
+            url: '/torneios/ajax/solicitar_participacao_torneio.php',
             method: 'POST',
             data: { torneio_id: torneioId },
             dataType: 'json',

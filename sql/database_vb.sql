@@ -2100,6 +2100,7 @@ ALTER TABLE `torneio_partidas`
 --
 ALTER TABLE `torneio_solicitacoes`
   ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_torneio_usuario` (`torneio_id`,`usuario_id`),
   ADD KEY `torneio_id` (`torneio_id`),
   ADD KEY `usuario_id` (`usuario_id`),
   ADD KEY `status` (`status`);

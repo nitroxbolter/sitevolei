@@ -39,7 +39,7 @@ if (!$sou_criador && !$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
 }
 
 // Buscar solicitações pendentes
-$sql_solicitacoes = "SELECT ts.*, u.nome AS usuario_nome, u.foto_perfil, u.email, u.telefone, u.id AS usuario_id
+$sql_solicitacoes = "SELECT ts.*, u.nome AS usuario_nome, u.foto_perfil, u.email, u.id AS usuario_id
                      FROM torneio_solicitacoes ts
                      JOIN usuarios u ON u.id = ts.usuario_id
                      WHERE ts.torneio_id = ? AND ts.status = 'Pendente'

@@ -88,55 +88,6 @@ if (!$sou_criador && !$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
     exit();
 }
 
-// Verificar se a coluna modalidade existe
-$columnsQuery = $pdo->query("SHOW COLUMNS FROM torneios LIKE 'modalidade'");
-$tem_modalidade = $columnsQuery && $columnsQuery->rowCount() > 0;
-
-if (!$tem_modalidade) {
-    // Adicionar coluna modalidade
-    try {
-        $pdo->exec("ALTER TABLE torneios ADD COLUMN modalidade ENUM('todos_contra_todos', 'todos_chaves', 'torneio_pro') DEFAULT NULL AFTER integrantes_por_time");
-    } catch (Exception $e) {
-        error_log("Erro ao adicionar coluna modalidade: " . $e->getMessage());
-    }
-} else {
-    // Verificar se o enum já inclui 'torneio_pro'
-    $column_info = $columnsQuery->fetch(PDO::FETCH_ASSOC);
-    if (isset($column_info['Type']) && strpos($column_info['Type'], 'torneio_pro') === false) {
-        try {
-            $pdo->exec("ALTER TABLE torneios MODIFY COLUMN modalidade ENUM('todos_contra_todos', 'todos_chaves', 'torneio_pro') DEFAULT NULL");
-        } catch (Exception $e) {
-            error_log("Erro ao atualizar enum modalidade: " . $e->getMessage());
-        }
-    }
-}
-
-// Verificar se a coluna quantidade_grupos existe
-$columnsQuery = $pdo->query("SHOW COLUMNS FROM torneios LIKE 'quantidade_grupos'");
-$tem_quantidade_grupos = $columnsQuery && $columnsQuery->rowCount() > 0;
-
-if (!$tem_quantidade_grupos) {
-    // Adicionar coluna quantidade_grupos
-    try {
-        $pdo->exec("ALTER TABLE torneios ADD COLUMN quantidade_grupos INT(11) DEFAULT NULL AFTER modalidade");
-    } catch (Exception $e) {
-        error_log("Erro ao adicionar coluna quantidade_grupos: " . $e->getMessage());
-    }
-}
-
-// Verificar se a coluna quantidade_quadras existe
-$columnsQuery = $pdo->query("SHOW COLUMNS FROM torneios LIKE 'quantidade_quadras'");
-$tem_quantidade_quadras = $columnsQuery && $columnsQuery->rowCount() > 0;
-
-if (!$tem_quantidade_quadras) {
-    // Adicionar coluna quantidade_quadras
-    try {
-        $pdo->exec("ALTER TABLE torneios ADD COLUMN quantidade_quadras INT(11) DEFAULT 1 AFTER quantidade_grupos");
-    } catch (Exception $e) {
-        error_log("Erro ao adicionar coluna quantidade_quadras: " . $e->getMessage());
-    }
-}
-
 // Se a modalidade mudou, limpar jogos existentes
 $sql_modalidade_atual = "SELECT modalidade FROM torneios WHERE id = ?";
 $stmt_modalidade = executeQuery($pdo, $sql_modalidade_atual, [$torneio_id]);

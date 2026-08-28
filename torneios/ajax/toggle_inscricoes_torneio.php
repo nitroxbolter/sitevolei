@@ -44,38 +44,38 @@ if (!$sou_criador && !$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
     exit();
 }
 
-// Verificar se a coluna existe e criar se necessário
 try {
-    $columnsQuery = $pdo->query("SHOW COLUMNS FROM torneios LIKE 'inscricoes_abertas'");
-    $coluna_existe = $columnsQuery && $columnsQuery->rowCount() > 0;
-    
-    if (!$coluna_existe) {
-        // Criar a coluna automaticamente
-        try {
-            $sql_add_column = "ALTER TABLE torneios ADD COLUMN inscricoes_abertas TINYINT(1) DEFAULT 0 NOT NULL";
-            $pdo->exec($sql_add_column);
-            error_log("Coluna inscricoes_abertas criada com sucesso na tabela torneios");
-        } catch (Exception $e) {
-            error_log("Erro ao criar coluna inscricoes_abertas: " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Erro ao criar coluna de inscrições: ' . $e->getMessage()]);
-            exit();
-        }
+    if ($inscricoes_abertas && !in_array($torneio['status'], ['Criado', 'Inscrições Abertas'], true)) {
+        echo json_encode(['success' => false, 'message' => 'Não é possível abrir inscrições após o início ou encerramento do torneio.']);
+        exit();
     }
-    
-    // Atualizar campo
-    $sql_update = "UPDATE torneios SET inscricoes_abertas = ? WHERE id = ?";
-    $stmt_update = executeQuery($pdo, $sql_update, [$inscricoes_abertas, $torneio_id]);
+
+    $novo_status = $torneio['status'];
+    if ($inscricoes_abertas && $torneio['status'] === 'Criado') {
+        $novo_status = 'Inscrições Abertas';
+    } elseif (!$inscricoes_abertas && $torneio['status'] === 'Inscrições Abertas') {
+        $novo_status = 'Criado';
+    }
+
+    $sql_update = "UPDATE torneios SET inscricoes_abertas = ?, status = ? WHERE id = ?";
+    $stmt_update = executeQuery($pdo, $sql_update, [$inscricoes_abertas, $novo_status, $torneio_id]);
     
     if ($stmt_update) {
         $mensagem = $inscricoes_abertas 
             ? 'Inscrições abertas com sucesso! Os usuários poderão solicitar participação no torneio.' 
             : 'Inscrições fechadas. Os usuários não poderão mais solicitar participação.';
-        echo json_encode(['success' => true, 'message' => $mensagem, 'inscricoes_abertas' => $inscricoes_abertas]);
+        echo json_encode([
+            'success' => true,
+            'message' => $mensagem,
+            'inscricoes_abertas' => $inscricoes_abertas,
+            'status' => $novo_status
+        ]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Erro ao atualizar inscrições.']);
     }
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+    error_log('Erro ao atualizar inscrições: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Não foi possível atualizar as inscrições.']);
 }
 ?>
 

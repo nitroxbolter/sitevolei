@@ -49,7 +49,9 @@ if ($torneio['status'] === 'Finalizado') {
 
 // Encerrar torneio
 try {
-    $sql_update = "UPDATE torneios SET status = 'Finalizado', data_fim = NOW() WHERE id = ?";
+    $sql_update = "UPDATE torneios
+                   SET status = 'Finalizado', inscricoes_abertas = 0, data_fim = NOW()
+                   WHERE id = ?";
     $stmt_update = executeQuery($pdo, $sql_update, [$torneio_id]);
     
     if ($stmt_update) {

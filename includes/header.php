@@ -30,6 +30,37 @@
     <link href="<?php echo htmlspecialchars($css_path); ?>" rel="stylesheet">
     <!-- jQuery (necessário antes de scripts inline em páginas) -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <?php $csrf_token = csrfToken(); ?>
+    <meta name="csrf-token" content="<?php echo htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8'); ?>">
+    <script>
+        window.csrfToken = <?php echo json_encode($csrf_token); ?>;
+
+        if (window.jQuery) {
+            window.jQuery.ajaxSetup({
+                headers: { 'X-CSRF-Token': window.csrfToken }
+            });
+        }
+
+        (function() {
+            var originalFetch = window.fetch;
+            if (!originalFetch) return;
+
+            window.fetch = function(input, init) {
+                init = init || {};
+                var requestMethod = input instanceof Request ? input.method : 'GET';
+                var method = String(init.method || requestMethod).toUpperCase();
+                var requestUrl = input instanceof Request ? input.url : input;
+                var target = new URL(requestUrl, window.location.href);
+                if (target.origin === window.location.origin && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+                    var requestHeaders = input instanceof Request ? input.headers : {};
+                    var headers = new Headers(init.headers || requestHeaders);
+                    headers.set('X-CSRF-Token', window.csrfToken);
+                    init.headers = headers;
+                }
+                return originalFetch.call(window, input, init);
+            };
+        })();
+    </script>
     
     <?php if (isset($css_extra)): ?>
         <?php foreach ($css_extra as $css): ?>
