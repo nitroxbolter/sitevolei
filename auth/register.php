@@ -15,73 +15,51 @@ $erro = '';
 $sucesso = '';
 
 if ($_POST) {
-    $nome = sanitizar($_POST['nome']);
-    $usuario_nome = sanitizar($_POST['usuario'] ?? '');
-    $cpf = sanitizar($_POST['cpf'] ?? '');
-    $telefone = sanitizar($_POST['telefone'] ?? '');
-    $email = sanitizar($_POST['email']);
-    $senha = $_POST['senha'];
-    $confirmar_senha = $_POST['confirmar_senha'];
-    $nivel = $_POST['nivel'];
-    $disponibilidade = sanitizar($_POST['disponibilidade']);
-    $data_aniversario = isset($_POST['data_aniversario']) && !empty($_POST['data_aniversario']) ? $_POST['data_aniversario'] : null;
-    
-    // Validações
-    if (empty($nome) || empty($usuario_nome) || empty($cpf) || empty($telefone) || empty($email) || empty($senha) || empty($confirmar_senha)) {
-        $erro = 'Por favor, preencha todos os campos obrigatórios.';
-    } elseif (!validarEmail($email)) {
-        $erro = 'Email inválido.';
-    } elseif (strlen($senha) < 6) {
-        $erro = 'A senha deve ter pelo menos 6 caracteres.';
-    } elseif ($senha !== $confirmar_senha) {
-        $erro = 'As senhas não coincidem.';
-    } elseif (getUserByEmail($pdo, $email)) {
-        $erro = 'Este email já está cadastrado.';
+    if (!csrfTokenValido()) {
+        $erro = 'Sua sessão expirou. Atualize a página e tente novamente.';
     } else {
-        // Verificar se usuário ou CPF já existem
-        $sql_check = "SELECT id FROM usuarios WHERE usuario = ? OR cpf = ?";
-        $stmt_check = executeQuery($pdo, $sql_check, [$usuario_nome, $cpf]);
-        if ($stmt_check && $stmt_check->fetch()) {
-            $erro = 'Nome de usuário ou CPF já cadastrado.';
-        } else {
-            // Normalizar CPF e telefone (apenas números)
-            $cpf_limpo = preg_replace('/[^0-9]/', '', $cpf);
-            $telefone_limpo = preg_replace('/[^0-9]/', '', $telefone);
+        $nome = sanitizar($_POST['nome'] ?? '');
+        $usuario_nome = normalizarUsuario($_POST['usuario'] ?? '');
+        $cpf_limpo = normalizarCpf($_POST['cpf'] ?? '');
+        $telefone_limpo = normalizarTelefone($_POST['telefone'] ?? '');
+        $email = normalizarEmail($_POST['email'] ?? '');
+        $senha = $_POST['senha'] ?? '';
+        $confirmar_senha = $_POST['confirmar_senha'] ?? '';
+        $nivel = $_POST['nivel'] ?? '';
+        $disponibilidade = sanitizar($_POST['disponibilidade'] ?? '');
+        $data_aniversario = isset($_POST['data_aniversario']) && !empty($_POST['data_aniversario']) ? $_POST['data_aniversario'] : null;
+        $aceita_termos = isset($_POST['aceita_termos']);
 
-            // Verificar se campo data_aniversario existe na tabela
-            try {
-                $sql_check = "SHOW COLUMNS FROM usuarios LIKE 'data_aniversario'";
-                $stmt_check = $pdo->query($sql_check);
-                $aniversario_exists = $stmt_check && $stmt_check->rowCount() > 0;
-                
-                if (!$aniversario_exists) {
-                    $sql_add = "ALTER TABLE usuarios ADD COLUMN data_aniversario DATE DEFAULT NULL AFTER disponibilidade";
-                    $pdo->exec($sql_add);
-                    $aniversario_exists = true;
-                }
-            } catch (Exception $e) {
-                $aniversario_exists = false;
-            }
-            
+        // Validações
+        if (empty($nome) || empty($usuario_nome) || empty($cpf_limpo) || empty($telefone_limpo) || empty($email) || empty($senha) || empty($confirmar_senha)) {
+            $erro = 'Por favor, preencha todos os campos obrigatórios.';
+        } elseif (!validarUsuarioLogin($usuario_nome)) {
+            $erro = 'O nome de usuário deve ter 3 a 50 caracteres e usar apenas letras, números e underscore.';
+        } elseif (!validarCpf($cpf_limpo)) {
+            $erro = 'CPF inválido.';
+        } elseif (!validarEmail($email)) {
+            $erro = 'Email inválido.';
+        } elseif (!senhaAtendePolitica($senha)) {
+            $erro = 'A senha deve ter pelo menos 8 caracteres.';
+        } elseif ($senha !== $confirmar_senha) {
+            $erro = 'As senhas não coincidem.';
+        } elseif (!$aceita_termos) {
+            $erro = 'Você deve aceitar os termos de uso.';
+        } elseif (usuarioEmailCpfEmUso($pdo, $usuario_nome, $email, $cpf_limpo)) {
+            $erro = 'Nome de usuário, email ou CPF já cadastrado.';
+        } else {
             // Cadastrar usuário com reputação inicial 100
             $senha_hash = hashSenha($senha);
-            
-            if ($aniversario_exists && $data_aniversario) {
-                $sql = "INSERT INTO usuarios (nome, usuario, cpf, telefone, email, senha, nivel, disponibilidade, data_aniversario, reputacao) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 100)";
-                $params = [$nome, $usuario_nome, $cpf_limpo, $telefone_limpo, $email, $senha_hash, $nivel, $disponibilidade, $data_aniversario];
-            } else {
-                $sql = "INSERT INTO usuarios (nome, usuario, cpf, telefone, email, senha, nivel, disponibilidade, reputacao) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 100)";
-                $params = [$nome, $usuario_nome, $cpf_limpo, $telefone_limpo, $email, $senha_hash, $nivel, $disponibilidade];
-            }
-            
+            $sql = "INSERT INTO usuarios (nome, usuario, cpf, telefone, email, senha, nivel, disponibilidade, data_aniversario, reputacao)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 100)";
+            $params = [$nome, $usuario_nome, $cpf_limpo, $telefone_limpo, $email, $senha_hash, $nivel, $disponibilidade, $data_aniversario];
+
             if (executeQuery($pdo, $sql, $params)) {
                 $sucesso = 'Cadastro realizado com sucesso! Você já pode fazer login.';
                 // Limpar formulário
                 $_POST = [];
             } else {
-                $erro = 'Erro ao cadastrar usuário. Tente novamente.';
+                $erro = 'Erro ao cadastrar usuário. Confira se os dados ainda não estão em uso.';
             }
         }
     }
@@ -108,6 +86,7 @@ include '../includes/header.php';
                 <?php endif; ?>
                 
                 <form method="POST">
+                    <?php echo csrfInput(); ?>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="nome" class="form-label">
@@ -147,15 +126,15 @@ include '../includes/header.php';
                             <label for="senha" class="form-label">
                                 <i class="fas fa-lock me-1"></i>Senha *
                             </label>
-                            <input type="password" class="form-control" id="senha" name="senha" required>
-                            <div class="form-text">Mínimo 6 caracteres</div>
+                            <input type="password" class="form-control" id="senha" name="senha" minlength="8" required>
+                            <div class="form-text">Mínimo 8 caracteres</div>
                         </div>
                         
                         <div class="col-md-6 mb-3">
                             <label for="confirmar_senha" class="form-label">
                                 <i class="fas fa-lock me-1"></i>Confirmar Senha *
                             </label>
-                            <input type="password" class="form-control" id="confirmar_senha" name="confirmar_senha" required>
+                            <input type="password" class="form-control" id="confirmar_senha" name="confirmar_senha" minlength="8" required>
                         </div>
                     </div>
                     
@@ -202,7 +181,7 @@ include '../includes/header.php';
                     </div>
                     
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="termos" required>
+                        <input type="checkbox" class="form-check-input" id="termos" name="aceita_termos" required>
                         <label class="form-check-label" for="termos">
                             Aceito os <a href="#" data-bs-toggle="modal" data-bs-target="#termosModal">termos de uso</a> *
                         </label>

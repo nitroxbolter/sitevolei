@@ -80,6 +80,8 @@ $times_existentes = $stmt ? (int)$stmt->fetch()['total'] : 0;
 
 $pdo->beginTransaction();
 try {
+    executeQuery($pdo, "SELECT id FROM torneios WHERE id = ? FOR UPDATE", [$torneio_id]);
+
     // SEMPRE limpar tudo primeiro (integrantes e times) antes de criar novos
     // Isso garante que não haverá duplicação mesmo se já existirem times
     if ($times_existentes > 0) {

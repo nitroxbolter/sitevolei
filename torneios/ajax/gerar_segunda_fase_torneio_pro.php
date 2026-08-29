@@ -27,24 +27,6 @@ if (!podeGerenciarTorneio($pdo, $torneio_id, $_SESSION['user_id'])) {
     exit();
 }
 
-// Verificar e remover grupos existentes da 2ª fase antes de criar novos
-$sql_check_existentes = "SELECT id FROM torneio_grupos WHERE torneio_id = ? AND (nome = ? OR nome = ? OR nome = ? OR nome = ? OR nome = ? OR nome = ?)";
-$stmt_check = executeQuery($pdo, $sql_check_existentes, [$torneio_id, "2ª Fase - Ouro A", "2ª Fase - Ouro B", "2ª Fase - Prata A", "2ª Fase - Prata B", "2ª Fase - Bronze A", "2ª Fase - Bronze B"]);
-$grupos_existentes_ids = $stmt_check ? $stmt_check->fetchAll(PDO::FETCH_COLUMN) : [];
-
-if (!empty($grupos_existentes_ids)) {
-    $placeholders = implode(',', array_fill(0, count($grupos_existentes_ids), '?'));
-    
-    // Remover times dos grupos
-    executeQuery($pdo, "DELETE FROM torneio_grupo_times WHERE grupo_id IN ($placeholders)", $grupos_existentes_ids);
-    
-    // Remover classificações dos grupos
-    executeQuery($pdo, "DELETE FROM torneio_classificacao WHERE grupo_id IN ($placeholders)", $grupos_existentes_ids);
-    
-    // Remover grupos
-    executeQuery($pdo, "DELETE FROM torneio_grupos WHERE id IN ($placeholders)", $grupos_existentes_ids);
-}
-
 // Criar grupos Ouro A e Ouro B com os 1º lugares das chaves especificadas
 try {
     // Debug: Verificar chaves existentes antes de iniciar transação
@@ -69,8 +51,22 @@ try {
         }
     }
     
-    error_log("DEBUG: Iniciando transação...");
     $pdo->beginTransaction();
+    executeQuery($pdo, "SELECT id FROM torneios WHERE id = ? FOR UPDATE", [$torneio_id]);
+
+    // Verificar e remover grupos existentes da 2ª fase antes de criar novos.
+    $sql_check_existentes = "SELECT id FROM torneio_grupos WHERE torneio_id = ? AND (nome = ? OR nome = ? OR nome = ? OR nome = ? OR nome = ? OR nome = ?)";
+    $stmt_check = executeQuery($pdo, $sql_check_existentes, [$torneio_id, "2ª Fase - Ouro A", "2ª Fase - Ouro B", "2ª Fase - Prata A", "2ª Fase - Prata B", "2ª Fase - Bronze A", "2ª Fase - Bronze B"]);
+    $grupos_existentes_ids = $stmt_check ? $stmt_check->fetchAll(PDO::FETCH_COLUMN) : [];
+
+    if (!empty($grupos_existentes_ids)) {
+        $placeholders = implode(',', array_fill(0, count($grupos_existentes_ids), '?'));
+        executeQuery($pdo, "DELETE FROM torneio_grupo_times WHERE grupo_id IN ($placeholders)", $grupos_existentes_ids);
+        executeQuery($pdo, "DELETE FROM torneio_classificacao WHERE grupo_id IN ($placeholders)", $grupos_existentes_ids);
+        executeQuery($pdo, "DELETE FROM torneio_grupos WHERE id IN ($placeholders)", $grupos_existentes_ids);
+    }
+
+    error_log("DEBUG: Iniciando transação...");
     error_log("DEBUG: Transação iniciada. inTransaction: " . ($pdo->inTransaction() ? 'SIM' : 'NÃO'));
     
     // Função para converter número em letra (1 -> A, 2 -> B, etc.)
@@ -1799,6 +1795,9 @@ try {
     ]);
     
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     echo json_encode([
         'success' => false,
         'message' => 'Erro ao processar: ' . $e->getMessage(),

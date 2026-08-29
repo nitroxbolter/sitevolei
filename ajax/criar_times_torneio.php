@@ -48,12 +48,14 @@ if (!$quantidade_times || !$integrantes_por_time) {
     exit();
 }
 
-// Verificar se já existem times e excluir antes de criar novos
-$sql = "DELETE FROM torneio_times WHERE torneio_id = ?";
-executeQuery($pdo, $sql, [$torneio_id]);
-
 $pdo->beginTransaction();
 try {
+    executeQuery($pdo, "SELECT id FROM torneios WHERE id = ? FOR UPDATE", [$torneio_id]);
+
+    // Verificar se já existem times e excluir antes de criar novos
+    $sql = "DELETE FROM torneio_times WHERE torneio_id = ?";
+    executeQuery($pdo, $sql, [$torneio_id]);
+
     // Array de cores diferentes para cada time
     $cores = [
         '#007bff',  // Azul

@@ -93,15 +93,25 @@ $sql_modalidade_atual = "SELECT modalidade FROM torneios WHERE id = ?";
 $stmt_modalidade = executeQuery($pdo, $sql_modalidade_atual, [$torneio_id]);
 $modalidade_atual = $stmt_modalidade ? $stmt_modalidade->fetch()['modalidade'] : null;
 
-// Atualizar modalidade, quantidade_grupos e quantidade_quadras
-$sql = "UPDATE torneios SET modalidade = ?, quantidade_grupos = ?, quantidade_quadras = ? WHERE id = ?";
-$result = executeQuery($pdo, $sql, [$modalidade, $quantidade_grupos, $quantidade_quadras, $torneio_id]);
+$pdo->beginTransaction();
+try {
+    executeQuery($pdo, "SELECT id FROM torneios WHERE id = ? FOR UPDATE", [$torneio_id]);
 
-// Se a modalidade mudou, limpar jogos, grupos e classificação
-if ($modalidade_atual && $modalidade_atual !== $modalidade) {
-    try {
-        $pdo->beginTransaction();
-        
+    // Atualizar modalidade, quantidade_grupos e quantidade_quadras
+    $sql = "UPDATE torneios SET modalidade = ?, quantidade_grupos = ?, quantidade_quadras = ? WHERE id = ?";
+    $result = executeQuery($pdo, $sql, [$modalidade, $quantidade_grupos, $quantidade_quadras, $torneio_id]);
+    if (!$result) {
+        throw new Exception('Erro ao salvar modalidade.');
+    }
+
+    // Se a modalidade mudou, limpar jogos, grupos e classificação na mesma transação.
+    if ($modalidade_atual && $modalidade_atual !== $modalidade) {
+        $stmt_finalizadas = executeQuery($pdo, "SELECT COUNT(*) AS total FROM torneio_partidas WHERE torneio_id = ? AND status = 'Finalizada'", [$torneio_id]);
+        $finalizadas = $stmt_finalizadas ? (int)$stmt_finalizadas->fetch()['total'] : 0;
+        if ($finalizadas > 0) {
+            throw new Exception('Não é possível alterar a modalidade depois que existem partidas finalizadas.');
+        }
+
         // Limpar chaves eliminatórias
         $sql_chaves = "DELETE FROM torneio_chaves_times WHERE torneio_id = ?";
         executeQuery($pdo, $sql_chaves, [$torneio_id]);
@@ -128,21 +138,19 @@ if ($modalidade_atual && $modalidade_atual !== $modalidade) {
         // Limpar classificação
         $sql_classificacao = "DELETE FROM torneio_classificacao WHERE torneio_id = ?";
         executeQuery($pdo, $sql_classificacao, [$torneio_id]);
-        
-        $pdo->commit();
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        error_log("Erro ao limpar jogos ao mudar modalidade: " . $e->getMessage());
     }
-}
 
-if ($result) {
+    $pdo->commit();
     echo json_encode([
         'success' => true, 
         'message' => 'Modalidade salva com sucesso!'
     ]);
-} else {
-    echo json_encode(['success' => false, 'message' => 'Erro ao salvar modalidade.']);
+} catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    error_log("Erro ao salvar modalidade: " . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
 ?>
 

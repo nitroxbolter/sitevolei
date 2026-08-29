@@ -7,9 +7,21 @@ $titulo = 'Meu Perfil';
 requireLogin();
 
 $usuario = getUserById($pdo, $_SESSION['user_id']);
+if (!$usuario) {
+    unset($_SESSION['user_id'], $_SESSION['user_nome'], $_SESSION['user_email']);
+    header('Location: auth/login.php?msg=login_necessario');
+    exit();
+}
 
 // Processar atualização do perfil
 if ($_POST) {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: perfil.php');
+        exit();
+    }
+
     $acao = $_POST['acao'] ?? '';
     if ($acao === 'alterar_senha') {
         $senha_atual = $_POST['senha_atual'] ?? '';
@@ -22,8 +34,8 @@ if ($_POST) {
             header('Location: perfil.php');
             exit();
         }
-        if (strlen($senha_nova) < 6) {
-            $_SESSION['mensagem'] = 'A nova senha deve ter pelo menos 6 caracteres.';
+        if (!senhaAtendePolitica($senha_nova)) {
+            $_SESSION['mensagem'] = 'A nova senha deve ter pelo menos 8 caracteres.';
             $_SESSION['tipo_mensagem'] = 'danger';
             header('Location: perfil.php');
             exit();
@@ -57,7 +69,7 @@ if ($_POST) {
     // Usar valores atuais como padrão quando não enviados
     $nome = isset($_POST['nome']) ? sanitizar($_POST['nome']) : $usuario['nome'];
     $nivel = $_POST['nivel'] ?? $usuario['nivel'];
-    $telefone = isset($_POST['telefone']) ? sanitizar($_POST['telefone']) : ($usuario['telefone'] ?? '');
+    $telefone = isset($_POST['telefone']) ? normalizarTelefone($_POST['telefone']) : ($usuario['telefone'] ?? '');
     $disponibilidade = isset($_POST['disponibilidade']) ? sanitizar($_POST['disponibilidade']) : ($usuario['disponibilidade'] ?? '');
     $avatar_selecionado = isset($_POST['avatar_selecionado']) ? trim($_POST['avatar_selecionado']) : '';
     
@@ -82,32 +94,27 @@ if ($_POST) {
     
     // Processar foto 3x4 via base64 (cropper)
     $foto34Base64 = $_POST['foto34_cropped'] ?? '';
-    if (!empty($foto34Base64) && preg_match('/^data:image\/(png|jpeg);base64,/', $foto34Base64)) {
+    if (!empty($foto34Base64) && strlen($foto34Base64) <= 3 * 1024 * 1024 && preg_match('/^data:image\/(png|jpeg);base64,/', $foto34Base64)) {
         $dados = preg_replace('/^data:image\/(png|jpeg);base64,/', '', $foto34Base64);
         $dados = str_replace(' ', '+', $dados);
         $bin = base64_decode($dados);
-        if ($bin !== false) {
+        if ($bin !== false && function_exists('imagecreatefromstring')) {
             $dir = __DIR__ . '/assets/arquivos/logousers';
             if (!is_dir($dir)) { @mkdir($dir, 0777, true); }
             $arquivo = $dir . '/' . (int)$_SESSION['user_id'] . '.png';
-            if (function_exists('imagecreatefromstring')) {
-                $src = @imagecreatefromstring($bin);
-                if ($src) {
-                    $dstW = 300; $dstH = 400; // 3x4
-                    $dst = imagecreatetruecolor($dstW, $dstH);
-                    imagealphablending($dst, false);
-                    imagesavealpha($dst, true);
-                    $w = imagesx($src); $h = imagesy($src);
-                    imagecopyresampled($dst, $src, 0, 0, 0, 0, $dstW, $dstH, $w, $h);
-                    imagepng($dst, $arquivo);
-                    imagedestroy($dst); imagedestroy($src);
-                } else {
-                    file_put_contents($arquivo, $bin);
+            $src = @imagecreatefromstring($bin);
+            if ($src) {
+                $dstW = 300; $dstH = 400; // 3x4
+                $dst = imagecreatetruecolor($dstW, $dstH);
+                imagealphablending($dst, false);
+                imagesavealpha($dst, true);
+                $w = imagesx($src); $h = imagesy($src);
+                imagecopyresampled($dst, $src, 0, 0, 0, 0, $dstW, $dstH, $w, $h);
+                if (imagepng($dst, $arquivo)) {
+                    $foto_perfil = 'assets/arquivos/logousers/' . (int)$_SESSION['user_id'] . '.png';
                 }
-            } else {
-                file_put_contents($arquivo, $bin);
+                imagedestroy($dst); imagedestroy($src);
             }
-            $foto_perfil = 'assets/arquivos/logousers/' . (int)$_SESSION['user_id'] . '.png';
         }
     }
 
@@ -180,7 +187,7 @@ include 'includes/header.php';
                 </div>
                 
                 <h4><?php echo htmlspecialchars($usuario['nome']); ?></h4>
-                <p class="text-muted"><?php echo $usuario['email']; ?></p>
+                <p class="text-muted"><?php echo htmlspecialchars($usuario['email']); ?></p>
                 
                 <div class="d-flex justify-content-center align-items-center mb-3">
                     <span class="badge bg-<?php echo $usuario['nivel'] === 'Profissional' ? 'danger' : ($usuario['nivel'] === 'Avançado' ? 'warning' : ($usuario['nivel'] === 'Intermediário' ? 'info' : 'secondary')); ?> me-2">
@@ -374,6 +381,7 @@ include 'includes/header.php';
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" enctype="multipart/form-data">
+                <?php echo csrfInput(); ?>
                 <div class="modal-body">
                     <?php if (isset($erro)): ?>
                         <?php echo exibirMensagem('erro', $erro); ?>
@@ -443,18 +451,19 @@ include 'includes/header.php';
             <form method="POST">
                 <div class="modal-body">
                     <input type="hidden" name="acao" value="alterar_senha">
+                    <?php echo csrfInput(); ?>
                     <div class="mb-3">
                         <label for="senha_atual" class="form-label">Senha Atual</label>
                         <input type="password" class="form-control" id="senha_atual" name="senha_atual" required>
                     </div>
                     <div class="mb-3">
                         <label for="senha_nova" class="form-label">Nova Senha</label>
-                        <input type="password" class="form-control" id="senha_nova" name="senha_nova" minlength="6" required>
-                        <small class="text-muted">Mínimo 6 caracteres</small>
+                        <input type="password" class="form-control" id="senha_nova" name="senha_nova" minlength="8" required>
+                        <small class="text-muted">Mínimo 8 caracteres</small>
                     </div>
                     <div class="mb-3">
                         <label for="senha_confirmar" class="form-label">Confirmar Nova Senha</label>
-                        <input type="password" class="form-control" id="senha_confirmar" name="senha_confirmar" minlength="6" required>
+                        <input type="password" class="form-control" id="senha_confirmar" name="senha_confirmar" minlength="8" required>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -477,6 +486,7 @@ include 'includes/header.php';
             <form method="POST">
                 <div class="modal-body">
                     <input type="hidden" name="acao" value="avatar">
+                    <?php echo csrfInput(); ?>
                     <div class="d-flex flex-wrap gap-3 justify-content-center">
                         <?php 
                         $avatars = ['01','02','03','04','05','06'];

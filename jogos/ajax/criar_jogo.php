@@ -37,7 +37,19 @@ if (empty($titulo) || empty($data_jogo) || empty($local)) {
     exit();
 }
 
-// Removido limite mínimo de 6 e máximo de 20 jogadores
+if ($max_jogadores <= 0) {
+    $_SESSION['mensagem'] = 'Informe uma quantidade válida de jogadores';
+    $_SESSION['tipo_mensagem'] = 'danger';
+    header('Location: ../jogos.php');
+    exit();
+}
+
+if (!empty($data_fim_jogo) && strtotime($data_fim_jogo) <= strtotime($data_jogo)) {
+    $_SESSION['mensagem'] = 'A data/hora de término deve ser posterior ao início do jogo';
+    $_SESSION['tipo_mensagem'] = 'danger';
+    header('Location: ../jogos.php');
+    exit();
+}
 
 // Permitir criação com a data do dia (sem bloquear datas iguais/anteriores)
 

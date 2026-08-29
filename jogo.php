@@ -145,6 +145,7 @@ include 'includes/header.php';
             </div>
             <form method="POST" action="ajax/editar_jogo.php">
                 <div class="modal-body">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
                     <input type="hidden" name="jogo_id" value="<?php echo (int)$jogo_id; ?>">
                     <div class="row">
                         <div class="col-md-6 mb-3">

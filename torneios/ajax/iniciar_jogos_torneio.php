@@ -120,6 +120,14 @@ if ($modalidade === 'todos_chaves' || $modalidade === 'torneio_pro') {
     }
 }
 
+$pdo->beginTransaction();
+$lock_stmt = executeQuery($pdo, "SELECT id FROM torneios WHERE id = ? FOR UPDATE", [$torneio_id]);
+if (!$lock_stmt || !$lock_stmt->fetch()) {
+    $pdo->rollBack();
+    echo json_encode(['success' => false, 'message' => 'Torneio não encontrado para bloqueio.']);
+    exit();
+}
+
 // Verificar se já existem partidas válidas
 $sql_check = "SELECT COUNT(*) as total FROM torneio_partidas tp
               INNER JOIN torneio_times t1 ON t1.id = tp.time1_id
@@ -129,6 +137,7 @@ $stmt_check = executeQuery($pdo, $sql_check, [$torneio_id, $torneio_id, $torneio
 $total_partidas_validas = $stmt_check ? (int)$stmt_check->fetch()['total'] : 0;
 
 if ($total_partidas_validas > 0) {
+    $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => 'Os jogos já foram gerados. Clique em "Limpar Jogos" no cabeçalho da seção "Jogos de Enfrentamento" se deseja gerar novamente.']);
     exit();
 }
@@ -157,6 +166,7 @@ $columnsQuery = $pdo->query("SHOW TABLES LIKE 'torneio_partidas'");
 $tabela_existe = $columnsQuery && $columnsQuery->rowCount() > 0;
 
 if (!$tabela_existe) {
+    $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => 'Estrutura de banco de dados não configurada. Execute o script SQL primeiro.']);
     exit();
 }
@@ -168,8 +178,6 @@ $quantidade_quadras = (int)($torneio['quantidade_quadras'] ?? 1);
 if ($quantidade_quadras < 1) {
     $quantidade_quadras = 1;
 }
-
-$pdo->beginTransaction();
 
 try {
     $total_times = count($times);

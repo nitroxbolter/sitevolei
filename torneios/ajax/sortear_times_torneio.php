@@ -68,8 +68,19 @@ if (empty($times)) {
     exit();
 }
 
+$vagas_times = count($times) * (int)$integrantes_por_time;
+if (count($participantes) !== $vagas_times) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'A quantidade de participantes precisa ser igual às vagas dos times. Participantes: ' . count($participantes) . '. Vagas: ' . $vagas_times . '.'
+    ]);
+    exit();
+}
+
 $pdo->beginTransaction();
 try {
+    executeQuery($pdo, "SELECT id FROM torneios WHERE id = ? FOR UPDATE", [$torneio_id]);
+
     // Limpar integrantes existentes
     $sql = "DELETE FROM torneio_time_integrantes WHERE time_id IN (SELECT id FROM torneio_times WHERE torneio_id = ?)";
     executeQuery($pdo, $sql, [$torneio_id]);

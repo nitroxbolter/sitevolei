@@ -8,6 +8,13 @@ requireAdmin($pdo);
 
 // Processar ações
 if ($_POST) {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: grupos_jogos.php');
+        exit();
+    }
+
     $acao = $_POST['acao'] ?? '';
     
     switch ($acao) {
@@ -69,7 +76,8 @@ if ($_POST) {
                     $_SESSION['tipo_mensagem'] = 'success';
                 } catch (Exception $e) {
                     if ($pdo->inTransaction()) { $pdo->rollBack(); }
-                    $_SESSION['mensagem'] = 'Erro ao remover grupo: ' . $e->getMessage();
+                    error_log("Erro ao remover grupo pelo admin: " . $e->getMessage());
+                    $_SESSION['mensagem'] = 'Erro ao remover grupo.';
                     $_SESSION['tipo_mensagem'] = 'danger';
                 }
             }
@@ -186,10 +194,10 @@ include '../includes/header.php';
                                 <td><?php echo formatarData($grupo['data_criacao'], 'd/m/Y'); ?></td>
                                 <td>
                                     <div class="btn-group">
-                                        <button class="btn btn-sm btn-warning" onclick="confirmarInativacaoGrupo(<?php echo $grupo['id']; ?>, '<?php echo htmlspecialchars($grupo['nome']); ?>')">
+                                        <button class="btn btn-sm btn-warning" onclick='confirmarInativacaoGrupo(<?php echo (int)$grupo['id']; ?>, <?php echo json_encode($grupo['nome'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>)'>
                                             <i class="fas fa-ban"></i> Inativar
                                         </button>
-                                        <button class="btn btn-sm btn-danger" onclick="confirmarRemocaoGrupo(<?php echo $grupo['id']; ?>, '<?php echo htmlspecialchars($grupo['nome']); ?>')">
+                                        <button class="btn btn-sm btn-danger" onclick='confirmarRemocaoGrupo(<?php echo (int)$grupo['id']; ?>, <?php echo json_encode($grupo['nome'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>)'>
                                             <i class="fas fa-trash"></i> Remover
                                         </button>
                                     </div>
@@ -250,7 +258,7 @@ include '../includes/header.php';
                                 </td>
                                 <td><?php echo htmlspecialchars($jogo['criado_por_nome']); ?></td>
                                 <td>
-                                    <button class="btn btn-sm btn-danger" onclick="confirmarRemocaoJogo(<?php echo $jogo['id']; ?>, '<?php echo htmlspecialchars($jogo['titulo']); ?>')">
+                                    <button class="btn btn-sm btn-danger" onclick='confirmarRemocaoJogo(<?php echo (int)$jogo['id']; ?>, <?php echo json_encode($jogo['titulo'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>)'>
                                         <i class="fas fa-trash"></i> Remover
                                     </button>
                                 </td>
@@ -279,6 +287,7 @@ include '../includes/header.php';
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form method="POST" style="display: inline;">
                     <input type="hidden" name="acao" value="remover_grupo">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="grupo_id" id="grupoIdRemover">
                     <button type="submit" class="btn btn-danger">Remover Grupo</button>
                 </form>
@@ -303,6 +312,7 @@ include '../includes/header.php';
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form method="POST" style="display: inline;">
                     <input type="hidden" name="acao" value="inativar_grupo">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="grupo_id" id="grupoIdInativar">
                     <button type="submit" class="btn btn-warning">Inativar Grupo</button>
                 </form>
@@ -327,6 +337,7 @@ include '../includes/header.php';
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form method="POST" style="display: inline;">
                     <input type="hidden" name="acao" value="remover_jogo">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="jogo_id" id="jogoIdRemover">
                     <button type="submit" class="btn btn-danger">Remover Jogo</button>
                 </form>

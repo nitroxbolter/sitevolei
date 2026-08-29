@@ -20,13 +20,20 @@ if ($profissional_id > 0) {
 
 // Processar formulário
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: ../../informacoes.php?secao=profissionais');
+        exit();
+    }
+
     $acao = $_POST['acao'] ?? '';
     
     if ($acao === 'salvar') {
         $nome = trim($_POST['nome'] ?? '');
         $telefone = trim($_POST['telefone'] ?? '');
         $modalidade = trim($_POST['modalidade'] ?? '');
-        $email = trim($_POST['email'] ?? '');
+        $email = normalizarEmail($_POST['email'] ?? '');
         $descricao = trim($_POST['descricao'] ?? '');
         $ativo = isset($_POST['ativo']) ? 1 : 0;
         
@@ -34,6 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (empty($nome)) {
             $erros[] = 'Nome é obrigatório.';
+        }
+
+        if ($email !== '' && !validarEmail($email)) {
+            $erros[] = 'Email inválido.';
         }
         
         // Limpar telefone (apenas números)
@@ -114,6 +125,7 @@ include '../../includes/header.php';
             <div class="card-body">
                 <form method="POST">
                     <input type="hidden" name="acao" value="salvar">
+                    <?php echo csrfInput(); ?>
                     
                     <div class="mb-3">
                         <label for="nome" class="form-label">Nome *</label>
@@ -179,6 +191,7 @@ include '../../includes/header.php';
 <?php if ($profissional_id > 0): ?>
 <form id="formExcluir" method="POST" style="display: none;">
     <input type="hidden" name="acao" value="excluir">
+    <?php echo csrfInput(); ?>
 </form>
 
 <script>

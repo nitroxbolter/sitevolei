@@ -157,15 +157,9 @@
                         
                         if ($user_id_session > 0 && $pdo_disponivel) {
                             $usuario = getUserById($pdo, $user_id_session);
-                            
-                            // Se não encontrou o usuário (pode estar inativo), tentar buscar sem filtro de ativo
+
                             if (!$usuario || !is_array($usuario)) {
-                                $sql_fallback = "SELECT * FROM usuarios WHERE id = ?";
-                                $stmt_fallback = executeQuery($pdo, $sql_fallback, [$user_id_session]);
-                                if ($stmt_fallback) {
-                                    $usuario = $stmt_fallback->fetch();
-                                    $stmt_fallback->closeCursor();
-                                }
+                                unset($_SESSION['user_id'], $_SESSION['user_nome'], $_SESSION['user_email']);
                             }
                         }
                         

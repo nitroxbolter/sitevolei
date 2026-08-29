@@ -18,10 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $jogo_id = (int)($_POST['jogo_id'] ?? 0);
 if ($jogo_id <= 0) { echo json_encode(['success'=>false,'message'=>'Jogo inválido']); exit(); }
 
-// Verificar se é o criador
-$stmt = executeQuery($pdo, "SELECT criado_por FROM jogos WHERE id = ?", [$jogo_id]);
-$row = $stmt ? $stmt->fetch() : null;
-if (!$row || (int)$row['criado_por'] !== (int)$_SESSION['user_id']) {
+if (!podeGerenciarJogo($pdo, $jogo_id, $_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Sem permissão']);
     exit();
 }

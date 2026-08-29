@@ -20,6 +20,13 @@ if ($atualizacao_id > 0) {
 
 // Processar formulário
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: ../../informacoes.php?secao=atualizacoes');
+        exit();
+    }
+
     $acao = $_POST['acao'] ?? '';
     
     if ($acao === 'salvar') {
@@ -129,6 +136,7 @@ include '../../includes/header.php';
             <div class="card-body">
                 <form method="POST">
                     <input type="hidden" name="acao" value="salvar">
+                    <?php echo csrfInput(); ?>
                     
                     <div class="mb-3">
                         <label for="titulo" class="form-label">Título *</label>
@@ -181,6 +189,7 @@ include '../../includes/header.php';
 <?php if ($atualizacao_id > 0): ?>
 <form id="formExcluir" method="POST" style="display: none;">
     <input type="hidden" name="acao" value="excluir">
+    <?php echo csrfInput(); ?>
 </form>
 
 <script>

@@ -39,6 +39,13 @@ if (!$sou_admin_grupo && !isAdmin($pdo, $_SESSION['user_id'])) {
 
 // Processar ações
 if ($_POST) {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: grupo.php?id='.(int)$grupo_id);
+        exit();
+    }
+
     $acao = $_POST['acao'] ?? '';
     if ($acao === 'atualizar_grupo') {
         $nome = trim($_POST['nome'] ?? '');
@@ -65,11 +72,11 @@ if ($_POST) {
             }
 
             // Processar nova logo (opcional)
-            if ($ok && !empty($logoCropped) && preg_match('/^data:image\/(png|jpeg);base64,/', $logoCropped)) {
+            if ($ok && !empty($logoCropped) && strlen($logoCropped) <= 3 * 1024 * 1024 && preg_match('/^data:image\/(png|jpeg);base64,/', $logoCropped)) {
                 $dadosBase64 = preg_replace('/^data:image\/(png|jpeg);base64,/', '', $logoCropped);
                 $dadosBase64 = str_replace(' ', '+', $dadosBase64);
                 $binario = base64_decode($dadosBase64);
-                if ($binario !== false) {
+                if ($binario !== false && function_exists('imagecreatefromstring')) {
                     // Criar registro de logo
                     $stmtLogo = executeQuery($pdo, "INSERT INTO logos_grupos (caminho) VALUES ('')", []);
                     if ($stmtLogo) {
@@ -77,24 +84,18 @@ if ($_POST) {
                         $dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'arquivos' . DIRECTORY_SEPARATOR . 'logosgrupos';
                         if (!is_dir($dir)) { @mkdir($dir, 0777, true); }
                         $arquivo = $dir . DIRECTORY_SEPARATOR . $novoLogoId . '.png';
-                        // Redimensionar se GD disponível; caso não, salvar como veio
-                        if (function_exists('imagecreatefromstring')) {
-                            $src = @imagecreatefromstring($binario);
-                            if ($src) {
-                                $dst = imagecreatetruecolor(128, 128);
-                                imagealphablending($dst, false);
-                                imagesavealpha($dst, true);
-                                $width = imagesx($src);
-                                $height = imagesy($src);
-                                imagecopyresampled($dst, $src, 0, 0, 0, 0, 128, 128, $width, $height);
-                                $saved = imagepng($dst, $arquivo);
-                                imagedestroy($dst);
-                                imagedestroy($src);
-                            } else {
-                                $saved = (file_put_contents($arquivo, $binario) !== false);
-                            }
-                        } else {
-                            $saved = (file_put_contents($arquivo, $binario) !== false);
+                        $saved = false;
+                        $src = @imagecreatefromstring($binario);
+                        if ($src) {
+                            $dst = imagecreatetruecolor(128, 128);
+                            imagealphablending($dst, false);
+                            imagesavealpha($dst, true);
+                            $width = imagesx($src);
+                            $height = imagesy($src);
+                            imagecopyresampled($dst, $src, 0, 0, 0, 0, 128, 128, $width, $height);
+                            $saved = imagepng($dst, $arquivo);
+                            imagedestroy($dst);
+                            imagedestroy($src);
                         }
                         if ($saved) {
                             $relPath = 'assets/arquivos/logosgrupos/' . $novoLogoId . '.png';
@@ -207,7 +208,8 @@ if ($_POST) {
             exit();
         } catch (Exception $e) {
             if ($pdo->inTransaction()) { $pdo->rollBack(); }
-            $_SESSION['mensagem'] = 'Erro ao remover grupo: ' . $e->getMessage();
+            error_log("Erro ao remover grupo: " . $e->getMessage());
+            $_SESSION['mensagem'] = 'Erro ao remover grupo.';
             $_SESSION['tipo_mensagem'] = 'danger';
         }
     }
@@ -280,10 +282,12 @@ include '../includes/header.php';
             <a href="../grupos.php" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
             <form method="POST" onsubmit="return confirm('Marcar este grupo como inativo?');">
                 <input type="hidden" name="acao" value="inativar_grupo">
+                <?php echo csrfInput(); ?>
                 <button type="submit" class="btn btn-warning"><i class="fas fa-ban me-1"></i>Inativar</button>
             </form>
             <form method="POST" onsubmit="return confirm('Tem certeza que deseja excluir este grupo?');">
                 <input type="hidden" name="acao" value="excluir_grupo">
+                <?php echo csrfInput(); ?>
                 <button type="submit" class="btn btn-danger"><i class="fas fa-trash me-1"></i>Excluir Grupo</button>
             </form>
         </div>
@@ -299,6 +303,7 @@ include '../includes/header.php';
             <div class="card-body">
                 <form method="POST" id="formEditarGrupo">
                     <input type="hidden" name="acao" value="atualizar_grupo">
+                    <?php echo csrfInput(); ?>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="nome" class="form-label">Nome do Grupo *</label>
@@ -405,6 +410,7 @@ include '../includes/header.php';
                                         <td>
                                             <form method="POST" onsubmit="return confirm('Remover este membro?');" style="display:inline-block;">
                                                 <input type="hidden" name="acao" value="remover_membro">
+                                                <?php echo csrfInput(); ?>
                                                 <input type="hidden" name="usuario_id" value="<?php echo (int)$m['id']; ?>">
                                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-user-times"></i></button>
                                             </form>

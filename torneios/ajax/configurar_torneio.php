@@ -123,6 +123,25 @@ if ($max_participantes !== null && $max_participantes > 0) {
     }
 }
 
+if ($max_participantes !== null && $max_participantes < 0) {
+    returnError('Quantidade máxima de participantes inválida.');
+}
+
+if ($quantidade_times !== null && $quantidade_times < 0) {
+    returnError('Quantidade de times inválida.');
+}
+
+if ($integrantes_por_time !== null && $integrantes_por_time < 0) {
+    returnError('Quantidade de integrantes por time inválida.');
+}
+
+if ($quantidade_times !== null && $integrantes_por_time !== null && $quantidade_times > 0 && $integrantes_por_time > 0) {
+    $vagas_times = $quantidade_times * $integrantes_por_time;
+    if ($max_participantes !== null && $max_participantes > 0 && $vagas_times !== $max_participantes) {
+        returnError('A configuração precisa fechar a conta: ' . $quantidade_times . ' time(s) x ' . $integrantes_por_time . ' integrante(s) = ' . $vagas_times . ', mas o limite de participantes está em ' . $max_participantes . '.');
+    }
+}
+
 try {
     // Verificar quais colunas existem na tabela
     $columnsQuery = $pdo->query("SHOW COLUMNS FROM torneios");

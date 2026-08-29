@@ -8,6 +8,13 @@ requireAdmin($pdo);
 
 // Processar ações
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: loja.php');
+        exit();
+    }
+
     $acao = $_POST['acao'] ?? '';
     
     if ($acao === 'adicionar_produto') {
@@ -29,25 +36,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Upload de imagem
             $imagem = null;
             if (isset($_FILES['imagem']) && $_FILES['imagem']['error'] === UPLOAD_ERR_OK) {
-                $uploadDir = '../assets/arquivos/produtos/';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0777, true);
-                }
-                
-                $extensao = strtolower(pathinfo($_FILES['imagem']['name'], PATHINFO_EXTENSION));
-                $extensoesPermitidas = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-                
-                if (in_array($extensao, $extensoesPermitidas)) {
-                    $nomeArquivo = uniqid() . '_' . time() . '.' . $extensao;
-                    $caminhoCompleto = $uploadDir . $nomeArquivo;
-                    
-                    if (move_uploaded_file($_FILES['imagem']['tmp_name'], $caminhoCompleto)) {
-                        $imagem = 'assets/arquivos/produtos/' . $nomeArquivo;
-                    } else {
-                        $erros[] = 'Erro ao fazer upload da imagem.';
-                    }
-                } else {
-                    $erros[] = 'Formato de arquivo não permitido. Use: JPG, JPEG, PNG, GIF ou WEBP.';
+                $imagem = uploadImagemSegura($_FILES['imagem'], '../assets/arquivos/produtos/', 'assets/arquivos/produtos', true);
+                if (!$imagem) {
+                    $erros[] = 'Imagem inválida. Use JPG, PNG, GIF ou WEBP com até 2MB.';
                 }
             }
             
@@ -106,33 +97,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Upload de nova imagem (se houver)
             $imagem = $imagem_antiga; // Manter imagem antiga por padrão
             if (isset($_FILES['imagem']) && $_FILES['imagem']['error'] === UPLOAD_ERR_OK) {
-                $uploadDir = '../assets/arquivos/produtos/';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0777, true);
-                }
-                
-                $extensao = strtolower(pathinfo($_FILES['imagem']['name'], PATHINFO_EXTENSION));
-                $extensoesPermitidas = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-                
-                if (in_array($extensao, $extensoesPermitidas)) {
-                    $nomeArquivo = uniqid() . '_' . time() . '.' . $extensao;
-                    $caminhoCompleto = $uploadDir . $nomeArquivo;
-                    
-                    if (move_uploaded_file($_FILES['imagem']['tmp_name'], $caminhoCompleto)) {
-                        $imagem = 'assets/arquivos/produtos/' . $nomeArquivo;
-                        
-                        // Remover imagem antiga se existir
-                        if ($imagem_antiga) {
-                            $oldPath = '../' . $imagem_antiga;
-                            if (file_exists($oldPath)) {
-                                @unlink($oldPath);
-                            }
+                $nova_imagem = uploadImagemSegura($_FILES['imagem'], '../assets/arquivos/produtos/', 'assets/arquivos/produtos', true);
+                if ($nova_imagem) {
+                    $imagem = $nova_imagem;
+                    if ($imagem_antiga) {
+                        $oldPath = '../' . ltrim($imagem_antiga, '/');
+                        if (file_exists($oldPath)) {
+                            @unlink($oldPath);
                         }
-                    } else {
-                        $erros[] = 'Erro ao fazer upload da imagem.';
                     }
                 } else {
-                    $erros[] = 'Formato de arquivo não permitido. Use: JPG, JPEG, PNG, GIF ou WEBP.';
+                    $erros[] = 'Imagem inválida. Use JPG, PNG, GIF ou WEBP com até 2MB.';
                 }
             }
             
@@ -305,7 +280,7 @@ include '../includes/header.php';
                                                 <i class="fas fa-edit"></i> Editar
                                             </button>
                                             <button class="btn btn-sm btn-danger" 
-                                                    onclick="removerProduto(<?php echo $produto['id']; ?>, '<?php echo addslashes($produto['nome']); ?>')">
+                                                    onclick='removerProduto(<?php echo (int)$produto['id']; ?>, <?php echo json_encode($produto['nome'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>)'>
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                         </td>
@@ -333,6 +308,7 @@ include '../includes/header.php';
             <form method="POST" enctype="multipart/form-data" id="formAdicionarProduto">
                 <div class="modal-body">
                     <input type="hidden" name="acao" value="adicionar_produto">
+                    <?php echo csrfInput(); ?>
                     <div class="mb-3">
                         <label for="nome" class="form-label">Nome do Produto *</label>
                         <input type="text" class="form-control" id="nome" name="nome" required>
@@ -375,6 +351,7 @@ include '../includes/header.php';
             <form method="POST" enctype="multipart/form-data" id="formEditarProduto">
                 <div class="modal-body">
                     <input type="hidden" name="acao" value="editar_produto">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="produto_id" id="editar_produto_id">
                     <div class="mb-3">
                         <label for="editar_nome" class="form-label">Nome do Produto *</label>
@@ -449,6 +426,7 @@ function removerProduto(produtoId, nomeProduto) {
         const form = document.createElement('form');
         form.method = 'POST';
         form.innerHTML = '<input type="hidden" name="acao" value="remover_produto">' +
+                         '<input type="hidden" name="csrf_token" value="' + window.csrfToken + '">' +
                          '<input type="hidden" name="produto_id" value="' + produtoId + '">';
         document.body.appendChild(form);
         form.submit();

@@ -31,7 +31,7 @@ if ($usuario_id > 0) {
     try {
         $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
         
-        $sql = "SELECT id, nome, usuario, cpf, telefone, email, nivel, genero, reputacao, is_premium, premium_expira_em FROM usuarios WHERE id = :usuario_id LIMIT 1";
+        $sql = "SELECT id, nome, usuario, cpf, telefone, email, nivel, genero, reputacao, is_premium, premium_expira_em FROM usuarios WHERE id = :usuario_id AND ativo = 1 LIMIT 1";
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':usuario_id', $usuario_id, PDO::PARAM_INT);
         $stmt->execute();
@@ -53,6 +53,13 @@ if (!$usuario_editado) {
 
 // Processar alteração de senha
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'alterar_senha') {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: editar_usuario.php?id=' . $usuario_id);
+        exit();
+    }
+
     $nova_senha = $_POST['nova_senha'] ?? '';
     $confirmar_senha = $_POST['confirmar_senha'] ?? '';
     
@@ -62,8 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
         $erros[] = 'Preencha ambos os campos de senha.';
     } elseif ($nova_senha !== $confirmar_senha) {
         $erros[] = 'As senhas não coincidem.';
-    } elseif (strlen($nova_senha) < 6) {
-        $erros[] = 'A senha deve ter pelo menos 6 caracteres.';
+    } elseif (!senhaAtendePolitica($nova_senha)) {
+        $erros[] = 'A senha deve ter pelo menos 8 caracteres.';
     }
     
     if (empty($erros)) {
@@ -93,15 +100,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
 
 // Processar formulário
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['acao'] === 'salvar') {
-    $nome = trim($_POST['nome'] ?? '');
-    $usuario = trim($_POST['usuario'] ?? '');
-    $cpf = trim($_POST['cpf'] ?? '');
-    $telefone = trim($_POST['telefone'] ?? '');
-    $email = trim($_POST['email'] ?? '');
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: editar_usuario.php?id=' . $usuario_id);
+        exit();
+    }
+
+    $nome = sanitizar($_POST['nome'] ?? '');
+    $usuario = normalizarUsuario($_POST['usuario'] ?? '');
+    $cpf_limpo = normalizarCpf($_POST['cpf'] ?? '');
+    $telefone_limpo = normalizarTelefone($_POST['telefone'] ?? '');
+    $email = normalizarEmail($_POST['email'] ?? '');
     $nivel = trim($_POST['nivel'] ?? '');
     $genero = trim($_POST['genero'] ?? '');
-    $reputacao = (int)($_POST['reputacao'] ?? 0);
+    $reputacao = max(0, (int)($_POST['reputacao'] ?? 0));
     $status_plano = trim($_POST['status_plano'] ?? 'comum');
+    $niveis_validos = ['Iniciante', 'Intermediário', 'Avançado', 'Profissional'];
+    $generos_validos = ['Masculino', 'Feminino', 'Outro', 'Prefiro não informar'];
     
     // Definir premium baseado no status
     $is_premium = ($status_plano === 'premium') ? 1 : 0;
@@ -140,33 +156,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
     
     if (empty($usuario)) {
         $erros[] = 'Usuário (login) é obrigatório.';
-    } else {
-        // Verificar se usuário já existe em outro registro
-        $sql_check_usuario = "SELECT id FROM usuarios WHERE usuario = ? AND id != ?";
-        $stmt_check_usuario = executeQuery($pdo, $sql_check_usuario, [$usuario, $usuario_id]);
-        if ($stmt_check_usuario && $stmt_check_usuario->fetch()) {
-            $erros[] = 'Este nome de usuário já está cadastrado para outro usuário.';
-        }
+    } elseif (!validarUsuarioLogin($usuario)) {
+        $erros[] = 'O nome de usuário deve ter 3 a 50 caracteres e usar apenas letras, números e underscore.';
     }
     
     if (empty($email)) {
         $erros[] = 'Email é obrigatório.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $erros[] = 'Email inválido.';
-    } else {
-        // Verificar se email já existe em outro usuário
-        $sql_check = "SELECT id FROM usuarios WHERE email = ? AND id != ?";
-        $stmt_check = executeQuery($pdo, $sql_check, [$email, $usuario_id]);
-        if ($stmt_check && $stmt_check->fetch()) {
-            $erros[] = 'Este email já está cadastrado para outro usuário.';
-        }
     }
-    
-    // Limpar CPF (apenas números)
-    $cpf_limpo = preg_replace('/[^0-9]/', '', $cpf);
-    
-    // Limpar telefone (apenas números)
-    $telefone_limpo = preg_replace('/[^0-9]/', '', $telefone);
+
+    if ($nivel !== '' && !in_array($nivel, $niveis_validos, true)) {
+        $erros[] = 'Nível inválido.';
+    }
+
+    if ($genero !== '' && !in_array($genero, $generos_validos, true)) {
+        $erros[] = 'Gênero inválido.';
+    }
+
+    if (!in_array($status_plano, ['comum', 'premium'], true)) {
+        $erros[] = 'Plano inválido.';
+    }
+
+    if ($cpf_limpo !== '' && !validarCpf($cpf_limpo)) {
+        $erros[] = 'CPF inválido.';
+    }
+
+    if (usuarioEmailCpfEmUso($pdo, $usuario, $email, $cpf_limpo, $usuario_id)) {
+        $erros[] = 'Nome de usuário, email ou CPF já cadastrado para outro usuário.';
+    }
     
     if (empty($erros)) {
         try {
@@ -202,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao']) && $_POST['ac
             }
         } catch (PDOException $e) {
             error_log("Erro ao atualizar usuário: " . $e->getMessage());
-            $_SESSION['mensagem'] = 'Erro ao atualizar dados do usuário: ' . $e->getMessage();
+            $_SESSION['mensagem'] = 'Erro ao atualizar dados do usuário.';
             $_SESSION['tipo_mensagem'] = 'danger';
         }
     } else {
@@ -250,6 +268,7 @@ include '../includes/header.php';
             <div class="card-body">
                 <form method="POST">
                     <input type="hidden" name="acao" value="salvar">
+                    <?php echo csrfInput(); ?>
                     
                     <h6 class="mb-3"><i class="fas fa-user me-2"></i>Dados Pessoais</h6>
                     
@@ -357,20 +376,21 @@ include '../includes/header.php';
                 <!-- Alterar Senha -->
                 <form method="POST">
                     <input type="hidden" name="acao" value="alterar_senha">
+                    <?php echo csrfInput(); ?>
                     
                     <h6 class="mb-3"><i class="fas fa-key me-2"></i>Alterar Senha</h6>
                     
                     <div class="mb-3">
                         <label for="nova_senha" class="form-label">Nova Senha</label>
                         <input type="password" class="form-control" id="nova_senha" name="nova_senha" 
-                               minlength="6" placeholder="Mínimo 6 caracteres">
-                        <small class="form-text text-muted">A senha deve ter pelo menos 6 caracteres</small>
+                               minlength="8" placeholder="Mínimo 8 caracteres">
+                        <small class="form-text text-muted">A senha deve ter pelo menos 8 caracteres</small>
                     </div>
                     
                     <div class="mb-3">
                         <label for="confirmar_senha" class="form-label">Confirmar Nova Senha</label>
                         <input type="password" class="form-control" id="confirmar_senha" name="confirmar_senha" 
-                               minlength="6" placeholder="Digite a senha novamente">
+                               minlength="8" placeholder="Digite a senha novamente">
                     </div>
                     
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">

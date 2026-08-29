@@ -44,9 +44,13 @@ if (!$sou_criador && !$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
 
 $pdo->beginTransaction();
 try {
+    executeQuery($pdo, "SELECT id FROM torneios WHERE id = ? FOR UPDATE", [$torneio_id]);
+
     // Limpar integrantes existentes de todos os times do torneio
     $sql = "DELETE FROM torneio_time_integrantes WHERE time_id IN (SELECT id FROM torneio_times WHERE torneio_id = ?)";
     executeQuery($pdo, $sql, [$torneio_id]);
+    $integrantes_por_time = (int)($torneio['integrantes_por_time'] ?? 0);
+    $participantes_atribuidos = [];
     
     // Processar cada time
     foreach ($times_data as $timeData) {
@@ -63,19 +67,31 @@ try {
             $sql = "INSERT INTO torneio_times (torneio_id, nome, cor, ordem) VALUES (?, ?, ?, ?)";
             executeQuery($pdo, $sql, [$torneio_id, 'Time ' . $time_numero, $cor, $time_numero]);
             $time_id = (int)$pdo->lastInsertId();
+        } else {
+            $check_time = executeQuery($pdo, "SELECT id FROM torneio_times WHERE id = ? AND torneio_id = ? FOR UPDATE", [$time_id, $torneio_id]);
+            if (!$check_time || !$check_time->fetch()) {
+                throw new Exception('Time inválido para este torneio.');
+            }
         }
         
         // Adicionar participantes ao time
         if (!empty($participantes_ids)) {
+            if ($integrantes_por_time > 0 && count($participantes_ids) > $integrantes_por_time) {
+                throw new Exception('O time ' . $time_numero . ' excede o limite de ' . $integrantes_por_time . ' integrante(s).');
+            }
             $sql = "INSERT INTO torneio_time_integrantes (time_id, participante_id) VALUES (?, ?)";
             $stmt = $pdo->prepare($sql);
             foreach ($participantes_ids as $participante_id) {
                 $participante_id = (int)$participante_id;
                 if ($participante_id > 0) {
+                    if (isset($participantes_atribuidos[$participante_id])) {
+                        throw new Exception('O mesmo participante foi enviado em mais de um time.');
+                    }
                     // Verificar se participante pertence ao torneio
                     $check = executeQuery($pdo, "SELECT id FROM torneio_participantes WHERE id = ? AND torneio_id = ?", [$participante_id, $torneio_id]);
                     if ($check && $check->fetch()) {
                         $stmt->execute([$time_id, $participante_id]);
+                        $participantes_atribuidos[$participante_id] = true;
                     }
                 }
             }

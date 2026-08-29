@@ -211,6 +211,7 @@ include '../includes/header.php';
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="ajax/criar_jogo.php">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6 mb-3">

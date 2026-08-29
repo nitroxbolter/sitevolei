@@ -8,6 +8,13 @@ requireAdmin($pdo);
 
 // Processar ações
 if ($_POST) {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: usuarios.php');
+        exit();
+    }
+
     $acao = $_POST['acao'] ?? '';
     $usuario_id = (int)($_POST['usuario_id'] ?? 0);
     
@@ -20,8 +27,8 @@ if ($_POST) {
                 $_SESSION['tipo_mensagem'] = 'danger';
                 break;
             }
-            if (strlen($nova_senha) < 6) {
-                $_SESSION['mensagem'] = 'A senha deve ter pelo menos 6 caracteres.';
+            if (!senhaAtendePolitica($nova_senha)) {
+                $_SESSION['mensagem'] = 'A senha deve ter pelo menos 8 caracteres.';
                 $_SESSION['tipo_mensagem'] = 'danger';
                 break;
             }
@@ -68,7 +75,7 @@ if ($_POST) {
             break;
             
         case 'alterar_admin':
-            $is_admin = isset($_POST['is_admin']) ? 1 : 0;
+            $is_admin = isset($_POST['is_admin']) ? 3 : 0;
             
             $sql = "UPDATE usuarios SET is_admin = ? WHERE id = ?";
             if (executeQuery($pdo, $sql, [$is_admin, $usuario_id])) {
@@ -168,11 +175,6 @@ include '../includes/header.php';
                             <td><?php echo formatarData($usuario['data_cadastro'], 'd/m/Y'); ?></td>
                             <td>
                                 <div class="btn-group" role="group">
-                                    <?php 
-                                    // Debug: verificar o ID que está sendo usado no link
-                                    $link_id = $usuario['id'];
-                                    error_log("DEBUG usuarios.php: Gerando link para usuário ID = $link_id, Nome = {$usuario['nome']}");
-                                    ?>
                                     <a href="editar_usuario.php?id=<?php echo $usuario['id']; ?>" 
                                        class="btn btn-sm btn-primary"
                                        title="Editar usuário ID: <?php echo $usuario['id']; ?>">
@@ -180,7 +182,7 @@ include '../includes/header.php';
                                         <span class="d-none d-md-inline ms-1">Editar</span>
                                     </a>
                                     <?php if ($usuario['id'] != $_SESSION['user_id']): ?>
-                                        <button class="btn btn-sm btn-danger" onclick="confirmarRemocao(<?php echo $usuario['id']; ?>, '<?php echo htmlspecialchars($usuario['nome']); ?>')">
+                                        <button class="btn btn-sm btn-danger" onclick='confirmarRemocao(<?php echo (int)$usuario['id']; ?>, <?php echo json_encode($usuario['nome'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>)'>
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     <?php endif; ?>
@@ -210,6 +212,7 @@ include '../includes/header.php';
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form method="POST" style="display: inline;">
                     <input type="hidden" name="acao" value="remover_usuario">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="usuario_id" id="usuarioIdRemover">
                     <button type="submit" class="btn btn-danger">Remover Usuário</button>
                 </form>

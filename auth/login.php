@@ -21,68 +21,68 @@ if (isset($_GET['msg']) && $_GET['msg'] === 'login_necessario') {
 
 // Processar login
 if ($_POST && isset($_POST['acao']) && $_POST['acao'] === 'login') {
-    $email = sanitizar($_POST['email'] ?? '');
-    $senha = $_POST['senha'] ?? '';
-    
-    if (empty($email) || empty($senha)) {
-        $erro = 'Por favor, preencha todos os campos.';
-    } elseif (!validarEmail($email)) {
-        $erro = 'Email inválido.';
+    if (!csrfTokenValido()) {
+        $erro = 'Sua sessão expirou. Atualize a página e tente novamente.';
     } else {
-        $usuario = getUserByEmail($pdo, $email);
+        $email = normalizarEmail($_POST['email'] ?? '');
+        $senha = $_POST['senha'] ?? '';
         
-        if ($usuario && verificarSenha($senha, $usuario['senha'])) {
-            $_SESSION['user_id'] = $usuario['id'];
-            $_SESSION['user_nome'] = $usuario['nome'];
-            $_SESSION['user_email'] = $usuario['email'];
-            
-            header('Location: ../dashboard.php');
-            exit();
+        if (empty($email) || empty($senha)) {
+            $erro = 'Por favor, preencha todos os campos.';
+        } elseif (!validarEmail($email)) {
+            $erro = 'Email inválido.';
         } else {
-            $erro = 'Email ou senha incorretos.';
+            $usuario = getUserByEmail($pdo, $email);
+
+            if ($usuario && verificarSenha($senha, $usuario['senha'])) {
+                session_regenerate_id(true);
+                $_SESSION['user_id'] = $usuario['id'];
+                $_SESSION['user_nome'] = $usuario['nome'];
+                $_SESSION['user_email'] = $usuario['email'];
+
+                header('Location: ../dashboard.php');
+                exit();
+            } else {
+                $erro = 'Email ou senha incorretos.';
+            }
         }
     }
 }
 
 // Processar cadastro
 if ($_POST && isset($_POST['acao']) && $_POST['acao'] === 'cadastro') {
-    $nome = sanitizar($_POST['nome'] ?? '');
-    $usuario_nome = sanitizar($_POST['usuario'] ?? '');
-    $cpf = sanitizar($_POST['cpf'] ?? '');
-    $telefone = sanitizar($_POST['telefone'] ?? '');
-    $email = sanitizar($_POST['email'] ?? '');
-    $senha = $_POST['senha'] ?? '';
-    $confirmar_senha = $_POST['confirmar_senha'] ?? '';
-    $nivel = $_POST['nivel'] ?? '';
-    $disponibilidade = sanitizar($_POST['disponibilidade'] ?? '');
-    $aceita_termos = isset($_POST['aceita_termos']);
-    
-    // Validações
-    if (empty($nome) || empty($usuario_nome) || empty($cpf) || empty($telefone) || empty($email) || empty($senha) || empty($confirmar_senha)) {
-        $erro = 'Por favor, preencha todos os campos obrigatórios.';
-    } elseif (!validarEmail($email)) {
-        $erro = 'Email inválido.';
-    } elseif (strlen($senha) < 6) {
-        $erro = 'A senha deve ter pelo menos 6 caracteres.';
-    } elseif ($senha !== $confirmar_senha) {
-        $erro = 'As senhas não coincidem.';
-    } elseif (!$aceita_termos) {
-        $erro = 'Você deve aceitar os termos de uso.';
-    } elseif (getUserByEmail($pdo, $email)) {
-        $erro = 'Este email já está cadastrado.';
+    if (!csrfTokenValido()) {
+        $erro = 'Sua sessão expirou. Atualize a página e tente novamente.';
     } else {
-        // Verificar se usuário já existe
-        $sql_check = "SELECT id FROM usuarios WHERE usuario = ? OR cpf = ?";
-        $stmt_check = executeQuery($pdo, $sql_check, [$usuario_nome, $cpf]);
-        if ($stmt_check && $stmt_check->fetch()) {
-            $erro = 'Nome de usuário ou CPF já cadastrado.';
+        $nome = sanitizar($_POST['nome'] ?? '');
+        $usuario_nome = normalizarUsuario($_POST['usuario'] ?? '');
+        $cpf_limpo = normalizarCpf($_POST['cpf'] ?? '');
+        $telefone_limpo = normalizarTelefone($_POST['telefone'] ?? '');
+        $email = normalizarEmail($_POST['email'] ?? '');
+        $senha = $_POST['senha'] ?? '';
+        $confirmar_senha = $_POST['confirmar_senha'] ?? '';
+        $nivel = $_POST['nivel'] ?? '';
+        $disponibilidade = sanitizar($_POST['disponibilidade'] ?? '');
+        $aceita_termos = isset($_POST['aceita_termos']);
+
+        // Validações
+        if (empty($nome) || empty($usuario_nome) || empty($cpf_limpo) || empty($telefone_limpo) || empty($email) || empty($senha) || empty($confirmar_senha)) {
+            $erro = 'Por favor, preencha todos os campos obrigatórios.';
+        } elseif (!validarUsuarioLogin($usuario_nome)) {
+            $erro = 'O nome de usuário deve ter 3 a 50 caracteres e usar apenas letras, números e underscore.';
+        } elseif (!validarCpf($cpf_limpo)) {
+            $erro = 'CPF inválido.';
+        } elseif (!validarEmail($email)) {
+            $erro = 'Email inválido.';
+        } elseif (!senhaAtendePolitica($senha)) {
+            $erro = 'A senha deve ter pelo menos 8 caracteres.';
+        } elseif ($senha !== $confirmar_senha) {
+            $erro = 'As senhas não coincidem.';
+        } elseif (!$aceita_termos) {
+            $erro = 'Você deve aceitar os termos de uso.';
+        } elseif (usuarioEmailCpfEmUso($pdo, $usuario_nome, $email, $cpf_limpo)) {
+            $erro = 'Nome de usuário, email ou CPF já cadastrado.';
         } else {
-            // Formatar CPF (remover caracteres não numéricos)
-            $cpf_limpo = preg_replace('/[^0-9]/', '', $cpf);
-            
-            // Formatar telefone (remover caracteres não numéricos, manter apenas números)
-            $telefone_limpo = preg_replace('/[^0-9]/', '', $telefone);
-            
             // Cadastrar usuário (começa com 100 pontos de reputação)
             $senha_hash = hashSenha($senha);
             $sql = "INSERT INTO usuarios (nome, usuario, cpf, telefone, email, senha, nivel, disponibilidade, reputacao) 
@@ -93,7 +93,7 @@ if ($_POST && isset($_POST['acao']) && $_POST['acao'] === 'cadastro') {
                 // Limpar formulário
                 unset($_POST);
             } else {
-                $erro = 'Erro ao cadastrar usuário. Tente novamente.';
+                $erro = 'Erro ao cadastrar usuário. Confira se os dados ainda não estão em uso.';
             }
         }
     }
@@ -214,6 +214,7 @@ include '../includes/header.php';
             <!-- Formulário de Login -->
             <form method="POST" id="formLogin">
                 <input type="hidden" name="acao" value="login">
+                <?php echo csrfInput(); ?>
                 
                 <div class="form-floating mb-3">
                     <input type="email" class="form-control" id="email" name="email" 
@@ -267,6 +268,7 @@ include '../includes/header.php';
             <form method="POST" id="formCadastro">
                 <div class="modal-body">
                     <input type="hidden" name="acao" value="cadastro">
+                    <?php echo csrfInput(); ?>
                     
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -349,15 +351,15 @@ include '../includes/header.php';
                             <label for="senha_cadastro" class="form-label">
                                 <i class="fas fa-lock me-1"></i>Senha *
                             </label>
-                            <input type="password" class="form-control" id="senha_cadastro" name="senha" required>
-                            <small class="form-text text-muted">Mínimo 6 caracteres</small>
+                            <input type="password" class="form-control" id="senha_cadastro" name="senha" minlength="8" required>
+                            <small class="form-text text-muted">Mínimo 8 caracteres</small>
                         </div>
                         
                         <div class="col-md-6 mb-3">
                             <label for="confirmar_senha_cadastro" class="form-label">
                                 <i class="fas fa-lock me-1"></i>Confirmar Senha *
                             </label>
-                            <input type="password" class="form-control" id="confirmar_senha_cadastro" name="confirmar_senha" required>
+                            <input type="password" class="form-control" id="confirmar_senha_cadastro" name="confirmar_senha" minlength="8" required>
                         </div>
                     </div>
                     

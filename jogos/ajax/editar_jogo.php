@@ -21,10 +21,7 @@ if ($jogo_id <= 0) {
     exit();
 }
 
-// Verificar se é o criador
-$stmt = executeQuery($pdo, "SELECT criado_por FROM jogos WHERE id = ?", [$jogo_id]);
-$row = $stmt ? $stmt->fetch() : null;
-if (!$row || (int)$row['criado_por'] !== (int)$_SESSION['user_id']) {
+if (!podeGerenciarJogo($pdo, $jogo_id, $_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Sem permissão']);
     exit();
 }
@@ -40,6 +37,16 @@ $contato = sanitizar($_POST['contato'] ?? '');
 
 if ($titulo === '' || $data_jogo === '' || $local === '') {
     echo json_encode(['success' => false, 'message' => 'Preencha os campos obrigatórios']);
+    exit();
+}
+
+if ($max_jogadores <= 0) {
+    echo json_encode(['success' => false, 'message' => 'O número máximo de jogadores deve ser maior que zero']);
+    exit();
+}
+
+if ($data_fim !== '' && strtotime($data_fim) <= strtotime($data_jogo)) {
+    echo json_encode(['success' => false, 'message' => 'A data de fim deve ser posterior ao início do jogo']);
     exit();
 }
 

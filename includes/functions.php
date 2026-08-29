@@ -209,6 +209,71 @@ function sanitizar($dados) {
     return htmlspecialchars(strip_tags(trim($dados)));
 }
 
+function normalizarEmail($email) {
+    return strtolower(trim((string)$email));
+}
+
+function normalizarUsuario($usuario) {
+    return strtolower(trim(strip_tags((string)$usuario)));
+}
+
+function normalizarCpf($cpf) {
+    return preg_replace('/\D+/', '', (string)$cpf);
+}
+
+function normalizarTelefone($telefone) {
+    return preg_replace('/\D+/', '', (string)$telefone);
+}
+
+function validarCpf($cpf) {
+    $cpf = normalizarCpf($cpf);
+
+    if (strlen($cpf) !== 11 || preg_match('/^(\d)\1{10}$/', $cpf)) {
+        return false;
+    }
+
+    for ($t = 9; $t < 11; $t++) {
+        $soma = 0;
+        for ($i = 0; $i < $t; $i++) {
+            $soma += (int)$cpf[$i] * (($t + 1) - $i);
+        }
+        $digito = ((10 * $soma) % 11) % 10;
+        if ((int)$cpf[$t] !== $digito) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function validarUsuarioLogin($usuario) {
+    return (bool)preg_match('/^[a-z0-9_]{3,50}$/', $usuario);
+}
+
+function senhaAtendePolitica($senha) {
+    return is_string($senha) && strlen($senha) >= 8;
+}
+
+function usuarioEmailCpfEmUso($pdo, $usuario, $email, $cpf, $ignorar_id = 0) {
+    $condicoes = ["usuario = ?", "email = ?"];
+    $params = [$usuario, $email];
+
+    if ($cpf !== '') {
+        $condicoes[] = "cpf = ?";
+        $params[] = $cpf;
+    }
+
+    $sql = "SELECT usuario, email, cpf FROM usuarios WHERE (" . implode(' OR ', $condicoes) . ")";
+
+    if ((int)$ignorar_id > 0) {
+        $sql .= " AND id != ?";
+        $params[] = (int)$ignorar_id;
+    }
+
+    $stmt = executeQuery($pdo, $sql, $params);
+    return $stmt ? $stmt->fetch() : false;
+}
+
 // Proteção CSRF compartilhada pelas ações autenticadas do site.
 function csrfToken() {
     if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -245,6 +310,10 @@ function exigirCsrfToken() {
     exit();
 }
 
+function csrfInput() {
+    return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') . '">';
+}
+
 function podeGerenciarTorneio($pdo, $torneio_id, $usuario_id) {
     $sql = "SELECT t.criado_por, g.administrador_id
             FROM torneios t
@@ -259,6 +328,23 @@ function podeGerenciarTorneio($pdo, $torneio_id, $usuario_id) {
 
     return (int)$torneio['criado_por'] === (int)$usuario_id
         || (!empty($torneio['administrador_id']) && (int)$torneio['administrador_id'] === (int)$usuario_id)
+        || isAdmin($pdo, $usuario_id);
+}
+
+function podeGerenciarJogo($pdo, $jogo_id, $usuario_id) {
+    $sql = "SELECT j.criado_por, g.administrador_id
+            FROM jogos j
+            LEFT JOIN grupos g ON g.id = j.grupo_id
+            WHERE j.id = ?";
+    $stmt = executeQuery($pdo, $sql, [(int)$jogo_id]);
+    $jogo = $stmt ? $stmt->fetch() : false;
+
+    if (!$jogo) {
+        return false;
+    }
+
+    return (int)$jogo['criado_por'] === (int)$usuario_id
+        || (!empty($jogo['administrador_id']) && (int)$jogo['administrador_id'] === (int)$usuario_id)
         || isAdmin($pdo, $usuario_id);
 }
 
@@ -368,18 +454,32 @@ function mostrarMensagemLoginNecessario() {
 
 // Função para upload de foto
 function uploadFoto($arquivo, $pasta = 'uploads/profile_pics/') {
+    if (!isset($arquivo['error']) || $arquivo['error'] !== UPLOAD_ERR_OK) {
+        return false;
+    }
+
+    $tamanho_maximo = 2 * 1024 * 1024;
+    if (empty($arquivo['tmp_name']) || !is_uploaded_file($arquivo['tmp_name']) || ($arquivo['size'] ?? 0) > $tamanho_maximo) {
+        return false;
+    }
+
     if (!file_exists($pasta)) {
         mkdir($pasta, 0777, true);
     }
     
-    $extensoes_permitidas = ['jpg', 'jpeg', 'png', 'gif'];
-    $extensao = strtolower(pathinfo($arquivo['name'], PATHINFO_EXTENSION));
+    $tipos_permitidos = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/gif' => 'gif',
+    ];
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($arquivo['tmp_name']);
     
-    if (!in_array($extensao, $extensoes_permitidas)) {
+    if (!isset($tipos_permitidos[$mime]) || !@getimagesize($arquivo['tmp_name'])) {
         return false;
     }
     
-    $nome_arquivo = uniqid() . '.' . $extensao;
+    $nome_arquivo = bin2hex(random_bytes(16)) . '.' . $tipos_permitidos[$mime];
     $caminho_completo = $pasta . $nome_arquivo;
     
     if (move_uploaded_file($arquivo['tmp_name'], $caminho_completo)) {
@@ -389,10 +489,49 @@ function uploadFoto($arquivo, $pasta = 'uploads/profile_pics/') {
     return false;
 }
 
-// Todos os POSTs da API de torneios exigem o token enviado pelo cabeçalho comum.
+function uploadImagemSegura($arquivo, $pasta, $prefixoRelativo, $permitirWebp = false) {
+    if (!isset($arquivo['error']) || $arquivo['error'] !== UPLOAD_ERR_OK) {
+        return false;
+    }
+
+    $tamanho_maximo = 2 * 1024 * 1024;
+    if (empty($arquivo['tmp_name']) || !is_uploaded_file($arquivo['tmp_name']) || ($arquivo['size'] ?? 0) > $tamanho_maximo) {
+        return false;
+    }
+
+    $tipos_permitidos = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/gif' => 'gif',
+    ];
+    if ($permitirWebp) {
+        $tipos_permitidos['image/webp'] = 'webp';
+    }
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($arquivo['tmp_name']);
+    if (!isset($tipos_permitidos[$mime]) || !@getimagesize($arquivo['tmp_name'])) {
+        return false;
+    }
+
+    if (!is_dir($pasta)) {
+        mkdir($pasta, 0777, true);
+    }
+
+    $nome_arquivo = bin2hex(random_bytes(16)) . '.' . $tipos_permitidos[$mime];
+    $caminho_completo = rtrim($pasta, '/\\') . DIRECTORY_SEPARATOR . $nome_arquivo;
+
+    if (!move_uploaded_file($arquivo['tmp_name'], $caminho_completo)) {
+        return false;
+    }
+
+    return rtrim($prefixoRelativo, '/\\') . '/' . $nome_arquivo;
+}
+
+// Todos os POSTs das APIs AJAX exigem o token enviado pelo cabeçalho comum.
 if (isset($_SERVER['REQUEST_METHOD']) && strtoupper($_SERVER['REQUEST_METHOD']) === 'POST') {
     $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
-    if (strpos($script, '/torneios/ajax/') !== false) {
+    if (strpos($script, '/ajax/') !== false) {
         exigirCsrfToken();
     }
 }

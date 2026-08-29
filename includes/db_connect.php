@@ -42,20 +42,12 @@ function getUserById($pdo, $id) {
     }
     $sql = "SELECT * FROM usuarios WHERE id = ? AND ativo = 1";
     $stmt = executeQuery($pdo, $sql, [$id]);
-    $result = $stmt ? $stmt->fetch() : false;
-    
-    // Se não encontrou com ativo=1, tentar sem filtro de ativo
-    if (!$result) {
-        $sql_fallback = "SELECT * FROM usuarios WHERE id = ?";
-        $stmt_fallback = executeQuery($pdo, $sql_fallback, [$id]);
-        $result = $stmt_fallback ? $stmt_fallback->fetch() : false;
-    }
-    
-    return $result;
+    return $stmt ? $stmt->fetch() : false;
 }
 
 // Função para obter um usuário por email
 function getUserByEmail($pdo, $email) {
+    $email = strtolower(trim((string)$email));
     $sql = "SELECT * FROM usuarios WHERE email = ? AND ativo = 1";
     $stmt = executeQuery($pdo, $sql, [$email]);
     return $stmt ? $stmt->fetch() : false;

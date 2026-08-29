@@ -1561,10 +1561,10 @@ function sortearTimes() {
     $nomeParticipante = $p['usuario_nome'] ?? $p['nome_avulso'] ?? 'Participante #' . $p['id'];
     ?>
     participantes.push({
-        id: <?php echo $p['id']; ?>,
-        nome: '<?php echo addslashes($nomeParticipante); ?>',
-        foto: '<?php echo addslashes($fotoParticipante); ?>',
-        genero: '<?php echo addslashes($p['usuario_genero'] ?? ''); ?>'
+        id: <?php echo (int)$p['id']; ?>,
+        nome: <?php echo json_encode($nomeParticipante, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+        foto: <?php echo json_encode($fotoParticipante, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+        genero: <?php echo json_encode($p['usuario_genero'] ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>
     });
     <?php endforeach; ?>
     

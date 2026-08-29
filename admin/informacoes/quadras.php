@@ -20,6 +20,13 @@ if ($quadra_id > 0) {
 
 // Processar formulário
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: ../../informacoes.php?secao=quadras');
+        exit();
+    }
+
     $acao = $_POST['acao'] ?? '';
     
     if ($acao === 'salvar') {
@@ -44,32 +51,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Processar upload de foto
         $foto = $quadra['foto'] ?? null;
         if (isset($_FILES['foto']) && $_FILES['foto']['error'] === UPLOAD_ERR_OK) {
-            $uploadDir = '../../assets/arquivos/quadras/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
-            }
-            
-            $nomeArquivo = uniqid() . '_' . time() . '_' . basename($_FILES['foto']['name']);
-            $caminhoCompleto = $uploadDir . $nomeArquivo;
-            
-            $extensoesPermitidas = ['jpg', 'jpeg', 'png', 'gif'];
-            $extensao = strtolower(pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION));
-            
-            if (in_array($extensao, $extensoesPermitidas)) {
-                if (move_uploaded_file($_FILES['foto']['tmp_name'], $caminhoCompleto)) {
-                    // Remover foto antiga se existir
-                    if ($quadra && !empty($quadra['foto'])) {
-                        $fotoAntiga = '../../' . ltrim($quadra['foto'], '/');
-                        if (file_exists($fotoAntiga)) {
-                            unlink($fotoAntiga);
-                        }
+            $nova_foto = uploadImagemSegura($_FILES['foto'], '../../assets/arquivos/quadras/', 'assets/arquivos/quadras');
+            if ($nova_foto) {
+                if ($quadra && !empty($quadra['foto'])) {
+                    $fotoAntiga = '../../' . ltrim($quadra['foto'], '/');
+                    if (file_exists($fotoAntiga)) {
+                        @unlink($fotoAntiga);
                     }
-                    $foto = 'assets/arquivos/quadras/' . $nomeArquivo;
-                } else {
-                    $erros[] = 'Erro ao fazer upload da foto.';
                 }
+                $foto = $nova_foto;
             } else {
-                $erros[] = 'Formato de arquivo não permitido. Use: JPG, JPEG, PNG ou GIF.';
+                $erros[] = 'Foto inválida. Use JPG, PNG ou GIF com até 2MB.';
             }
         }
         
@@ -168,6 +160,7 @@ include '../../includes/header.php';
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="acao" value="salvar">
+                    <?php echo csrfInput(); ?>
                     
                     <div class="mb-3">
                         <label for="nome" class="form-label">Nome *</label>
@@ -255,6 +248,7 @@ include '../../includes/header.php';
 <?php if ($quadra_id > 0): ?>
 <form id="formExcluir" method="POST" style="display: none;">
     <input type="hidden" name="acao" value="excluir">
+    <?php echo csrfInput(); ?>
 </form>
 
 <script>
