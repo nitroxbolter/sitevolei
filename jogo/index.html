@@ -16,11 +16,17 @@
 <body>
     <div class="game-wrapper">
         <header>
+            <a class="home-link" href="/" aria-label="Voltar para o site">‹</a>
             <h1 class="logo">Edu voley</h1>
             <div class="scoreboard">
-                <span id="player-score">0</span> - <span id="opponent-score">0</span>
+                <div class="sets-container" aria-label="Sets">
+                    <span>Sets</span>
+                    <strong><span id="player-sets">0</span> - <span id="opponent-sets">0</span></strong>
+                </div>
+                <div class="points-container" aria-label="Pontos">
+                    <span id="player-score">0</span> - <span id="opponent-score">0</span>
+                </div>
             </div>
-            <a class="home-link" href="/">Voltar ao site</a>
         </header>
 
         <div id="game-container"></div>
@@ -28,11 +34,11 @@
         <pre id="debug-panel" style="display:none"></pre>
 
         <div class="controls-hint">
-            <div class="key-hint"><span class="key">Setas</span> Mover</div>
+            <div class="key-hint"><span class="key">Setas/WASD</span> Mover</div>
             <div class="key-hint"><span class="key">L</span> Sacar/Levantar</div>
             <div class="key-hint"><span class="key">SPACE</span> Pular</div>
-            <div class="key-hint"><span class="key">A/K</span> Jogar: manchete no chão, ataque no ar</div>
-            <div class="key-hint"><span class="key">Q/W/E</span> Trocar jogador</div>
+            <div class="key-hint"><span class="key">Ç</span> Manchete / ataque</div>
+            <div class="key-hint"><span class="key">Q/E</span> Trocar atacante</div>
         </div>
     </div>
 

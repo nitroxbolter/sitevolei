@@ -62,11 +62,13 @@ $sql = "SELECT
             u.nome,
             u.foto_perfil,
             COALESCE(SUM(sp.pontos), 0) AS total_pontos,
-            COUNT(DISTINCT sp.jogo_id) AS jogos_participados
+            COUNT(DISTINCT spp.jogo_id) AS jogos_participados
         FROM grupo_membros gm
         JOIN usuarios u ON u.id = gm.usuario_id
-        LEFT JOIN sistema_pontuacao_pontos sp ON sp.usuario_id = u.id 
-            AND sp.jogo_id IN (SELECT id FROM sistema_pontuacao_jogos WHERE sistema_id = ?)
+        LEFT JOIN sistema_pontuacao_participantes spp ON spp.usuario_id = u.id
+            AND spp.jogo_id IN (SELECT id FROM sistema_pontuacao_jogos WHERE sistema_id = ?)
+        LEFT JOIN sistema_pontuacao_pontos sp ON sp.usuario_id = spp.usuario_id
+            AND sp.jogo_id = spp.jogo_id
         WHERE gm.grupo_id = ? AND gm.ativo = 1
         GROUP BY u.id, u.nome, u.foto_perfil
         ORDER BY total_pontos DESC, u.nome";
@@ -318,4 +320,3 @@ include 'includes/header.php';
 <?php endif; ?>
 
 <?php include 'includes/footer.php'; ?>
-

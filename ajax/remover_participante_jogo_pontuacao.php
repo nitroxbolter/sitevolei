@@ -43,14 +43,26 @@ if (!$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
     exit();
 }
 
-// Remover participante (os pontos registrados serão mantidos)
-$sql = "DELETE FROM sistema_pontuacao_participantes WHERE jogo_id = ? AND usuario_id = ?";
-$result = executeQuery($pdo, $sql, [$jogo_id, $usuario_id]);
+try {
+    $pdo->beginTransaction();
 
-if ($result) {
+    // Remover participante e os pontos dele neste jogo para a classificação não somar pontos órfãos.
+    $sql = "DELETE FROM sistema_pontuacao_pontos WHERE jogo_id = ? AND usuario_id = ?";
+    executeQuery($pdo, $sql, [$jogo_id, $usuario_id]);
+
+    $sql = "DELETE FROM sistema_pontuacao_participantes WHERE jogo_id = ? AND usuario_id = ?";
+    $result = executeQuery($pdo, $sql, [$jogo_id, $usuario_id]);
+
+    if (!$result) {
+        throw new Exception('Erro ao remover participante.');
+    }
+
+    $pdo->commit();
     echo json_encode(['success' => true, 'message' => 'Participante removido com sucesso!']);
-} else {
-    echo json_encode(['success' => false, 'message' => 'Erro ao remover participante.']);
+} catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    echo json_encode(['success' => false, 'message' => 'Erro ao remover participante: ' . $e->getMessage()]);
 }
 ?>
-

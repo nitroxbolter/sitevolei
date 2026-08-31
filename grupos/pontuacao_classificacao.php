@@ -85,9 +85,12 @@ if ($genero_exists) {
                 u.nome,
                 u.foto_perfil,
                 COALESCE((
-                    SELECT SUM(sp.pontos) 
+                    SELECT SUM(sp.pontos)
                     FROM sistema_pontuacao_pontos sp
-                    WHERE sp.usuario_id = u.id 
+                    JOIN sistema_pontuacao_participantes spp
+                        ON spp.jogo_id = sp.jogo_id
+                       AND spp.usuario_id = sp.usuario_id
+                    WHERE sp.usuario_id = u.id
                     AND sp.jogo_id IN (SELECT id FROM sistema_pontuacao_jogos WHERE sistema_id = ?)
                 ), 0) AS total_pontos,
                 COALESCE((
@@ -114,9 +117,12 @@ if ($genero_exists) {
                 u.nome,
                 u.foto_perfil,
                 COALESCE((
-                    SELECT SUM(sp.pontos) 
+                    SELECT SUM(sp.pontos)
                     FROM sistema_pontuacao_pontos sp
-                    WHERE sp.usuario_id = u.id 
+                    JOIN sistema_pontuacao_participantes spp
+                        ON spp.jogo_id = sp.jogo_id
+                       AND spp.usuario_id = sp.usuario_id
+                    WHERE sp.usuario_id = u.id
                     AND sp.jogo_id IN (SELECT id FROM sistema_pontuacao_jogos WHERE sistema_id = ?)
                 ), 0) AS total_pontos,
                 COALESCE((
@@ -599,4 +605,3 @@ function removerParticipanteJogo(jogoId, usuarioId) {
 <?php endif; ?>
 
 <?php include '../includes/footer.php'; ?>
-

@@ -250,13 +250,7 @@ let lastLandingMark = null; // { x, y, depth, width, t }
 let lastOppAttackPlan = null; // debug: { fromX, fromY, toX, toY, vx, vy, flightTime, ballZ, ballVZ, t }
 let debugPanelEl = null;
 let playerHitPoseUntil = 0;
-const MATCH = {
-    regularSetPoints: 25,
-    tieBreakPoints: 15,
-    setsToWinMatch: 3,
-    minPointLead: 2
-};
-let score = { player: 0, opponent: 0, playerSets: 0, opponentSets: 0 };
+let score = { player: 0, opponent: 0 };
 let playerPoseEvent;
 let liftChargeStart = 0;
 let hitPowerRatio = 0;
@@ -401,7 +395,7 @@ function create() {
     oppRight.setDepth(8);
 
     // Sprite de ataque (pode ser o da direita ou esquerda conforme IA)
-    opponentAttacker = oppLeft; 
+    opponentAttacker = oppLeft;
 
     // Mantem apenas os raios dos jogadores visiveis; quadrantes vermelhos ficam ocultos.
     createPlayerRadiusOverlay(this);
@@ -481,11 +475,11 @@ function update(_time, delta) {
     updateLiftChoiceUi(this);
     clampPlayerTeam();
     updatePlayerRadiusOverlay();
-    
+
     // Atualização visual da altura do jogador (pulo)
     // Ajusta a origem vertical para fazer o sprite subir sem alterar a posição Y física
     getControlledPlayer().setDisplayOrigin(getControlledPlayer().width * 0.5, getControlledPlayer().height * 1.0 + (playerZ * 0.8));
-    
+
     updateDevOverlay(this);
     updateDebugPanel(this);
 }
@@ -988,7 +982,7 @@ function updateBallPhysics(scene) {
 
         // --- Rali do Time do Jogador ---
         const bolaVindoParaJogador = ballBody.body.velocity.y > 0;
-        if (bolaVindoParaJogador) { 
+        if (bolaVindoParaJogador) {
             // IA do Defensor: Segue a bola apenas quando ela cruza a rede ou está perto
             if (false && ballBody.y > (NET.y - 20) && ballBody.y < playerBacker.y) {
                 const trackSpeedX = 0.15;
@@ -1009,7 +1003,7 @@ function updateBallPhysics(scene) {
                 const vx = (playerSetter.x - ballBody.x) / flightTime;
                 const vvy = (playerSetter.y - ballBody.y) / flightTime;
                 ballBody.setVelocity(vx, vvy);
-                
+
                 const tex = scene.textures.exists('playerMachete') ? 'playerMachete' : 'oppMachete';
                 playerBacker.setTexture(tex);
                 scene.time.delayedCall(800, () => playerBacker.setTexture('playerBack'));
@@ -1062,10 +1056,10 @@ function updateBallPhysics(scene) {
                 const vx = (targetAttackX - ballBody.x) / flightTime;
                 const vvy = (targetAttackY - ballBody.y) / flightTime;
                 ballBody.setVelocity(vx, vvy);
-                
+
                 // Muda controle automaticamente para o atacante que vai receber o levantamento
                 scene.time.delayedCall(160, () => setControlledRole(attackRole));
-                
+
                 const tex = scene.textures.exists('playerLift') ? 'playerLift' : 'playerBack';
                 playerSetter.setTexture(tex);
                 scene.time.delayedCall(800, () => playerSetter.setTexture('playerBack'));
@@ -1455,7 +1449,6 @@ async function finalizeAndDownloadRallyLog(pointWinner) {
     completedShotLogs.forEach((shot, index) => lines.push(formatShotLog(shot, index + 1)));
     lines.push(`vencedor do ponto: ${pointWinner}`);
     lines.push(`placar: jogador ${score.player} x ${score.opponent} adversario`);
-    lines.push(`sets: jogador ${score.playerSets} x ${score.opponentSets} adversario`);
     lines.push(`fim: ${new Date().toLocaleString('pt-BR')}`);
 
     const text = lines.join('\n');
@@ -1769,13 +1762,9 @@ function awardPoint(scene, playerScored, reason = 'point') {
     cancelOpponentServeEvents();
     nextServer = playerScored ? 'PLAYER' : 'OPPONENT';
     state = 'POINT';
-    const pointResult = addPoint(playerScored);
+    addPoint(playerScored);
     finalizeAndDownloadRallyLog(playerScored ? 'PLAYER' : 'OPPONENT');
-    if (pointResult.matchWinner) {
-        showStatusMessage(scene, pointResult.matchWinner === 'PLAYER' ? 'VITORIA' : 'DERROTA', 1800, pointResult.matchWinner === 'PLAYER' ? '#22ff88' : '#ff2626');
-    } else if (pointResult.setWinner) {
-        showStatusMessage(scene, pointResult.setWinner === 'PLAYER' ? 'SET' : 'SET RIVAL', 1600, pointResult.setWinner === 'PLAYER' ? '#22ff88' : '#ff4d4d');
-    } else if (reason === 'net' && !playerScored) {
+    if (reason === 'net' && !playerScored) {
         showStatusMessage(scene, 'REDE', 1400, '#ff2626');
     } else {
         showStatusMessage(scene, 'PONTO', 1400);
@@ -1801,14 +1790,7 @@ function awardPoint(scene, playerScored, reason = 'point') {
     if (trail) trail.stop();
     landingShadowState = 0;
     if (landingShadow) landingShadow.setVisible(false);
-    if (scene) {
-        const delay = pointResult.matchWinner ? 2600 : 1800;
-        scene.time.delayedCall(delay, () => {
-            if (pointResult.matchWinner) resetMatchScore();
-            else if (pointResult.setWinner) resetSetScore();
-            resetServe();
-        });
-    }
+    if (scene) scene.time.delayedCall(1800, () => resetServe());
 }
 
 function placeBallAboveHead(visible) {
@@ -2215,59 +2197,13 @@ function setPlayerPose(scene, texture, duration) {
 }
 
 function addPoint(playerScored) {
-    const side = playerScored ? 'player' : 'opponent';
-    score[side] += 1;
+    if (playerScored) score.player += 1;
+    else score.opponent += 1;
 
-    let setWinner = null;
-    let matchWinner = null;
-    if (hasWonCurrentSet(playerScored)) {
-        if (playerScored) score.playerSets += 1;
-        else score.opponentSets += 1;
-        setWinner = playerScored ? 'PLAYER' : 'OPPONENT';
-
-        if (score.playerSets >= MATCH.setsToWinMatch || score.opponentSets >= MATCH.setsToWinMatch) {
-            matchWinner = score.playerSets > score.opponentSets ? 'PLAYER' : 'OPPONENT';
-        }
-    }
-
-    updateScoreboard();
-    return { setWinner, matchWinner };
-}
-
-function getCurrentSetTargetPoints() {
-    const playedSets = score.playerSets + score.opponentSets;
-    return playedSets >= 4 ? MATCH.tieBreakPoints : MATCH.regularSetPoints;
-}
-
-function hasWonCurrentSet(playerScored) {
-    const sidePoints = playerScored ? score.player : score.opponent;
-    const otherPoints = playerScored ? score.opponent : score.player;
-    return sidePoints >= getCurrentSetTargetPoints() && sidePoints - otherPoints >= MATCH.minPointLead;
-}
-
-function resetSetScore() {
-    score.player = 0;
-    score.opponent = 0;
-    updateScoreboard();
-}
-
-function resetMatchScore() {
-    score.player = 0;
-    score.opponent = 0;
-    score.playerSets = 0;
-    score.opponentSets = 0;
-    updateScoreboard();
-}
-
-function updateScoreboard() {
     const playerScore = document.getElementById('player-score');
     const opponentScore = document.getElementById('opponent-score');
-    const playerSets = document.getElementById('player-sets');
-    const opponentSets = document.getElementById('opponent-sets');
     if (playerScore) playerScore.innerText = String(score.player);
     if (opponentScore) opponentScore.innerText = String(score.opponent);
-    if (playerSets) playerSets.innerText = String(score.playerSets);
-    if (opponentSets) opponentSets.innerText = String(score.opponentSets);
 }
 
 function addHitEffect(scene, power) {
@@ -2482,10 +2418,10 @@ function createTouchControls(scene) {
     const actionPad = document.createElement('div');
     actionPad.className = 'mobile-touch-controls mobile-action-pad';
     [
-        { action: 'jump', label: 'P', down: () => pressVirtualButton('jump') },
-        { action: 'lift', label: 'S', down: () => setVirtualButton('lift', true), up: () => setVirtualButton('lift', false) },
-        { action: 'receive', label: 'M', down: () => setVirtualReceive(scene, true), up: () => setVirtualReceive(scene, false) },
-        { action: 'action', label: 'A', down: () => pressVirtualButton('action') }
+        { action: 'jump', label: 'PULAR', down: () => pressVirtualButton('jump') },
+        { action: 'receive', label: 'MANCHETE', down: () => setVirtualReceive(scene, true), up: () => setVirtualReceive(scene, false) },
+        { action: 'action', label: 'ATACAR', down: () => pressVirtualButton('action') },
+        { action: 'lift', label: 'SACAR', down: () => setVirtualButton('lift', true), up: () => setVirtualButton('lift', false) }
     ].forEach((control) => {
         const button = createDomTouchButton(control.label, 'mobile-action-btn');
         button.dataset.action = control.action;
@@ -2835,7 +2771,7 @@ function drawCourtAxis() {
 function drawHeightRuler() {
     const baseX = player.x + 58;
     // Usa a posição Y do physics (que é o chão)
-    const baseY = player.y - PLAYER.headOffsetY; 
+    const baseY = player.y - PLAYER.headOffsetY;
     const maxZ = BALL.tossTargetZ;
     const topY = baseY - maxZ * BALL.zToPixels;
 
@@ -2911,7 +2847,7 @@ function performRallyHit(scene) {
         'velocidade total aplicada': Math.round(Math.hypot(ballBody.body.velocity.x, ballBody.body.velocity.y, ballVZ))
     });
     setShotVelocity(ballBody.body.velocity.x, ballBody.body.velocity.y, ballVZ);
-    
+
     playerHitPoseUntil = scene.time.now + 400;
     attacker.setTexture('playerHit');
     scene.time.delayedCall(520, () => {
@@ -2923,7 +2859,7 @@ function performRallyHit(scene) {
             setControlledRole('RECEPTOR');
         }
     });
-    
+
     scene.cameras.main.shake(200, 0.015);
     addHitEffect(scene, { shake: 0.01 });
 }

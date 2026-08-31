@@ -678,7 +678,7 @@ function adicionarParticipanteJogo(usuarioId) {
 }
 
 function removerParticipanteJogo(usuarioId) {
-    if (!confirm('Deseja remover este participante do jogo? Os pontos registrados serão mantidos, mas o participante não aparecerá mais na lista.')) return;
+    if (!confirm('Deseja remover este participante do jogo? Os pontos registrados para ele neste jogo também serão removidos.')) return;
     
     $.ajax({
         url: '../ajax/remover_participante_jogo_pontuacao.php',
@@ -1230,4 +1230,3 @@ $('#formCriarJogo').on('submit', function(e) {
 </script>
 
 <?php include '../includes/footer.php'; ?>
-

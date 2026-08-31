@@ -46,19 +46,26 @@ if (!$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
 $pdo->beginTransaction();
 
 try {
-    // Remover pontos existentes
+    // Remover pontos existentes do jogo e gravar novamente apenas para participantes válidos.
     $sql = "DELETE FROM sistema_pontuacao_pontos WHERE jogo_id = ?";
     executeQuery($pdo, $sql, [$jogo_id]);
     
+    $sql = "SELECT usuario_id FROM sistema_pontuacao_participantes WHERE jogo_id = ?";
+    $stmtParticipantes = executeQuery($pdo, $sql, [$jogo_id]);
+    $participantesValidos = $stmtParticipantes ? array_map('intval', $stmtParticipantes->fetchAll(PDO::FETCH_COLUMN)) : [];
+    $participantesValidos = array_flip($participantesValidos);
+
     // Inserir novos pontos
-    $sql = "INSERT INTO sistema_pontuacao_pontos (jogo_id, usuario_id, pontos) VALUES (?, ?, ?)";
+    $sql = "INSERT INTO sistema_pontuacao_pontos (jogo_id, usuario_id, pontos)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE pontos = VALUES(pontos)";
     $stmt = $pdo->prepare($sql);
     
     foreach ($pontos as $usuario_id => $pontos_valor) {
         $usuario_id = (int)$usuario_id;
         $pontos_valor = (float)$pontos_valor;
         
-        if ($usuario_id > 0 && $pontos_valor >= 0) {
+        if ($usuario_id > 0 && isset($participantesValidos[$usuario_id]) && $pontos_valor >= 0) {
             $stmt->execute([$jogo_id, $usuario_id, $pontos_valor]);
         }
     }
@@ -70,4 +77,3 @@ try {
     echo json_encode(['success' => false, 'message' => 'Erro ao salvar pontos: ' . $e->getMessage()]);
 }
 ?>
-

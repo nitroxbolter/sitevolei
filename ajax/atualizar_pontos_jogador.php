@@ -57,20 +57,10 @@ if (!$stmt || !$stmt->fetch()) {
 }
 
 try {
-    // Verificar se já existe registro de pontos
-    $sql = "SELECT id FROM sistema_pontuacao_pontos WHERE jogo_id = ? AND usuario_id = ?";
-    $stmt = executeQuery($pdo, $sql, [$jogo_id, $usuario_id]);
-    $existe = $stmt && $stmt->fetch();
-    
-    if ($existe) {
-        // Atualizar pontos existentes
-        $sql = "UPDATE sistema_pontuacao_pontos SET pontos = ? WHERE jogo_id = ? AND usuario_id = ?";
-        $result = executeQuery($pdo, $sql, [$pontos, $jogo_id, $usuario_id]);
-    } else {
-        // Inserir novos pontos
-        $sql = "INSERT INTO sistema_pontuacao_pontos (jogo_id, usuario_id, pontos) VALUES (?, ?, ?)";
-        $result = executeQuery($pdo, $sql, [$jogo_id, $usuario_id, $pontos]);
-    }
+    $sql = "INSERT INTO sistema_pontuacao_pontos (jogo_id, usuario_id, pontos)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE pontos = VALUES(pontos)";
+    $result = executeQuery($pdo, $sql, [$jogo_id, $usuario_id, $pontos]);
     
     if ($result) {
         echo json_encode(['success' => true, 'message' => 'Pontos atualizados com sucesso!']);
@@ -81,4 +71,3 @@ try {
     echo json_encode(['success' => false, 'message' => 'Erro ao atualizar pontos: ' . $e->getMessage()]);
 }
 ?>
-
