@@ -19,24 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-// Capturar torneio_id de múltiplas fontes para garantir que seja encontrado
-$torneio_id = 0;
-if (isset($_POST['torneio_id']) && $_POST['torneio_id'] > 0) {
-    $torneio_id = (int)$_POST['torneio_id'];
-} elseif (isset($_GET['torneio_id']) && $_GET['torneio_id'] > 0) {
-    $torneio_id = (int)$_GET['torneio_id'];
-} elseif (isset($_REQUEST['torneio_id']) && $_REQUEST['torneio_id'] > 0) {
-    $torneio_id = (int)$_REQUEST['torneio_id'];
-} else {
-    // Tentar pegar do raw input (JSON)
-    $rawInput = file_get_contents('php://input');
-    if ($rawInput) {
-        $parsed = json_decode($rawInput, true);
-        if (isset($parsed['torneio_id']) && $parsed['torneio_id'] > 0) {
-            $torneio_id = (int)$parsed['torneio_id'];
-        }
-    }
-}
+$torneio_id = isset($_POST['torneio_id']) ? (int)$_POST['torneio_id'] : 0;
 
 if ($torneio_id <= 0) {
     echo json_encode([
@@ -59,10 +42,13 @@ if (!$torneio) {
     exit();
 }
 
-$sou_criador = ((int)$torneio['criado_por'] === (int)$_SESSION['user_id']);
-$sou_admin = $torneio['administrador_id'] && ((int)$torneio['administrador_id'] === (int)$_SESSION['user_id']);
-if (!$sou_criador && !$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
+if (!podeGerenciarTorneio($pdo, $torneio_id, $_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Sem permissão.']);
+    exit();
+}
+
+if (!torneioPodeEditarEstrutura($torneio['status'] ?? '')) {
+    echo json_encode(['success' => false, 'message' => 'Não é possível criar ou recriar times depois que o torneio começou ou foi encerrado.']);
     exit();
 }
 
@@ -77,10 +63,29 @@ if ($quantidade_times <= 0 || $integrantes_por_time <= 0) {
     exit();
 }
 
+if (torneioTemJogosGerados($pdo, $torneio_id)) {
+    echo json_encode(['success' => false, 'message' => 'Não é possível recriar times com jogos já gerados. Limpe os jogos antes de alterar a estrutura.']);
+    exit();
+}
+
 // Verificar quantos times já existem
 $sql = "SELECT COUNT(*) AS total FROM torneio_times WHERE torneio_id = ?";
 $stmt = executeQuery($pdo, $sql, [$torneio_id]);
 $times_existentes = $stmt ? (int)$stmt->fetch()['total'] : 0;
+
+if ($times_existentes > 0) {
+    $sql_integrantes = "SELECT COUNT(*) AS total
+                        FROM torneio_time_integrantes tti
+                        INNER JOIN torneio_times tt ON tt.id = tti.time_id
+                        WHERE tt.torneio_id = ?";
+    $stmt_integrantes = executeQuery($pdo, $sql_integrantes, [$torneio_id]);
+    $integrantes_vinculados = $stmt_integrantes ? (int)$stmt_integrantes->fetch()['total'] : 0;
+
+    if ($integrantes_vinculados > 0) {
+        echo json_encode(['success' => false, 'message' => 'Não é possível recriar times com integrantes vinculados. Remova os integrantes ou limpe os times antes de gerar novamente.']);
+        exit();
+    }
+}
 
 $pdo->beginTransaction();
 try {
@@ -89,7 +94,6 @@ try {
     // SEMPRE limpar tudo primeiro (integrantes e times) antes de criar novos
     // Isso garante que não haverá duplicação mesmo se já existirem times
     if ($times_existentes > 0) {
-        // Primeiro, remover todos os integrantes dos times deste torneio
         $sql = "DELETE tti FROM torneio_time_integrantes tti
                 INNER JOIN torneio_times tt ON tt.id = tti.time_id
                 WHERE tt.torneio_id = ?";
@@ -168,9 +172,6 @@ try {
     
     $pdo->commit();
     
-    if ($total_criado != $quantidade_times) {
-    }
-    
     $mensagem = $times_existentes > 0 
         ? "Times atualizados com sucesso! {$total_criado} time(s) criado(s)." 
         : "Times criados com sucesso! {$total_criado} time(s) criado(s).";
@@ -184,7 +185,6 @@ try {
 } catch (Exception $e) {
     $pdo->rollBack();
     error_log("Erro ao criar times: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Erro ao criar times: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Não foi possível criar os times agora.']);
 }
 ?>
-

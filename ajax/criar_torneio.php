@@ -3,219 +3,135 @@ session_start();
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
+header('Content-Type: application/json; charset=utf-8');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exigirCsrfToken();
 }
 
-header('Content-Type: application/json');
-
-// Debug: Log de entrada
-error_log("POST data: " . print_r($_POST, true));
-error_log("SESSION user_id: " . ($_SESSION['user_id'] ?? 'não definido'));
+function responderCriacaoTorneio($success, $message, $extra = [], $statusCode = 200) {
+    http_response_code($statusCode);
+    echo json_encode(array_merge([
+        'success' => $success,
+        'message' => $message
+    ], $extra));
+    exit();
+}
 
 if (!isLoggedIn()) {
-    error_log("Erro: Usuário não está logado");
-    echo json_encode(['success' => false, 'message' => 'Você precisa estar logado.']);
-    exit();
+    responderCriacaoTorneio(false, 'Você precisa estar logado.', [], 401);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    error_log("Erro: Método não é POST");
-    echo json_encode(['success' => false, 'message' => 'Método não permitido']);
-    exit();
+    responderCriacaoTorneio(false, 'Método não permitido.', [], 405);
 }
 
-$nome = trim($_POST['nome'] ?? '');
-$data_torneio = $_POST['data_torneio'] ?? '';
-$tipo = $_POST['tipo'] ?? 'grupo';
+$nome = trim((string)($_POST['nome'] ?? ''));
+$data_torneio = trim((string)($_POST['data_torneio'] ?? ''));
+$tipo = trim((string)($_POST['tipo'] ?? 'grupo'));
 $grupo_id = !empty($_POST['grupo_id']) ? (int)$_POST['grupo_id'] : null;
-$quantidade_participantes = isset($_POST['quantidade_participantes']) ? (int)$_POST['quantidade_participantes'] : null;
 
-error_log("Dados processados:");
-error_log("  nome: " . $nome);
-error_log("  data_torneio: " . $data_torneio);
-error_log("  tipo: " . $tipo);
-error_log("  grupo_id: " . ($grupo_id ?? 'null'));
-error_log("  quantidade_participantes: " . ($quantidade_participantes ?? 'null'));
-
-// Validar dados
 if ($nome === '' || $data_torneio === '') {
-    error_log("Erro de validação: campos obrigatórios não preenchidos");
-    echo json_encode(['success' => false, 'message' => 'Preencha todos os campos obrigatórios.']);
-    exit();
+    responderCriacaoTorneio(false, 'Preencha todos os campos obrigatórios.', [], 422);
+}
+
+if (strlen($nome) > 120) {
+    responderCriacaoTorneio(false, 'O nome do torneio deve ter no máximo 120 caracteres.', [], 422);
+}
+
+if (!in_array($tipo, ['grupo', 'avulso'], true)) {
+    responderCriacaoTorneio(false, 'Tipo de torneio inválido.', [], 422);
+}
+
+$data = DateTime::createFromFormat('Y-m-d', $data_torneio);
+$errosData = DateTime::getLastErrors();
+$dataValida = $data instanceof DateTime && ($errosData === false || (($errosData['warning_count'] ?? 0) === 0 && ($errosData['error_count'] ?? 0) === 0));
+if (!$dataValida) {
+    responderCriacaoTorneio(false, 'Data do torneio inválida.', [], 422);
 }
 
 if ($tipo === 'grupo' && !$grupo_id) {
-    error_log("Erro: tipo grupo mas sem grupo_id");
-    echo json_encode(['success' => false, 'message' => 'Selecione um grupo para torneio do grupo.']);
-    exit();
+    responderCriacaoTorneio(false, 'Selecione um grupo para torneio do grupo.', [], 422);
 }
 
-// Verificar se é admin do grupo (se for torneio do grupo)
-if ($tipo === 'grupo' && $grupo_id) {
-    $sql = "SELECT id, administrador_id FROM grupos WHERE id = ? AND ativo = 1";
-    $stmt = executeQuery($pdo, $sql, [$grupo_id]);
-    $grupo = $stmt ? $stmt->fetch() : false;
-    if (!$grupo) {
-        error_log("Erro: Grupo não encontrado ou inativo (ID: $grupo_id)");
-        echo json_encode(['success' => false, 'message' => 'Grupo não encontrado ou inativo.']);
-        exit();
-    }
-    if ((int)$grupo['administrador_id'] !== (int)$_SESSION['user_id'] && !isAdmin($pdo, $_SESSION['user_id'])) {
-        error_log("Erro: Usuário não é admin do grupo");
-        echo json_encode(['success' => false, 'message' => 'Apenas o administrador do grupo pode criar torneios.']);
-        exit();
-    }
-}
-
-// Se for torneio avulso, garantir que grupo_id seja NULL
-if ($tipo === 'avulso') {
-    $grupo_id = null;
-    error_log("Torneio avulso - grupo_id definido como NULL");
-}
-
-// Verificar se a tabela existe e quais colunas tem
 try {
-    $testQuery = $pdo->query("SHOW TABLES LIKE 'torneios'");
-    if (!$testQuery || $testQuery->rowCount() == 0) {
-        error_log("ERRO CRÍTICO: Tabela 'torneios' não existe no banco de dados!");
-        echo json_encode([
-            'success' => false, 
-            'message' => 'Erro: Tabela de torneios não encontrada. Execute o script SQL primeiro.',
-            'debug' => 'Tabela torneios não existe'
-        ]);
-        exit();
+    $tables = $pdo->query("SHOW TABLES LIKE 'torneios'");
+    if (!$tables || $tables->rowCount() === 0) {
+        responderCriacaoTorneio(false, 'Estrutura de torneios não encontrada. Verifique a instalação do banco.', [], 500);
     }
-    
-    // Verificar quais colunas existem
+
     $columnsQuery = $pdo->query("SHOW COLUMNS FROM torneios");
-    $columns = $columnsQuery->fetchAll(PDO::FETCH_COLUMN);
-    error_log("Colunas existentes na tabela torneios: " . implode(', ', $columns));
-    
-    // Usar data_inicio (coluna existente)
-    $campo_data = 'data_inicio';
-    
-    // Verificar se tipo existe
-    $tem_tipo = in_array('tipo', $columns);
-    if (!$tem_tipo) {
-        error_log("Coluna 'tipo' não existe, será NULL");
+    $columns = $columnsQuery ? $columnsQuery->fetchAll(PDO::FETCH_COLUMN) : [];
+    if (!in_array('data_inicio', $columns, true)) {
+        responderCriacaoTorneio(false, 'Estrutura de torneios incompleta. Verifique a instalação do banco.', [], 500);
     }
-    
-    // Verificar se quantidade_participantes existe, se não, usar max_participantes
-    $tem_quantidade = in_array('quantidade_participantes', $columns);
-    $tem_max_participantes = in_array('max_participantes', $columns);
-    
-    if (!$tem_quantidade && $tem_max_participantes) {
-        error_log("Usando coluna max_participantes em vez de quantidade_participantes");
-        $campo_quantidade = 'max_participantes';
-    } elseif ($tem_quantidade) {
-        $campo_quantidade = 'quantidade_participantes';
-    } else {
-        $campo_quantidade = null;
-        error_log("Nenhuma coluna de quantidade de participantes encontrada");
-    }
-    
-} catch (Exception $e) {
-    error_log("Erro ao verificar tabela: " . $e->getMessage());
-    $campo_data = 'data_inicio'; // Fallback
-    $tem_tipo = false;
-    $campo_quantidade = 'max_participantes'; // Fallback
-}
 
-// Criar torneio
-try {
-    // Montar SQL dinamicamente baseado nas colunas existentes
-    $campos = ['nome', $campo_data];
-    $valores = [$nome, $data_torneio];
-    
-    if ($tem_tipo) {
+    if ($tipo === 'grupo') {
+        $stmtGrupo = executeQuery($pdo, "SELECT id, administrador_id FROM grupos WHERE id = ? AND ativo = 1", [$grupo_id]);
+        $grupo = $stmtGrupo ? $stmtGrupo->fetch(PDO::FETCH_ASSOC) : false;
+
+        if (!$grupo) {
+            responderCriacaoTorneio(false, 'Grupo não encontrado ou inativo.', [], 404);
+        }
+
+        if ((int)$grupo['administrador_id'] !== (int)$_SESSION['user_id'] && !isAdmin($pdo, $_SESSION['user_id'])) {
+            responderCriacaoTorneio(false, 'Apenas o administrador do grupo pode criar torneios.', [], 403);
+        }
+    } else {
+        $grupo_id = null;
+    }
+
+    if (in_array('grupo_id', $columns, true)) {
+        $sqlCheck = "SELECT id FROM torneios
+                     WHERE nome = ?
+                       AND grupo_id <=> ?
+                       AND status NOT IN ('Finalizado', 'Cancelado')
+                     LIMIT 1";
+        $stmtCheck = executeQuery($pdo, $sqlCheck, [$nome, $grupo_id]);
+    } else {
+        $stmtCheck = executeQuery(
+            $pdo,
+            "SELECT id FROM torneios WHERE nome = ? AND status NOT IN ('Finalizado', 'Cancelado') LIMIT 1",
+            [$nome]
+        );
+    }
+    if ($stmtCheck && $stmtCheck->fetch(PDO::FETCH_ASSOC)) {
+        responderCriacaoTorneio(false, 'Já existe um torneio ativo com esse nome neste contexto.', [], 409);
+    }
+
+    $campos = ['nome', 'data_inicio', 'criado_por'];
+    $valores = [$nome, $data->format('Y-m-d'), (int)$_SESSION['user_id']];
+
+    if (in_array('tipo', $columns, true)) {
         $campos[] = 'tipo';
         $valores[] = $tipo;
     }
-    
-    // Incluir grupo_id apenas se a coluna existir
-    // Para torneios avulsos, grupo_id deve ser NULL
-    // Para torneios do grupo, grupo_id deve ser válido
-    if (in_array('grupo_id', $columns)) {
+    if (in_array('grupo_id', $columns, true)) {
         $campos[] = 'grupo_id';
-        // Se for torneio avulso ou grupo_id for inválido, usar NULL
-        if ($tipo === 'avulso' || !$grupo_id) {
-            $valores[] = null;
-            error_log("grupo_id definido como NULL (torneio avulso ou sem grupo)");
-        } else {
-            $valores[] = $grupo_id;
-            error_log("grupo_id definido como: $grupo_id");
-        }
+        $valores[] = $grupo_id;
     }
-    
-    // Não incluir quantidade_participantes na criação - será definido no gerenciamento
-    // if ($campo_quantidade && $quantidade_participantes !== null) {
-    //     $campos[] = $campo_quantidade;
-    //     $valores[] = $quantidade_participantes;
-    // }
-    
-    $campos[] = 'criado_por';
-    $valores[] = $_SESSION['user_id'];
-    
-    // Verificar se status existe
-    if (in_array('status', $columns)) {
+    if (in_array('status', $columns, true)) {
         $campos[] = 'status';
         $valores[] = 'Criado';
     }
-    
-    $placeholders = str_repeat('?,', count($campos) - 1) . '?';
-    $sql = "INSERT INTO torneios (" . implode(', ', $campos) . ") VALUES ($placeholders)";
-    
-    error_log("SQL: " . $sql);
-    error_log("Campos: " . implode(', ', $campos));
-    error_log("Valores: " . print_r($valores, true));
-    error_log("Valores detalhados:");
-    foreach ($valores as $idx => $val) {
-        error_log("  [$idx] " . ($val === null ? 'NULL' : $val) . " (tipo: " . gettype($val) . ")");
+    if (in_array('inscricoes_abertas', $columns, true)) {
+        $campos[] = 'inscricoes_abertas';
+        $valores[] = 0;
     }
-    
-    try {
-        $stmt = $pdo->prepare($sql);
-        $result = $stmt->execute($valores);
-    } catch (PDOException $e) {
-        error_log("Erro PDO ao executar: " . $e->getMessage());
-        error_log("Código do erro: " . $e->getCode());
-        error_log("Info do erro: " . print_r($stmt->errorInfo() ?? [], true));
-        throw $e; // Re-lançar para ser capturado no catch externo
+
+    $placeholders = implode(', ', array_fill(0, count($campos), '?'));
+    $stmt = $pdo->prepare("INSERT INTO torneios (" . implode(', ', $campos) . ") VALUES ({$placeholders})");
+
+    if (!$stmt->execute($valores)) {
+        error_log('Erro ao criar torneio: ' . json_encode($stmt->errorInfo()));
+        responderCriacaoTorneio(false, 'Não foi possível criar o torneio agora.', [], 500);
     }
-    
-    if ($result) {
-        $torneio_id = (int)$pdo->lastInsertId();
-        error_log("Sucesso: Torneio criado com ID $torneio_id");
-        echo json_encode([
-            'success' => true, 
-            'message' => 'Torneio criado com sucesso!',
-            'torneio_id' => $torneio_id
-        ]);
-    } else {
-        $errorInfo = $stmt->errorInfo();
-        error_log("Erro ao executar INSERT: " . print_r($errorInfo, true));
-        echo json_encode([
-            'success' => false, 
-            'message' => 'Erro ao criar torneio.',
-            'debug' => $errorInfo[2] ?? 'Erro desconhecido'
-        ]);
-    }
-} catch (PDOException $e) {
-    error_log("PDO Exception: " . $e->getMessage());
-    error_log("Código do erro: " . $e->getCode());
-    echo json_encode([
-        'success' => false, 
-        'message' => 'Erro ao criar torneio: ' . $e->getMessage(),
-        'debug' => $e->getMessage()
+
+    responderCriacaoTorneio(true, 'Torneio criado com sucesso!', [
+        'torneio_id' => (int)$pdo->lastInsertId()
     ]);
 } catch (Exception $e) {
-    error_log("Exception geral: " . $e->getMessage());
-    echo json_encode([
-        'success' => false, 
-        'message' => 'Erro inesperado: ' . $e->getMessage(),
-        'debug' => $e->getMessage()
-    ]);
+    error_log('Erro ao criar torneio: ' . $e->getMessage());
+    responderCriacaoTorneio(false, 'Não foi possível criar o torneio agora.', [], 500);
 }
 ?>
-

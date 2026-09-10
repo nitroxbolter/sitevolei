@@ -9352,30 +9352,10 @@ function gerarSegundaFaseTorneioPro() {
                 
             } else {
                 let errorMsg = response.message || 'Erro desconhecido ao gerar 2ª fase';
-                
-                // Exibir erro de debug
-                let debugHtml = '<div id="debug_2fase" class="mt-3">';
-                debugHtml += '<div class="card border-danger">';
-                debugHtml += '<div class="card-header bg-danger text-white">';
-                debugHtml += '<h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Erro no Debug</h6>';
-                debugHtml += '</div>';
-                debugHtml += '<div class="card-body">';
-                debugHtml += '<div class="alert alert-danger">';
-                debugHtml += '<strong>Erro:</strong> ' + errorMsg;
-                debugHtml += '</div>';
-                
+                $('#debug_2fase').remove();
                 if (response.debug) {
-                    debugHtml += '<h6>Detalhes do Debug:</h6>';
-                    debugHtml += '<pre class="bg-light p-2" style="max-height: 300px; overflow-y: auto;">';
-                    debugHtml += JSON.stringify(response.debug, null, 2);
-                    debugHtml += '</pre>';
+                    console.error('Erro detalhado ao gerar 2ª fase:', response.debug);
                 }
-                
-                debugHtml += '</div></div></div>';
-                
-                // Inserir após o card da 2ª fase
-                $('.card.border-warning').last().after(debugHtml);
-                
                 showAlert(errorMsg, 'danger');
             }
         },
@@ -9387,29 +9367,8 @@ function gerarSegundaFaseTorneioPro() {
                 responseText: xhr.responseText,
                 responseHeaders: xhr.getAllResponseHeaders()
             });
-            
-            // Remover debug anterior
             $('#debug_2fase').remove();
-            
-            // Exibir erro de debug
-            let debugHtml = '<div id="debug_2fase" class="mt-3">';
-            debugHtml += '<div class="card border-danger">';
-            debugHtml += '<div class="card-header bg-danger text-white">';
-            debugHtml += '<h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Erro AJAX</h6>';
-            debugHtml += '</div>';
-            debugHtml += '<div class="card-body">';
-            debugHtml += '<div class="alert alert-danger">';
-            debugHtml += '<strong>Erro de Comunicação:</strong> ' + error;
-            debugHtml += '</div>';
-            debugHtml += '<h6>Resposta do Servidor:</h6>';
-            debugHtml += '<pre class="bg-light p-2" style="max-height: 300px; overflow-y: auto;">';
-            debugHtml += xhr.responseText.substring(0, 1000);
-            debugHtml += '</pre>';
-            debugHtml += '</div></div></div>';
-            
-            // Inserir após o card da 2ª fase
-            $('.card.border-warning').last().after(debugHtml);
-            
+
             let errorMsg = 'Erro ao gerar 2ª fase';
             try {
                 const response = JSON.parse(xhr.responseText);
@@ -9417,7 +9376,7 @@ function gerarSegundaFaseTorneioPro() {
                     errorMsg = response.message;
                 }
             } catch (e) {
-                errorMsg += ': ' + xhr.responseText.substring(0, 200);
+                errorMsg = 'Não foi possível gerar a 2ª fase agora.';
             }
             showAlert(errorMsg, 'danger');
         }
@@ -9535,7 +9494,7 @@ function gerarFinalOuro() {
             } else {
                 let errorMsg = response.message || 'Erro desconhecido ao gerar final';
                 if (response.debug) {
-                    errorMsg += '\n\nDebug:\n' + response.debug;
+                    console.error('Erro detalhado ao gerar final:', response.debug);
                 }
                 showAlert(errorMsg, 'danger');
             }
@@ -9547,10 +9506,10 @@ function gerarFinalOuro() {
                     const response = JSON.parse(xhr.responseText);
                     errorMsg = response.message || errorMsg;
                     if (response.debug) {
-                        errorMsg += '\n\nDebug:\n' + response.debug;
+                        console.error('Erro detalhado ao gerar final:', response.debug);
                     }
                 } catch(e) {
-                    errorMsg += ': ' + xhr.responseText.substring(0, 200);
+                    errorMsg = 'Não foi possível gerar a final agora.';
                 }
             }
             showAlert(errorMsg, 'danger');
@@ -9732,30 +9691,10 @@ function gerarSegundaFaseTorneioPro() {
                 
             } else {
                 let errorMsg = response.message || 'Erro desconhecido ao gerar 2ª fase';
-                
-                // Exibir erro de debug
-                let debugHtml = '<div id="debug_2fase" class="mt-3">';
-                debugHtml += '<div class="card border-danger">';
-                debugHtml += '<div class="card-header bg-danger text-white">';
-                debugHtml += '<h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Erro no Debug</h6>';
-                debugHtml += '</div>';
-                debugHtml += '<div class="card-body">';
-                debugHtml += '<div class="alert alert-danger">';
-                debugHtml += '<strong>Erro:</strong> ' + errorMsg;
-                debugHtml += '</div>';
-                
+                $('#debug_2fase').remove();
                 if (response.debug) {
-                    debugHtml += '<h6>Detalhes do Debug:</h6>';
-                    debugHtml += '<pre class="bg-light p-2" style="max-height: 300px; overflow-y: auto;">';
-                    debugHtml += JSON.stringify(response.debug, null, 2);
-                    debugHtml += '</pre>';
+                    console.error('Erro detalhado ao gerar 2ª fase:', response.debug);
                 }
-                
-                debugHtml += '</div></div></div>';
-                
-                // Inserir após o card da 2ª fase
-                $('.card.border-warning').last().after(debugHtml);
-                
                 showAlert(errorMsg, 'danger');
             }
         },
@@ -9768,28 +9707,8 @@ function gerarSegundaFaseTorneioPro() {
                 responseHeaders: xhr.getAllResponseHeaders()
             });
             
-            // Remover debug anterior
             $('#debug_2fase').remove();
-            
-            // Exibir erro de debug
-            let debugHtml = '<div id="debug_2fase" class="mt-3">';
-            debugHtml += '<div class="card border-danger">';
-            debugHtml += '<div class="card-header bg-danger text-white">';
-            debugHtml += '<h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Erro AJAX</h6>';
-            debugHtml += '</div>';
-            debugHtml += '<div class="card-body">';
-            debugHtml += '<div class="alert alert-danger">';
-            debugHtml += '<strong>Erro de Comunicação:</strong> ' + error;
-            debugHtml += '</div>';
-            debugHtml += '<h6>Resposta do Servidor:</h6>';
-            debugHtml += '<pre class="bg-light p-2" style="max-height: 300px; overflow-y: auto;">';
-            debugHtml += xhr.responseText.substring(0, 1000);
-            debugHtml += '</pre>';
-            debugHtml += '</div></div></div>';
-            
-            // Inserir após o card da 2ª fase
-            $('.card.border-warning').last().after(debugHtml);
-            
+
             let errorMsg = 'Erro ao gerar 2ª fase';
             try {
                 const response = JSON.parse(xhr.responseText);
@@ -9797,7 +9716,7 @@ function gerarSegundaFaseTorneioPro() {
                     errorMsg = response.message;
                 }
             } catch (e) {
-                errorMsg += ': ' + xhr.responseText.substring(0, 200);
+                errorMsg = 'Não foi possível gerar a 2ª fase agora.';
             }
             showAlert(errorMsg, 'danger');
         }
@@ -9915,7 +9834,7 @@ function gerarFinalOuro() {
             } else {
                 let errorMsg = response.message || 'Erro desconhecido ao gerar final';
                 if (response.debug) {
-                    errorMsg += '\n\nDebug:\n' + response.debug;
+                    console.error('Erro detalhado ao gerar final:', response.debug);
                 }
                 showAlert(errorMsg, 'danger');
             }
@@ -9927,10 +9846,10 @@ function gerarFinalOuro() {
                     const response = JSON.parse(xhr.responseText);
                     errorMsg = response.message || errorMsg;
                     if (response.debug) {
-                        errorMsg += '\n\nDebug:\n' + response.debug;
+                        console.error('Erro detalhado ao gerar final:', response.debug);
                     }
                 } catch(e) {
-                    errorMsg += ': ' + xhr.responseText.substring(0, 200);
+                    errorMsg = 'Não foi possível gerar a final agora.';
                 }
             }
             showAlert(errorMsg, 'danger');

@@ -1,0 +1,6 @@
+/.codex-backups/
+/includes/db_config.php
+*.backup-before-*
+debug-logs/
+*.log
+log.txt

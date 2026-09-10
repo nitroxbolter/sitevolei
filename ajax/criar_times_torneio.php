@@ -37,10 +37,13 @@ if (!$torneio) {
     exit();
 }
 
-$sou_criador = ((int)$torneio['criado_por'] === (int)$_SESSION['user_id']);
-$sou_admin = $torneio['administrador_id'] && ((int)$torneio['administrador_id'] === (int)$_SESSION['user_id']);
-if (!$sou_criador && !$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
+if (!podeGerenciarTorneio($pdo, $torneio_id, $_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Sem permissão.']);
+    exit();
+}
+
+if (!torneioPodeEditarEstrutura($torneio['status'] ?? '')) {
+    echo json_encode(['success' => false, 'message' => 'Não é possível criar ou recriar times depois que o torneio começou ou foi encerrado.']);
     exit();
 }
 
@@ -50,6 +53,27 @@ $integrantes_por_time = $torneio['integrantes_por_time'] ?? null;
 if (!$quantidade_times || !$integrantes_por_time) {
     echo json_encode(['success' => false, 'message' => 'Configure quantidade de times e integrantes por time primeiro.']);
     exit();
+}
+
+if (torneioTemJogosGerados($pdo, $torneio_id)) {
+    echo json_encode(['success' => false, 'message' => 'Não é possível recriar times com jogos já gerados. Limpe os jogos antes de alterar a estrutura.']);
+    exit();
+}
+
+$stmt_times = executeQuery($pdo, "SELECT COUNT(*) AS total FROM torneio_times WHERE torneio_id = ?", [$torneio_id]);
+$times_existentes = $stmt_times ? (int)$stmt_times->fetch()['total'] : 0;
+if ($times_existentes > 0) {
+    $sql_integrantes = "SELECT COUNT(*) AS total
+                        FROM torneio_time_integrantes tti
+                        INNER JOIN torneio_times tt ON tt.id = tti.time_id
+                        WHERE tt.torneio_id = ?";
+    $stmt_integrantes = executeQuery($pdo, $sql_integrantes, [$torneio_id]);
+    $integrantes_vinculados = $stmt_integrantes ? (int)$stmt_integrantes->fetch()['total'] : 0;
+
+    if ($integrantes_vinculados > 0) {
+        echo json_encode(['success' => false, 'message' => 'Não é possível recriar times com integrantes vinculados. Remova os integrantes ou limpe os times antes de gerar novamente.']);
+        exit();
+    }
 }
 
 $pdo->beginTransaction();
@@ -97,7 +121,6 @@ try {
 } catch (Exception $e) {
     $pdo->rollBack();
     error_log("Erro ao criar times: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Erro ao criar times: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Não foi possível criar os times agora.']);
 }
 ?>
-

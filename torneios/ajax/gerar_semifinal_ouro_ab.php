@@ -177,11 +177,7 @@ $melhores_ouro_b = array_slice($classificacao_ouro_b, 0, 2);
 if (count($melhores_ouro_a) < 2 || count($melhores_ouro_b) < 2) {
     echo json_encode([
         'success' => false, 
-        'message' => 'É necessário ter pelo menos 2 times em cada grupo (Ouro A e Ouro B) para gerar a semi-final.',
-        'debug' => [
-            'ouro_a' => count($melhores_ouro_a),
-            'ouro_b' => count($melhores_ouro_b)
-        ]
+        'message' => 'É necessário ter pelo menos 2 times em cada grupo (Ouro A e Ouro B) para gerar a semi-final.'
     ]);
     exit();
 }
@@ -209,11 +205,7 @@ $todas_finalizadas_b = $info_partidas_b['total'] > 0 && $info_partidas_b['finali
 if (!$todas_finalizadas_a || !$todas_finalizadas_b) {
     echo json_encode([
         'success' => false, 
-        'message' => 'Nem todas as partidas dos grupos Ouro A e Ouro B estão finalizadas.',
-        'debug' => [
-            'ouro_a' => ['total' => $info_partidas_a['total'], 'finalizadas' => $info_partidas_a['finalizadas']],
-            'ouro_b' => ['total' => $info_partidas_b['total'], 'finalizadas' => $info_partidas_b['finalizadas']]
-        ]
+        'message' => 'Nem todas as partidas dos grupos Ouro A e Ouro B estão finalizadas.'
     ]);
     exit();
 }
@@ -330,4 +322,3 @@ try {
     ]);
 }
 ?>
-

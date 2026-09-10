@@ -331,6 +331,95 @@ function podeGerenciarTorneio($pdo, $torneio_id, $usuario_id) {
         || isAdmin($pdo, $usuario_id);
 }
 
+function torneioPodeEditarEstrutura($status) {
+    return in_array((string)$status, ['Criado', 'Inscrições Abertas'], true);
+}
+
+function torneioStatusBloqueiaEstrutura($status) {
+    return in_array((string)$status, ['Em Andamento', 'Finalizado', 'Cancelado'], true);
+}
+
+function torneioTemJogosGerados($pdo, $torneio_id) {
+    $torneio_id = (int)$torneio_id;
+    $tabelas = ['torneio_partidas', 'partidas_2fase_torneio', 'partidas_2fase_eliminatorias'];
+
+    foreach ($tabelas as $tabela) {
+        try {
+            $existe = $pdo->query("SHOW TABLES LIKE " . $pdo->quote($tabela));
+            if (!$existe || $existe->rowCount() === 0) {
+                continue;
+            }
+
+            $stmt = executeQuery($pdo, "SELECT COUNT(*) AS total FROM {$tabela} WHERE torneio_id = ?", [$torneio_id]);
+            $total = $stmt ? (int)($stmt->fetch()['total'] ?? 0) : 0;
+            if ($total > 0) {
+                return true;
+            }
+        } catch (Exception $e) {
+            error_log("Erro ao verificar jogos gerados em {$tabela}: " . $e->getMessage());
+        }
+    }
+
+    return false;
+}
+
+function torneioTemTimesGerados($pdo, $torneio_id) {
+    $stmt = executeQuery($pdo, "SELECT COUNT(*) AS total FROM torneio_times WHERE torneio_id = ?", [(int)$torneio_id]);
+    return $stmt ? (int)($stmt->fetch()['total'] ?? 0) > 0 : false;
+}
+
+function validarConfiguracaoTorneio($pdo, $torneio, $config) {
+    $status = (string)($torneio['status'] ?? '');
+    $torneio_id = (int)($torneio['id'] ?? 0);
+    $max_participantes = $config['max_participantes'];
+    $quantidade_times = $config['quantidade_times'];
+    $integrantes_por_time = $config['integrantes_por_time'];
+    $limiteAtual = (int)($torneio['max_participantes'] ?? ($torneio['quantidade_participantes'] ?? 0));
+    $timesAtuais = (int)($torneio['quantidade_times'] ?? 0);
+    $integrantesAtuais = (int)($torneio['integrantes_por_time'] ?? 0);
+    $limiteEfetivo = $max_participantes ?? ($limiteAtual > 0 ? $limiteAtual : null);
+    $timesEfetivo = $quantidade_times ?? ($timesAtuais > 0 ? $timesAtuais : null);
+    $integrantesEfetivo = $integrantes_por_time ?? ($integrantesAtuais > 0 ? $integrantesAtuais : null);
+
+    if (torneioStatusBloqueiaEstrutura($status)) {
+        return 'A estrutura do torneio não pode ser alterada depois que ele começou ou foi encerrado.';
+    }
+
+    $stmt = executeQuery($pdo, "SELECT COUNT(*) AS total FROM torneio_participantes WHERE torneio_id = ?", [$torneio_id]);
+    $totalParticipantes = $stmt ? (int)($stmt->fetch()['total'] ?? 0) : 0;
+
+    if ($max_participantes !== null) {
+        if ($max_participantes <= 0) {
+            return 'O limite de participantes precisa ser maior que zero.';
+        }
+        if ($totalParticipantes > $max_participantes) {
+            return 'Não é possível reduzir o limite: já existem ' . $totalParticipantes . ' participante(s) cadastrados.';
+        }
+    }
+
+    if ($quantidade_times !== null && $quantidade_times <= 0) {
+        return 'A quantidade de times precisa ser maior que zero.';
+    }
+
+    if ($integrantes_por_time !== null && $integrantes_por_time <= 0) {
+        return 'A quantidade de integrantes por time precisa ser maior que zero.';
+    }
+
+    $estruturaJaGerada = torneioTemTimesGerados($pdo, $torneio_id) || torneioTemJogosGerados($pdo, $torneio_id);
+    if ($estruturaJaGerada && ($quantidade_times !== null || $integrantes_por_time !== null)) {
+        return 'Não é possível alterar quantidade de times ou integrantes depois que os times ou jogos foram gerados. Limpe a estrutura antes de reconfigurar.';
+    }
+
+    if ($limiteEfetivo !== null && $timesEfetivo !== null && $integrantesEfetivo !== null) {
+        $vagas_times = $timesEfetivo * $integrantesEfetivo;
+        if ($vagas_times !== $limiteEfetivo) {
+            return 'A configuração precisa fechar a conta: ' . $timesEfetivo . ' time(s) x ' . $integrantesEfetivo . ' integrante(s) = ' . $vagas_times . ', mas o limite está em ' . $limiteEfetivo . '.';
+        }
+    }
+
+    return null;
+}
+
 
 function recalcularVagasJogo($pdo, $jogo_id) {
     $stmtJogo = executeQuery($pdo, "SELECT max_jogadores FROM jogos WHERE id = ?", [(int)$jogo_id]);

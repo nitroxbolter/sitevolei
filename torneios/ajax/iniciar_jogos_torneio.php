@@ -584,9 +584,7 @@ try {
     error_log("Stack trace: " . $e->getTraceAsString());
     echo json_encode([
         'success' => false, 
-        'message' => 'Erro ao gerar jogos: ' . $e->getMessage(),
-        'debug' => $e->getTraceAsString()
+        'message' => 'Não foi possível gerar os jogos agora.'
     ]);
 }
 ?>
-

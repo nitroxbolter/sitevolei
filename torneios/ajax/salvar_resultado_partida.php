@@ -39,7 +39,8 @@ ini_set('log_errors', 1);
 register_shutdown_function(function() {
     $error = error_get_last();
     if ($error !== NULL && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        returnJsonError('Erro fatal: ' . $error['message']);
+        error_log('Erro fatal ao salvar resultado: ' . $error['message']);
+        returnJsonError('Não foi possível salvar o resultado agora.');
     }
 });
 
@@ -57,9 +58,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exigirCsrfToken();
 }
 } catch (Exception $e) {
-    returnJsonError('Erro ao carregar arquivos: ' . $e->getMessage());
+    error_log('Erro ao carregar arquivos em salvar_resultado_partida: ' . $e->getMessage());
+    returnJsonError('Não foi possível processar a solicitação agora.');
 } catch (Error $e) {
-    returnJsonError('Erro fatal ao carregar arquivos: ' . $e->getMessage());
+    error_log('Erro fatal ao carregar arquivos em salvar_resultado_partida: ' . $e->getMessage());
+    returnJsonError('Não foi possível processar a solicitação agora.');
 }
 
 // Limpar qualquer output que possa ter sido gerado pelos includes
@@ -1674,17 +1677,8 @@ try {
         'semi_finais_geradas' => $semi_finais_geradas_auto
     ];
     
-    // Adicionar debug se houver mensagens de debug
-    if (!empty($debug_messages)) {
-        $response['debug'] = $debug_messages; // Retornar como array para facilitar processamento
-    }
-    // Adicionar debug da criação automática da final
-    if (!empty($debug_messages_final)) {
-        if (isset($response['debug'])) {
-            $response['debug'] = array_merge($response['debug'], $debug_messages_final);
-        } else {
-            $response['debug'] = $debug_messages_final;
-        }
+    if (!empty($debug_messages) || !empty($debug_messages_final)) {
+        error_log('Fluxo salvar_resultado_partida: ' . json_encode(array_merge($debug_messages, $debug_messages_final), JSON_UNESCAPED_UNICODE));
     }
     
     // Usar função helper para retornar JSON de forma segura
@@ -1706,7 +1700,7 @@ try {
         header('Content-Type: application/json; charset=utf-8');
     }
     
-    echo json_encode(['success' => false, 'message' => 'Erro ao salvar resultado: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Não foi possível salvar o resultado agora.']);
     exit();
 } catch (Error $e) {
     if (isset($pdo) && $pdo->inTransaction()) {
@@ -1725,7 +1719,7 @@ try {
         header('Content-Type: application/json; charset=utf-8');
     }
     
-    echo json_encode(['success' => false, 'message' => 'Erro fatal ao salvar resultado: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Não foi possível salvar o resultado agora.']);
     exit();
 }
 
@@ -1742,4 +1736,3 @@ if (!headers_sent()) {
 echo json_encode(['success' => false, 'message' => 'Erro desconhecido ao processar requisição']);
 exit();
 ?>
-

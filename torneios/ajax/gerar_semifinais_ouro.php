@@ -11,12 +11,7 @@ function handleError($errno, $errstr, $errfile, $errline) {
         header('Content-Type: application/json');
         echo json_encode([
             'success' => false,
-            'message' => 'Erro interno: ' . $errstr,
-            'error' => [
-                'code' => $errno,
-                'file' => basename($errfile),
-                'line' => $errline
-            ]
+            'message' => 'Não foi possível gerar as semi-finais agora.'
         ]);
         exit();
     }
@@ -28,12 +23,7 @@ function handleException($exception) {
         header('Content-Type: application/json');
         echo json_encode([
             'success' => false,
-            'message' => 'Erro interno: ' . $exception->getMessage(),
-            'error' => [
-                'file' => basename($exception->getFile()),
-                'line' => $exception->getLine(),
-                'trace' => $exception->getTraceAsString()
-            ]
+            'message' => 'Não foi possível gerar as semi-finais agora.'
         ]);
         exit();
     }
@@ -159,14 +149,7 @@ $info_partidas_b = $stmt_check_b ? $stmt_check_b->fetch() : ['total' => 0, 'fina
 if ($info_partidas_a['total'] == 0 || $info_partidas_b['total'] == 0) {
     echo json_encode([
         'success' => false, 
-        'message' => "Os jogos da 2ª fase ainda não foram gerados para $serie A e $serie B.",
-        'debug' => [
-            'serie_a_total' => $info_partidas_a['total'],
-            'serie_b_total' => $info_partidas_b['total'],
-            'grupo_a_id' => $grupo_a_id,
-            'grupo_b_id' => $grupo_b_id,
-            'tem_tipo_fase' => $tem_tipo_fase
-        ]
+        'message' => "Os jogos da 2ª fase ainda não foram gerados para $serie A e $serie B."
     ]);
     exit();
 }
@@ -176,13 +159,7 @@ if (($info_partidas_a['total'] > 0 && $info_partidas_a['finalizadas'] < $info_pa
     ($info_partidas_b['total'] > 0 && $info_partidas_b['finalizadas'] < $info_partidas_b['total'])) {
     echo json_encode([
         'success' => false, 
-        'message' => "Nem todas as partidas dos grupos $serie A e $serie B estão finalizadas. Por favor, finalize todos os jogos antes de gerar as semi-finais.",
-        'debug' => [
-            'serie_a_total' => $info_partidas_a['total'],
-            'serie_a_finalizadas' => $info_partidas_a['finalizadas'],
-            'serie_b_total' => $info_partidas_b['total'],
-            'serie_b_finalizadas' => $info_partidas_b['finalizadas']
-        ]
+        'message' => "Nem todas as partidas dos grupos $serie A e $serie B estão finalizadas. Por favor, finalize todos os jogos antes de gerar as semi-finais."
     ]);
     exit();
 }
@@ -1625,8 +1602,7 @@ try {
         'message' => "Semi-finais da série $serie geradas com sucesso! Total de " . $partidas_inseridas . " partidas eliminatórias criadas. Os 2 vencedores irão para a final.",
         'total_partidas' => $partidas_inseridas,
         'grupo_id' => $grupo_chaves_id,
-        'grupo_nome' => "2ª Fase - $serie - Chaves",
-        'debug' => $debug_messages
+        'grupo_nome' => "2ª Fase - $serie - Chaves"
     ]);
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
@@ -1635,15 +1611,10 @@ try {
     addDebug("Erro ao gerar semi-finais da série $serie: " . $e->getMessage());
     addDebug("Stack trace: " . $e->getTraceAsString());
     error_log("EXCEÇÃO em gerar_semifinais_ouro.php: " . $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine());
+    error_log("Fluxo gerar_semifinais_ouro.php: " . json_encode($debug_messages, JSON_UNESCAPED_UNICODE));
     echo json_encode([
         'success' => false, 
-        'message' => "Erro ao gerar semi-finais da série $serie: " . $e->getMessage(),
-        'debug' => $debug_messages,
-        'error_details' => [
-            'file' => basename($e->getFile()),
-            'line' => $e->getLine(),
-            'trace' => explode("\n", $e->getTraceAsString())
-        ]
+        'message' => 'Não foi possível gerar as semi-finais agora.'
     ]);
 } catch (Error $e) {
     if ($pdo->inTransaction()) {
@@ -1653,13 +1624,7 @@ try {
     error_log("ERRO FATAL em gerar_semifinais_ouro.php: " . $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine());
     echo json_encode([
         'success' => false, 
-        'message' => 'Erro fatal ao gerar semi-finais: ' . $e->getMessage(),
-        'debug' => $debug_messages,
-        'error_details' => [
-            'file' => basename($e->getFile()),
-            'line' => $e->getLine()
-        ]
+        'message' => 'Não foi possível gerar as semi-finais agora.'
     ]);
 }
 ?>
-

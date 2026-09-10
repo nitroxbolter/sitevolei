@@ -337,9 +337,6 @@ $(document).ready(function() {
                     }, 1000);
                 } else {
                     var mensagem = response.message || 'Erro ao criar torneio';
-                    if (response.debug) {
-                        mensagem += '<br><small><strong>Debug:</strong> ' + response.debug + '</small>';
-                    }
                     if (typeof showAlert === 'function') {
                         showAlert(mensagem, 'danger');
                     } else {
@@ -354,11 +351,8 @@ $(document).ready(function() {
                     try {
                         var response = JSON.parse(xhr.responseText);
                         mensagem = response.message || mensagem;
-                        if (response.debug) {
-                            mensagem += '<br><small><strong>Debug:</strong> ' + response.debug + '</small>';
-                        }
                     } catch(e) {
-                        mensagem += '<br><small>Resposta do servidor: ' + xhr.responseText.substring(0, 200) + '</small>';
+                        mensagem = 'Não foi possível criar o torneio agora.';
                     }
                 }
                 if (typeof showAlert === 'function') {

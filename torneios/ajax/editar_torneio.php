@@ -20,29 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $torneio_id = (int)($_POST['torneio_id'] ?? 0);
-$debug_ids = [
-    'post' => $_POST['torneio_id'] ?? null,
-    'get' => $_GET['torneio_id'] ?? null,
-    'request' => $_REQUEST['torneio_id'] ?? null
-];
-
-// Fallback: tentar obter do raw input (JSON ou querystring)
-if ($torneio_id <= 0) {
-    $raw = file_get_contents('php://input');
-    if ($raw) {
-        $parsed = json_decode($raw, true);
-        if (is_array($parsed) && isset($parsed['torneio_id'])) {
-            $torneio_id = (int)$parsed['torneio_id'];
-            $debug_ids['raw_json'] = $parsed['torneio_id'];
-        } else {
-            parse_str($raw, $parsed_qs);
-            if (isset($parsed_qs['torneio_id'])) {
-                $torneio_id = (int)$parsed_qs['torneio_id'];
-                $debug_ids['raw_qs'] = $parsed_qs['torneio_id'];
-            }
-        }
-    }
-}
 $nome = trim($_POST['nome'] ?? '');
 $data_torneio = $_POST['data_torneio'] ?? '';
 $descricao = trim($_POST['descricao'] ?? '');
@@ -51,10 +28,7 @@ $max_participantes = isset($_POST['max_participantes']) ? (int)$_POST['max_parti
 if ($torneio_id <= 0) {
     echo json_encode([
         'success' => false,
-        'message' => 'Torneio inválido.',
-        'debug' => [
-            'ids_recebidos' => $debug_ids
-        ]
+        'message' => 'Torneio inválido.'
     ]);
     exit();
 }
@@ -169,7 +143,6 @@ try {
     }
 } catch (Exception $e) {
     error_log("Erro ao atualizar torneio: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Erro: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Não foi possível atualizar o torneio agora.']);
 }
 ?>
-

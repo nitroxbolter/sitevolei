@@ -201,8 +201,7 @@ try {
     
     echo json_encode([
         'success' => true,
-        'message' => "Final da série $serie criada com sucesso! $time1_nome vs $time2_nome",
-        'debug' => $debug_output
+        'message' => "Final da série $serie criada com sucesso! $time1_nome vs $time2_nome"
     ]);
     
 } catch (Exception $e) {
@@ -213,12 +212,11 @@ try {
     $debug_output = implode("\n", $debug_messages);
     
     error_log("Erro ao gerar final do Ouro: " . $e->getMessage());
+    error_log("Fluxo gerar_final_ouro: " . $debug_output);
     
     echo json_encode([
         'success' => false,
-        'message' => 'Erro ao gerar final: ' . $e->getMessage(),
-        'debug' => $debug_output
+        'message' => 'Não foi possível gerar a final agora.'
     ]);
 }
 ?>
-

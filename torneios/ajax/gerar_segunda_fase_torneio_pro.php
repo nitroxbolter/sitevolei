@@ -764,20 +764,7 @@ try {
         
         echo json_encode([
             'success' => false,
-            'message' => $mensagem_erro,
-            'debug' => [
-                'chaves_ouro_a' => $chaves_ouro_a ?? [],
-                'chaves_ouro_b' => $chaves_ouro_b ?? [],
-                'times_ouro_a_encontrados' => count($times_ouro_a ?? []),
-                'times_ouro_b_encontrados' => count($times_ouro_b ?? []),
-                'times_prata_a_encontrados' => count($times_prata_a ?? []),
-                'times_prata_b_encontrados' => count($times_prata_b ?? []),
-                'times_bronze_a_encontrados' => count($times_bronze_a ?? []),
-                'times_bronze_b_encontrados' => count($times_bronze_b ?? []),
-                'total_classificacao' => $total_classificacao,
-                'grupos_existentes' => $grupos_existentes ?? [],
-                'debug_classificacao_por_grupo' => $debug_classificacao ?? []
-            ]
+            'message' => $mensagem_erro
         ]);
         exit();
     }
@@ -814,15 +801,7 @@ try {
                     }
                     echo json_encode([
                         'success' => false,
-                        'message' => 'Erro ao criar grupo Ouro A: ' . ($error_info[2] ?? 'Erro desconhecido'),
-                        'debug' => [
-                            'erro_sql' => $error_info[2] ?? 'Erro desconhecido',
-                            'error_code' => $error_info[0] ?? null,
-                            'sql_state' => $error_info[1] ?? null,
-                            'torneio_id' => $torneio_id,
-                            'nome_grupo' => "2ª Fase - Ouro A",
-                            'sql' => $sql_grupo_ouro_a
-                        ]
+                        'message' => 'Não foi possível criar o grupo Ouro A agora.'
                     ]);
                     exit();
                 }
@@ -835,13 +814,7 @@ try {
             $pdo->rollBack();
             echo json_encode([
                 'success' => false,
-                'message' => 'Exceção ao criar grupo Ouro A: ' . $e->getMessage(),
-                'debug' => [
-                    'erro' => $e->getMessage(),
-                    'code' => $e->getCode(),
-                    'torneio_id' => $torneio_id,
-                    'trace' => $e->getTraceAsString()
-                ]
+                'message' => 'Não foi possível criar o grupo Ouro A agora.'
             ]);
             exit();
         }
@@ -927,15 +900,7 @@ try {
                     }
                     echo json_encode([
                         'success' => false,
-                        'message' => 'Erro ao criar grupo Ouro B: ' . ($error_info[2] ?? 'Erro desconhecido'),
-                        'debug' => [
-                            'erro_sql' => $error_info[2] ?? 'Erro desconhecido',
-                            'error_code' => $error_info[0] ?? null,
-                            'sql_state' => $error_info[1] ?? null,
-                            'torneio_id' => $torneio_id,
-                            'nome_grupo' => "2ª Fase - Ouro B",
-                            'sql' => $sql_grupo_ouro_b
-                        ]
+                        'message' => 'Não foi possível criar o grupo Ouro B agora.'
                     ]);
                     exit();
                 }
@@ -948,13 +913,7 @@ try {
             $pdo->rollBack();
             echo json_encode([
                 'success' => false,
-                'message' => 'Exceção ao criar grupo Ouro B: ' . $e->getMessage(),
-                'debug' => [
-                    'erro' => $e->getMessage(),
-                    'code' => $e->getCode(),
-                    'torneio_id' => $torneio_id,
-                    'trace' => $e->getTraceAsString()
-                ]
+                'message' => 'Não foi possível criar o grupo Ouro B agora.'
             ]);
             exit();
         }
@@ -1021,8 +980,7 @@ try {
                     }
                     echo json_encode([
                         'success' => false,
-                        'message' => 'Erro ao criar grupo Prata A: ' . ($error_info[2] ?? 'Erro desconhecido'),
-                        'debug' => ['erro_sql' => $error_info[2] ?? 'Erro desconhecido']
+                        'message' => 'Não foi possível criar o grupo Prata A agora.'
                     ]);
                     exit();
                 }
@@ -1071,8 +1029,7 @@ try {
             }
             echo json_encode([
                 'success' => false,
-                'message' => 'Exceção ao criar grupo Prata A: ' . $e->getMessage(),
-                'debug' => ['erro' => $e->getMessage(), 'trace' => $e->getTraceAsString()]
+                'message' => 'Não foi possível criar o grupo Prata A agora.'
             ]);
             exit();
         }
@@ -1102,8 +1059,7 @@ try {
                     }
                     echo json_encode([
                         'success' => false,
-                        'message' => 'Erro ao criar grupo Prata B: ' . ($error_info[2] ?? 'Erro desconhecido'),
-                        'debug' => ['erro_sql' => $error_info[2] ?? 'Erro desconhecido']
+                        'message' => 'Não foi possível criar o grupo Prata B agora.'
                     ]);
                     exit();
                 }
@@ -1152,8 +1108,7 @@ try {
             }
             echo json_encode([
                 'success' => false,
-                'message' => 'Exceção ao criar grupo Prata B: ' . $e->getMessage(),
-                'debug' => ['erro' => $e->getMessage(), 'trace' => $e->getTraceAsString()]
+                'message' => 'Não foi possível criar o grupo Prata B agora.'
             ]);
             exit();
         }
@@ -1183,8 +1138,7 @@ try {
                     }
                     echo json_encode([
                         'success' => false,
-                        'message' => 'Erro ao criar grupo Bronze A: ' . ($error_info[2] ?? 'Erro desconhecido'),
-                        'debug' => ['erro_sql' => $error_info[2] ?? 'Erro desconhecido']
+                        'message' => 'Não foi possível criar o grupo Bronze A agora.'
                     ]);
                     exit();
                 }
@@ -1233,8 +1187,7 @@ try {
             }
             echo json_encode([
                 'success' => false,
-                'message' => 'Exceção ao criar grupo Bronze A: ' . $e->getMessage(),
-                'debug' => ['erro' => $e->getMessage(), 'trace' => $e->getTraceAsString()]
+                'message' => 'Não foi possível criar o grupo Bronze A agora.'
             ]);
             exit();
         }
@@ -1264,8 +1217,7 @@ try {
                     }
                     echo json_encode([
                         'success' => false,
-                        'message' => 'Erro ao criar grupo Bronze B: ' . ($error_info[2] ?? 'Erro desconhecido'),
-                        'debug' => ['erro_sql' => $error_info[2] ?? 'Erro desconhecido']
+                        'message' => 'Não foi possível criar o grupo Bronze B agora.'
                     ]);
                     exit();
                 }
@@ -1314,8 +1266,7 @@ try {
             }
             echo json_encode([
                 'success' => false,
-                'message' => 'Exceção ao criar grupo Bronze B: ' . $e->getMessage(),
-                'debug' => ['erro' => $e->getMessage(), 'trace' => $e->getTraceAsString()]
+                'message' => 'Não foi possível criar o grupo Bronze B agora.'
             ]);
             exit();
         }
@@ -1329,8 +1280,7 @@ try {
         } catch (PDOException $e) {
             echo json_encode([
                 'success' => false,
-                'message' => 'Erro ao finalizar criação dos grupos: ' . $e->getMessage(),
-                'debug' => ['erro' => $e->getMessage()]
+                'message' => 'Não foi possível finalizar a criação dos grupos agora.'
             ]);
             exit();
         }
@@ -1623,11 +1573,7 @@ try {
     if (empty($grupos_verificados_final)) {
         echo json_encode([
             'success' => false,
-            'message' => 'Erro: Os grupos foram criados mas não foram encontrados no banco de dados. Verifique os logs do servidor.',
-            'debug' => [
-                'grupos_criados' => array_keys($grupos_criados),
-                'grupos_encontrados' => []
-            ]
+            'message' => 'Os grupos foram criados, mas não foram encontrados na validação final. Verifique os logs do servidor.'
         ]);
         exit();
     }
@@ -1635,7 +1581,7 @@ try {
     echo json_encode([
         'success' => true,
         'message' => 'Grupos Ouro A, Ouro B, Prata A, Prata B, Bronze A e Bronze B criados com sucesso! Total: ' . count($grupos_verificados_final) . ' grupos.',
-        'debug' => [
+        'grupos' => [
             'ouro_a' => [
                 'grupo_id' => $grupos_criados['Ouro A']['id'] ?? null,
                 'total_times' => count($times_ouro_a),
@@ -1675,13 +1621,7 @@ try {
     }
     echo json_encode([
         'success' => false,
-        'message' => 'Erro ao processar: ' . $e->getMessage(),
-        'debug' => [
-            'erro' => $e->getMessage(),
-            'arquivo' => $e->getFile(),
-            'linha' => $e->getLine(),
-            'trace' => $e->getTraceAsString()
-        ]
+        'message' => 'Não foi possível gerar a segunda fase agora.'
     ]);
 }
 ?>

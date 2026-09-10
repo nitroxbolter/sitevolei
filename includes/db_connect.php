@@ -1,9 +1,24 @@
 <?php
 // Conexão com o banco de dados
-$host = 'localhost';
-$dbname = 'database_vb';
-$username = 'sitevolei';
-$password = '216b68202934c71c162d84c5a079dcf5';
+$configPath = __DIR__ . '/db_config.php';
+if (is_file($configPath)) {
+    $dbConfig = require $configPath;
+    $host = $dbConfig['host'] ?? 'localhost';
+    $dbname = $dbConfig['dbname'] ?? '';
+    $username = $dbConfig['username'] ?? '';
+    $password = $dbConfig['password'] ?? '';
+} else {
+    $host = getenv('DB_HOST') ?: 'localhost';
+    $dbname = getenv('DB_NAME') ?: '';
+    $username = getenv('DB_USER') ?: '';
+    $password = getenv('DB_PASSWORD') ?: '';
+}
+
+if ($dbname === '' || $username === '' || $password === '') {
+    error_log('Configuração do banco incompleta.');
+    http_response_code(500);
+    die('Erro interno ao conectar ao banco de dados.');
+}
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
