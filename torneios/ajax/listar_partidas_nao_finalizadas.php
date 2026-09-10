@@ -72,13 +72,19 @@ if ($fase_filtro === '2ª Fase') {
 } elseif ($fase_filtro) {
     // Buscar da tabela antiga para outras fases
     if ($fase_filtro === 'Grupos') {
-        // Para fase "Grupos", buscar também partidas com fase NULL ou vazia (1ª fase)
+        // Para a 1ª fase, aceitar partidas sem grupo_id e excluir somente grupos reais de 2ª fase.
         $sql = "SELECT id, time1_id, time2_id, fase, grupo_id 
                 FROM torneio_partidas 
                 WHERE torneio_id = ? 
                 AND (fase = ? OR fase IS NULL OR fase = '')
                 AND status != 'Finalizada'
-                AND grupo_id IN (SELECT id FROM torneio_grupos WHERE torneio_id = ? AND nome NOT LIKE '2ª Fase%')
+                AND (
+                    grupo_id IS NULL
+                    OR grupo_id NOT IN (
+                        SELECT id FROM torneio_grupos
+                        WHERE torneio_id = ? AND nome LIKE '2ª Fase%'
+                    )
+                )
                 ORDER BY fase ASC, grupo_id ASC, rodada ASC, id ASC";
         $stmt = executeQuery($pdo, $sql, [$torneio_id, $fase_filtro, $torneio_id]);
         $partidas = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
@@ -125,4 +131,3 @@ echo json_encode([
     'total' => count($partidas)
 ]);
 ?>
-
