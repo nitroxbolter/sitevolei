@@ -1,4 +1,4 @@
-/* Comunidade do Vôlei - Estilos Customizados */
+/* MundoVolei - Estilos Customizados */
 
 :root {
     --primary-color: #007bff;
@@ -12,7 +12,6 @@
     --volleyball-orange: #ff6b35;
     --volleyball-blue: #004e89;
 }
-
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f8f9fa;

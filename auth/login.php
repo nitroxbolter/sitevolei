@@ -192,7 +192,7 @@ include '../includes/header.php';
     <div class="login-card">
         <div class="login-header">
             <i class="fas fa-volleyball-ball fa-3x mb-3"></i>
-            <h2 class="mb-0">Comunidade do Vôlei</h2>
+            <h2 class="mb-0">MundoVolei</h2>
             <p class="mb-0 mt-2">Entre com sua conta</p>
         </div>
         
@@ -391,7 +391,7 @@ include '../includes/header.php';
             </div>
             <div class="modal-body">
                 <h6>1. Aceitação dos Termos</h6>
-                <p>Ao utilizar a plataforma Comunidade do Vôlei, você concorda com estes termos de uso.</p>
+                <p>Ao utilizar a plataforma MundoVolei, você concorda com estes termos de uso.</p>
                 
                 <h6>2. Uso da Plataforma</h6>
                 <p>A plataforma é destinada exclusivamente para organização de jogos e torneios de vôlei.</p>

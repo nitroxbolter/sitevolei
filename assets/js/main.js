@@ -1,4 +1,4 @@
-// Comunidade do Vôlei - JavaScript Principal
+// MundoVolei - JavaScript Principal
 
 $(document).ready(function() {
     // Inicializar tooltips
@@ -111,7 +111,6 @@ $(document).ready(function() {
     updateTimeCounters();
     setInterval(updateTimeCounters, 60000); // Atualizar a cada minuto
 });
-
 // Função para mostrar alertas
 function showAlert(message, type = 'info') {
     var alertHtml = `

@@ -6,7 +6,7 @@
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <h5><i class="fas fa-volleyball-ball me-2"></i>Comunidade do Vôlei</h5>
+                    <h5><i class="fas fa-volleyball-ball me-2"></i>MundoVolei</h5>
                     <p class="mb-0">Conectando jogadores e grupos de vôlei em Santa Maria</p>
                 </div>
                 <div class="col-md-6 text-md-end">
@@ -23,7 +23,7 @@
             <hr class="my-3">
             <div class="row">
                 <div class="col-12 text-center">
-                    <p class="mb-0">&copy; <?php echo date('Y'); ?> Comunidade do Vôlei. Todos os direitos reservados.</p>
+                    <p class="mb-0">&copy; <?php echo date('Y'); ?> MundoVolei. Todos os direitos reservados.</p>
                 </div>
             </div>
         </div>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo isset($titulo) ? $titulo . ' - ' : ''; ?>Comunidade do Vôlei</title>
+    <title><?php echo isset($titulo) ? $titulo . ' - ' : ''; ?>MundoVolei</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -73,8 +73,8 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
         <div class="container">
             <span class="navbar-brand">
-                <img src="/assets/arquivos/logo.png" alt="Logo Comunidade do Vôlei" class="me-2" style="height:28px; width:auto;">
-                Comunidade do Vôlei
+                <img src="/assets/arquivos/logo.png" alt="Logo MundoVolei" class="me-2" style="height:28px; width:auto;">
+                MundoVolei
             </span>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">

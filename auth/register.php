@@ -217,7 +217,7 @@ include '../includes/header.php';
             </div>
             <div class="modal-body">
                 <h6>1. Aceitação dos Termos</h6>
-                <p>Ao utilizar a plataforma Comunidade do Vôlei, você concorda com estes termos de uso.</p>
+                <p>Ao utilizar a plataforma MundoVolei, você concorda com estes termos de uso.</p>
                 
                 <h6>2. Uso da Plataforma</h6>
                 <p>A plataforma é destinada exclusivamente para organização de jogos e torneios de vôlei.</p>

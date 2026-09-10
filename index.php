@@ -40,8 +40,8 @@ include 'includes/header.php';
         <div class="row align-items-center">
             <div class="col-lg-6">
                 <h1 class="display-4 fw-bold mb-3 d-flex align-items-center">
-                    <img src="assets/arquivos/logo.png" alt="Logo Comunidade do Vôlei" class="me-3" style="height:80px; width:auto; vertical-align:middle;">
-                    <span class="text-nowrap">Comunidade do Vôlei</span>
+                    <img src="assets/arquivos/logo.png" alt="Logo MundoVolei" class="me-3" style="height:80px; width:auto; vertical-align:middle;">
+                    <span class="text-nowrap">MundoVolei</span>
                 </h1>
                 <p class="lead mb-4">
                     Conecte-se com jogadores e grupos de vôlei em Santa Maria. 
