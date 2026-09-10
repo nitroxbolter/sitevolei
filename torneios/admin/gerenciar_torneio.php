@@ -483,6 +483,106 @@ input[type="number"]::-webkit-inner-spin-button {
 .pontos-chave-input[type="number"] {
     -moz-appearance: textfield;
 }
+
+.eliminatorias-section {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.eliminatorias-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-bottom: 2px solid #0d6efd;
+}
+
+.eliminatorias-heading .fase-badge {
+    min-width: 112px;
+    padding: 7px 14px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #4f8df7 0%, #6f51c7 100%);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+    box-shadow: 0 2px 7px rgba(13, 110, 253, .28);
+}
+
+.eliminatorias-table {
+    min-width: 820px;
+    table-layout: fixed;
+}
+
+.eliminatorias-table th {
+    color: #4b5563;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.eliminatorias-table td {
+    vertical-align: middle;
+}
+
+.eliminatoria-time {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.eliminatoria-time-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    flex: 0 0 16px;
+}
+
+.eliminatoria-time-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.eliminatoria-score {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.eliminatoria-score .pontos-chave-input {
+    width: 56px;
+    height: 32px;
+    text-align: center;
+    padding: 2px 4px;
+}
+
+.eliminatoria-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+@media (max-width: 768px) {
+    .eliminatorias-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .eliminatorias-heading .fase-badge {
+        min-width: 0;
+    }
+}
 </style>
 
 <div id="alert-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
@@ -5146,44 +5246,46 @@ endif;
                         $chaves_fase = array_filter($chaves, function($c) use ($fase) { return $c['fase'] === $fase; });
                         if (!empty($chaves_fase)):
                     ?>
-                        <div class="table-responsive">
-                            <table class="table table-hover">
+                        <div class="eliminatorias-section mb-3">
+                            <div class="eliminatorias-heading">
+                                <span class="fase-badge"><?php
+                                    if ($fase === 'Semi') {
+                                        echo 'Semi-Final';
+                                    } elseif ($fase === 'Final') {
+                                        echo 'Final';
+                                    } elseif ($fase === '3º Lugar') {
+                                        echo '3º Lugar';
+                                    } else {
+                                        echo $fase;
+                                    }
+                                ?></span>
+                                <span class="text-muted small"><?php echo count($chaves_fase); ?> confronto(s)</span>
+                            </div>
+                            <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 eliminatorias-table">
+                                <colgroup>
+                                    <col style="width: 29%;">
+                                    <col style="width: 17%;">
+                                    <col style="width: 29%;">
+                                    <col style="width: 12%;">
+                                    <col style="width: 13%;">
+                                </colgroup>
                                 <thead>
                                     <tr>
-                                        <th></th>
-                                        <th></th>
-                                        <th></th>
-                                        <th class="text-center">
-                                            <div class="d-flex justify-content-center align-items-center">
-                                                <div class="rounded border border-primary border-2 d-flex align-items-center justify-content-center" 
-                                                     style="width: 100px; height: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 8px !important;">
-                                                    <div class="text-center text-white">
-                                                        <strong style="font-size: 12px; font-weight: bold;"><?php 
-                                                            if ($fase === 'Semi') {
-                                                                echo 'Semi-Final';
-                                                            } elseif ($fase === 'Final') {
-                                                                echo 'Final';
-                                                            } elseif ($fase === '3º Lugar') {
-                                                                echo '3º Lugar';
-                                                            } else {
-                                                                echo $fase;
-                                                            }
-                                                        ?></strong>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </th>
-                                        <th>Status</th>
-                                        <th>Ações</th>
+                                        <th>Time A</th>
+                                        <th class="text-center">Placar</th>
+                                        <th>Time B</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-end">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($chaves_fase as $chave): ?>
                                         <tr>
                                             <td>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <div style="width: 16px; height: 16px; background-color: <?php echo htmlspecialchars($chave['time1_cor'] ?? '#ccc'); ?>; border-radius: 3px;"></div>
-                                                    <strong><?php echo htmlspecialchars($chave['time1_nome'] ?? 'Aguardando'); ?></strong>
+                                                <div class="eliminatoria-time">
+                                                    <div class="eliminatoria-time-color" style="background-color: <?php echo htmlspecialchars($chave['time1_cor'] ?? '#ccc'); ?>;"></div>
+                                                    <strong class="eliminatoria-time-name"><?php echo htmlspecialchars($chave['time1_nome'] ?? 'Aguardando'); ?></strong>
                                                     <?php if ($chave['time1_id'] && !empty($integrantes_por_time_chaves[$chave['time1_id']])): ?>
                                                         <?php 
                                                         $primeiro_integ = $integrantes_por_time_chaves[$chave['time1_id']][0];
@@ -5230,14 +5332,13 @@ endif;
                                                 </div>
                                             </td>
                                             <td>
-                                                <div class="d-flex align-items-center gap-1 justify-content-center">
+                                                <div class="eliminatoria-score">
                                                     <?php if ($chave['time1_id'] && $chave['time2_id']): ?>
                                                         <input type="number" 
                                                                class="form-control form-control-sm pontos-chave-input" 
                                                                id="pontos_time1_chave_<?php echo $chave['id']; ?>" 
                                                                value="<?php echo $chave['pontos_time1']; ?>" 
                                                                min="0" 
-                                                               style="width: 60px; height: 30px; text-align: center; padding: 2px 4px;"
                                                                data-chave-id="<?php echo $chave['id']; ?>"
                                                                readonly
                                                                disabled>
@@ -5247,7 +5348,6 @@ endif;
                                                                id="pontos_time2_chave_<?php echo $chave['id']; ?>" 
                                                                value="<?php echo $chave['pontos_time2']; ?>" 
                                                                min="0" 
-                                                               style="width: 60px; height: 30px; text-align: center; padding: 2px 4px;"
                                                                data-chave-id="<?php echo $chave['id']; ?>"
                                                                readonly
                                                                disabled>
@@ -5257,9 +5357,9 @@ endif;
                                             </div>
                                             </td>
                                             <td>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <div style="width: 16px; height: 16px; background-color: <?php echo htmlspecialchars($chave['time2_cor'] ?? '#ccc'); ?>; border-radius: 3px;"></div>
-                                                    <strong><?php echo htmlspecialchars($chave['time2_nome'] ?? 'Aguardando'); ?></strong>
+                                                <div class="eliminatoria-time">
+                                                    <div class="eliminatoria-time-color" style="background-color: <?php echo htmlspecialchars($chave['time2_cor'] ?? '#ccc'); ?>;"></div>
+                                                    <strong class="eliminatoria-time-name"><?php echo htmlspecialchars($chave['time2_nome'] ?? 'Aguardando'); ?></strong>
                                                     <?php if ($chave['time2_id'] && !empty($integrantes_por_time_chaves[$chave['time2_id']])): ?>
                                                         <?php 
                                                         $primeiro_integ = $integrantes_por_time_chaves[$chave['time2_id']][0];
@@ -5305,15 +5405,14 @@ endif;
                                                     <?php endif; ?>
                                             </div>
                                             </td>
-                                            <td></td>
-                                            <td>
+                                            <td class="text-center">
                                                 <span class="badge bg-<?php echo $chave['status'] === 'Finalizada' ? 'success' : ($chave['status'] === 'Em Andamento' ? 'warning' : 'secondary'); ?>">
                                                     <?php echo $chave['status']; ?>
                                                 </span>
                                             </td>
-                                            <td>
+                                            <td class="text-end">
                                                 <?php if ($chave['time1_id'] && $chave['time2_id'] && $torneio['status'] !== 'Finalizado'): ?>
-                                                    <div class="d-flex gap-1">
+                                                    <div class="eliminatoria-actions">
                                                         <button class="btn btn-sm btn-success btn-salvar-chave" 
                                                                 id="btn_salvar_chave_<?php echo $chave['id']; ?>" 
                                                                 onclick="salvarResultadoChave(<?php echo $chave['id']; ?>)"
@@ -5332,7 +5431,8 @@ endif;
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
-                                        </div>
+                            </div>
+                        </div>
                     <?php 
                         endif;
                     endforeach; 
