@@ -3723,9 +3723,8 @@ if ($timesSalvos && $modalidade):
         }
     }
     
-    // DEBUG: Sempre permitir gerar 2ª fase se todas as partidas da 1ª fase estiverem finalizadas
-    $pode_gerar_2fase = $todas_1fase_finalizadas && $torneio['status'] !== 'Finalizado';
-    $pode_gerar_jogos_2fase = $tem_grupos_2fase && !$tem_jogos_2fase && $torneio['status'] !== 'Finalizado';
+    $pode_gerar_2fase = $todas_1fase_finalizadas && !$tem_grupos_2fase && !$tem_jogos_2fase && $torneio['status'] !== 'Finalizado';
+    $pode_gerar_jogos_2fase = false;
     
     // Verificar se pode gerar semi-finais específicas do Ouro
     $pode_gerar_semifinais_ouro = false;
@@ -3888,11 +3887,6 @@ if ($timesSalvos && $modalidade):
                             <i class="fas fa-play me-1"></i>Gerar 2ª Fase
                         </button>
                     <?php endif; ?>
-                    <?php if ($pode_gerar_jogos_2fase): ?>
-                        <button class="btn btn-sm btn-primary" onclick="gerarJogosSegundaFaseTorneioPro()">
-                            <i class="fas fa-futbol me-1"></i>Gerar Jogos da 2ª Fase
-                        </button>
-                    <?php endif; ?>
                     <?php if ($pode_gerar_semifinais_ouro): ?>
                         <button class="btn btn-sm btn-warning" onclick="gerarSemifinaisOuro()" title="Gerar 2 jogos eliminatórios entre os 2 melhores times de Ouro A e os 2 melhores de Ouro B">
                             <i class="fas fa-medal me-1"></i>Gerar Semi-Finais Ouro
@@ -3969,21 +3963,12 @@ if ($timesSalvos && $modalidade):
                     <?php endif; ?>
                     <?php if ($tem_grupos_2fase): ?>
                         <?php if ($tem_jogos_2fase): ?>
-                            <!-- Mostrar botão Limpar quando há jogos -->
-                            <button class="btn btn-sm btn-danger" onclick="limparSegundaFaseTorneioPro()" id="btnLimpar2Fase">
-                                <i class="fas fa-trash me-1"></i>Limpar Jogos da 2ª Fase
-                            </button>
                             <?php if ($tem_jogos_2fase_nao_finalizados): ?>
                                 <!-- Mostrar botão Simular quando há jogos não finalizados -->
                                 <button class="btn btn-sm btn-warning" onclick="simularResultados2Fase()" id="btnSimularResultados2Fase">
                                     <i class="fas fa-dice me-1"></i>Simular Jogos da 2ª Fase
                                 </button>
                             <?php endif; ?>
-                        <?php else: ?>
-                            <!-- Mostrar botão Simular quando não há jogos -->
-                            <button class="btn btn-sm btn-warning" onclick="simularResultados2Fase()" id="btnSimularResultados2Fase">
-                                <i class="fas fa-dice me-1"></i>Simular Jogos da 2ª Fase
-                            </button>
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
@@ -3993,6 +3978,12 @@ if ($timesSalvos && $modalidade):
                     <div class="alert alert-info mb-0">
                         <i class="fas fa-info-circle me-2"></i>
                         Todas as partidas da 1ª fase foram finalizadas. Clique em "Gerar 2ª Fase" para criar os grupos Ouro A e Ouro B conforme a classificação dos grupos.
+                    </div>
+                <?php endif; ?>
+                <?php if ($tem_grupos_2fase && !$tem_jogos_2fase && $torneio['status'] !== 'Finalizado'): ?>
+                    <div class="alert alert-warning mb-3">
+                        <i class="fas fa-sync-alt me-2"></i>
+                        Finalizando automaticamente os jogos da 2ª fase para liberar a simulação.
                     </div>
                 <?php endif; ?>
                 
@@ -9338,13 +9329,8 @@ function gerarSegundaFaseTorneioPro() {
             
             if (response.success) {
                 showAlert(response.message, 'success');
-                
-                // Recarregar página após 1.5 segundos para atualizar os botões
-                setTimeout(function() {
-                    location.reload();
-                }, 1500);
-                
-                return; // Não criar tabelas dinamicamente, deixar o PHP fazer isso após reload
+                gerarJogosSegundaFaseTorneioPro(true);
+                return;
                 
                 // Criar tabelas de classificação da 2ª fase (não é debug, são tabelas reais)
                 let tabelasHtml = '<div id="tabelas_2fase" class="mt-3"><div class="row mb-3">';
@@ -9483,8 +9469,8 @@ function gerarSegundaFaseTorneioPro() {
     });
 }
 
-function gerarJogosSegundaFaseTorneioPro() {
-    if (!confirm('Isso gerará os jogos/confrontos da 2ª fase. Deseja continuar?')) return;
+function gerarJogosSegundaFaseTorneioPro(pularConfirmacao = false) {
+    if (!pularConfirmacao && !confirm('Isso gerará os jogos/confrontos da 2ª fase. Deseja continuar?')) return;
     
     $.ajax({
         url: '../ajax/gerar_jogos_segunda_fase_torneio_pro.php',
@@ -9493,7 +9479,7 @@ function gerarJogosSegundaFaseTorneioPro() {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                showAlert(response.message, 'success');
+                showAlert(response.message || '2ª fase e jogos gerados com sucesso.', 'success');
                 setTimeout(function() {
                     location.reload();
                 }, 1500);
@@ -9537,6 +9523,14 @@ function limparSegundaFaseTorneioPro() {
         }
     });
 }
+
+<?php if ($modalidade === 'torneio_pro' && $tem_grupos_2fase && !$tem_jogos_2fase && $torneio['status'] !== 'Finalizado'): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        gerarJogosSegundaFaseTorneioPro(true);
+    }, 500);
+});
+<?php endif; ?>
 
 // Função para popular tabela de classificação da 2ª fase
 function popularClassificacao2Fase() {
@@ -9677,13 +9671,8 @@ function gerarSegundaFaseTorneioPro() {
             
             if (response.success) {
                 showAlert(response.message, 'success');
-                
-                // Recarregar página após 1.5 segundos para atualizar os botões
-                setTimeout(function() {
-                    location.reload();
-                }, 1500);
-                
-                return; // Não criar tabelas dinamicamente, deixar o PHP fazer isso após reload
+                gerarJogosSegundaFaseTorneioPro(true);
+                return;
                 
                 // Criar tabelas de classificação da 2ª fase (não é debug, são tabelas reais)
                 let tabelasHtml = '<div id="tabelas_2fase" class="mt-3"><div class="row mb-3">';
@@ -9823,8 +9812,8 @@ function gerarSegundaFaseTorneioPro() {
     });
 }
 
-function gerarJogosSegundaFaseTorneioPro() {
-    if (!confirm('Isso gerará os jogos/confrontos da 2ª fase. Deseja continuar?')) return;
+function gerarJogosSegundaFaseTorneioPro(pularConfirmacao = false) {
+    if (!pularConfirmacao && !confirm('Isso gerará os jogos/confrontos da 2ª fase. Deseja continuar?')) return;
     
     $.ajax({
         url: '../ajax/gerar_jogos_segunda_fase_torneio_pro.php',
@@ -9833,7 +9822,7 @@ function gerarJogosSegundaFaseTorneioPro() {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                showAlert(response.message, 'success');
+                showAlert(response.message || '2ª fase e jogos gerados com sucesso.', 'success');
                 setTimeout(function() {
                     location.reload();
                 }, 1500);

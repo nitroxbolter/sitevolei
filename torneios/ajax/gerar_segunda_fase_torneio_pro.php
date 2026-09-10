@@ -55,6 +55,27 @@ try {
     $pdo->beginTransaction();
     executeQuery($pdo, "SELECT id FROM torneios WHERE id = ? FOR UPDATE", [$torneio_id]);
 
+    $sql_check_2fase = "SELECT COUNT(*) as total FROM torneio_grupos WHERE torneio_id = ? AND nome LIKE '2ª Fase%'";
+    $stmt_check_2fase = executeQuery($pdo, $sql_check_2fase, [$torneio_id]);
+    $tem_grupos_2fase = $stmt_check_2fase ? (int)$stmt_check_2fase->fetch()['total'] > 0 : false;
+
+    $sql_check_jogos_2fase = "SELECT COUNT(*) as total FROM partidas_2fase_torneio WHERE torneio_id = ?";
+    $stmt_check_jogos_2fase = executeQuery($pdo, $sql_check_jogos_2fase, [$torneio_id]);
+    $tem_jogos_2fase = $stmt_check_jogos_2fase ? (int)$stmt_check_jogos_2fase->fetch()['total'] > 0 : false;
+
+    $sql_check_eliminatorias_2fase = "SELECT COUNT(*) as total FROM partidas_2fase_eliminatorias WHERE torneio_id = ?";
+    $stmt_check_eliminatorias_2fase = executeQuery($pdo, $sql_check_eliminatorias_2fase, [$torneio_id]);
+    $tem_eliminatorias_2fase = $stmt_check_eliminatorias_2fase ? (int)$stmt_check_eliminatorias_2fase->fetch()['total'] > 0 : false;
+
+    if ($tem_grupos_2fase || $tem_jogos_2fase || $tem_eliminatorias_2fase) {
+        $pdo->rollBack();
+        echo json_encode([
+            'success' => false,
+            'message' => 'A 2ª fase já foi gerada. Use limpar 2ª fase antes de gerar novamente.'
+        ]);
+        exit();
+    }
+
     // Verificar e remover grupos existentes da 2ª fase antes de criar novos.
     $sql_check_existentes = "SELECT id FROM torneio_grupos WHERE torneio_id = ? AND (nome = ? OR nome = ? OR nome = ? OR nome = ? OR nome = ? OR nome = ?)";
     $stmt_check = executeQuery($pdo, $sql_check_existentes, [$torneio_id, "2ª Fase - Ouro A", "2ª Fase - Ouro B", "2ª Fase - Prata A", "2ª Fase - Prata B", "2ª Fase - Bronze A", "2ª Fase - Bronze B"]);
