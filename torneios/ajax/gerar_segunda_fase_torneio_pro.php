@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -33,13 +37,11 @@ try {
     $sql_debug_chaves = "SELECT id, nome, ordem FROM torneio_grupos WHERE torneio_id = ? ORDER BY ordem";
     $stmt_debug_chaves = executeQuery($pdo, $sql_debug_chaves, [$torneio_id]);
     $chaves_existentes = $stmt_debug_chaves ? $stmt_debug_chaves->fetchAll(PDO::FETCH_ASSOC) : [];
-    error_log("DEBUG - Chaves existentes no torneio $torneio_id: " . json_encode($chaves_existentes));
     
     // Verificar se há classificação
     $sql_debug_class = "SELECT COUNT(*) as total FROM torneio_classificacao WHERE torneio_id = ?";
     $stmt_debug_class = executeQuery($pdo, $sql_debug_class, [$torneio_id]);
     $total_classificacao = $stmt_debug_class ? (int)$stmt_debug_class->fetch()['total'] : 0;
-    error_log("DEBUG - Total de registros de classificação no torneio $torneio_id: $total_classificacao");
     
     // Verificar classificação por grupo
     if (!empty($chaves_existentes)) {
@@ -47,7 +49,6 @@ try {
             $sql_class_chave = "SELECT COUNT(*) as total FROM torneio_classificacao WHERE torneio_id = ? AND grupo_id = ?";
             $stmt_class_chave = executeQuery($pdo, $sql_class_chave, [$torneio_id, $chave['id']]);
             $total_chave = $stmt_class_chave ? (int)$stmt_class_chave->fetch()['total'] : 0;
-            error_log("DEBUG - Classificação na " . $chave['nome'] . " (ID: " . $chave['id'] . "): $total_chave registros");
         }
     }
     
@@ -66,8 +67,6 @@ try {
         executeQuery($pdo, "DELETE FROM torneio_grupos WHERE id IN ($placeholders)", $grupos_existentes_ids);
     }
 
-    error_log("DEBUG: Iniciando transação...");
-    error_log("DEBUG: Transação iniciada. inTransaction: " . ($pdo->inTransaction() ? 'SIM' : 'NÃO'));
     
     // Função para converter número em letra (1 -> A, 2 -> B, etc.)
     $numeroParaLetra = function($numero) {
@@ -80,27 +79,22 @@ try {
     $grupos_ouro_b = [2, 4, 6]; // Grupo B, D, F
     
     // DEBUG: Verificar estrutura da tabela torneio_classificacao
-    error_log("DEBUG ESTRUTURA - Verificando estrutura da tabela torneio_classificacao...");
     try {
         $sql_estrutura = "SHOW COLUMNS FROM torneio_classificacao";
         $stmt_estrutura = $pdo->query($sql_estrutura);
         $colunas = $stmt_estrutura ? $stmt_estrutura->fetchAll(PDO::FETCH_ASSOC) : [];
-        error_log("DEBUG ESTRUTURA - Colunas da tabela torneio_classificacao: " . json_encode(array_column($colunas, 'Field')));
         
         // Verificar se existe grupo_id
         $tem_grupo_id = false;
         foreach ($colunas as $coluna) {
             if ($coluna['Field'] === 'grupo_id') {
                 $tem_grupo_id = true;
-                error_log("DEBUG ESTRUTURA - Coluna grupo_id encontrada. Tipo: " . $coluna['Type']);
                 break;
             }
         }
         if (!$tem_grupo_id) {
-            error_log("DEBUG ESTRUTURA - ERRO: Coluna grupo_id NÃO encontrada na tabela torneio_classificacao!");
         }
     } catch (Exception $e) {
-        error_log("DEBUG ESTRUTURA - Erro ao verificar estrutura: " . $e->getMessage());
     }
     
     // DEBUG: Verificar se a tabela torneio_classificacao_2fase existe
@@ -117,9 +111,7 @@ try {
         $sql_count_2fase = "SELECT COUNT(*) as total FROM torneio_classificacao_2fase WHERE torneio_id = ?";
         $stmt_count_2fase = executeQuery($pdo, $sql_count_2fase, [$torneio_id]);
         $total_class_2fase = $stmt_count_2fase ? (int)$stmt_count_2fase->fetch()['total'] : 0;
-        error_log("DEBUG ESTRUTURA - Tabela torneio_classificacao_2fase existe! Total de registros: $total_class_2fase");
     } else {
-        error_log("DEBUG ESTRUTURA - Usando tabela torneio_classificacao para buscar classificação da 1ª fase.");
     }
     
     // Função auxiliar para calcular classificação completa de um grupo diretamente dos jogos
@@ -213,31 +205,26 @@ try {
     $buscar_1lugar_grupo = function($numero_grupo) use ($pdo, $torneio_id, $tabela_2fase_existe, $numeroParaLetra, $calcular_classificacao_grupo) {
         $letra_grupo = $numeroParaLetra($numero_grupo);
         $nome_grupo = "Grupo $letra_grupo";
-        error_log("DEBUG BUSCAR 1º - Buscando grupo: $nome_grupo para torneio $torneio_id");
         
         // SEMPRE buscar da tabela torneio_classificacao (dados da 1ª fase estão aqui)
         $sql_grupo = "SELECT id, nome FROM torneio_grupos WHERE torneio_id = ? AND nome = ? LIMIT 1";
         $stmt_grupo = executeQuery($pdo, $sql_grupo, [$torneio_id, $nome_grupo]);
         
         if ($stmt_grupo === false || !$stmt_grupo) {
-            error_log("DEBUG BUSCAR 1º - Erro ao buscar grupo: $nome_grupo para torneio $torneio_id");
             return null;
         }
         
         $grupo = $stmt_grupo->fetch(PDO::FETCH_ASSOC);
         if (!$grupo) {
-            error_log("DEBUG BUSCAR 1º - Grupo não encontrado: $nome_grupo para torneio $torneio_id");
             return null;
         }
         
         $grupo_id = (int)$grupo['id'];
-        error_log("DEBUG BUSCAR 1º - Grupo encontrado: $nome_grupo (ID: $grupo_id)");
         
         // DEBUG: Verificar quantos registros existem na tabela para este grupo
         $sql_debug_count = "SELECT COUNT(*) as total FROM torneio_classificacao WHERE torneio_id = ? AND grupo_id = ?";
         $stmt_debug_count = executeQuery($pdo, $sql_debug_count, [$torneio_id, $grupo_id]);
         $total_registros = $stmt_debug_count ? (int)$stmt_debug_count->fetch()['total'] : 0;
-        error_log("DEBUG BUSCAR 1º - Total de registros na tabela torneio_classificacao para grupo_id=$grupo_id: $total_registros");
         
         // DEBUG: Listar todos os registros deste grupo
         $sql_debug_all = "SELECT tc.time_id, tc.grupo_id, tc.pontos_total, tc.vitorias, tc.average, tt.nome as time_nome
@@ -247,7 +234,6 @@ try {
                          ORDER BY tc.pontos_total DESC, tc.vitorias DESC, tc.average DESC";
         $stmt_debug_all = executeQuery($pdo, $sql_debug_all, [$torneio_id, $grupo_id]);
         $todos_registros = $stmt_debug_all ? $stmt_debug_all->fetchAll(PDO::FETCH_ASSOC) : [];
-        error_log("DEBUG BUSCAR 1º - Registros encontrados: " . json_encode($todos_registros));
         
         $sql_1lugar = "SELECT 
             tc.time_id,
@@ -274,10 +260,8 @@ try {
         $stmt_1lugar = executeQuery($pdo, $sql_1lugar, [$torneio_id, $grupo_id]);
         
         if ($stmt_1lugar === false || !$stmt_1lugar) {
-            error_log("DEBUG BUSCAR 1º - Erro ao executar query para buscar 1º lugar no grupo $numero_grupo");
             $error_info = $pdo->errorInfo();
             if ($error_info) {
-                error_log("DEBUG BUSCAR 1º - Erro PDO: " . json_encode($error_info));
             }
             return null;
         }
@@ -286,14 +270,10 @@ try {
         
         // DEBUG: Verificar se encontrou resultado
         if ($primeiro) {
-            error_log("DEBUG BUSCAR 1º - Resultado encontrado na query: time_id=" . ($primeiro['time_id'] ?? 'N/A') . ", time_nome=" . ($primeiro['time_nome'] ?? 'N/A'));
         } else {
-            error_log("DEBUG BUSCAR 1º - Query executada mas nenhum resultado retornado (fetch retornou false/null)");
         }
         
         if (!$primeiro) {
-            error_log("DEBUG BUSCAR 1º - Nenhum 1º lugar encontrado na tabela de classificação para o grupo $numero_grupo");
-            error_log("DEBUG BUSCAR 1º - Tentando calcular diretamente dos jogos...");
             
             // Se não encontrou na tabela, calcular diretamente dos jogos
             $letra_grupo = $numeroParaLetra($numero_grupo);
@@ -305,7 +285,6 @@ try {
             $grupo_calc = $stmt_grupo_calc ? $stmt_grupo_calc->fetch(PDO::FETCH_ASSOC) : null;
             
             if (!$grupo_calc) {
-                error_log("DEBUG BUSCAR 1º - Grupo não encontrado: $nome_grupo");
                 return null;
             }
             
@@ -315,7 +294,6 @@ try {
             $classificacao_calculada = $calcular_classificacao_grupo($grupo_id_calc, $torneio_id);
             
             if (empty($classificacao_calculada)) {
-                error_log("DEBUG BUSCAR 1º - Nenhum jogo finalizado encontrado no grupo $nome_grupo");
                 return null;
             }
             
@@ -336,9 +314,7 @@ try {
                 'pontos_total' => $classificacao_calculada[0]['pontos_total']
             ];
             
-            error_log("DEBUG BUSCAR 1º - 1º lugar calculado dos jogos no grupo $numero_grupo: " . $primeiro['time_nome'] . " (ID: " . $primeiro['time_id'] . ", Pontos: " . $primeiro['pontos_total'] . ")");
         } else {
-            error_log("DEBUG BUSCAR 1º - 1º lugar encontrado na tabela no grupo $numero_grupo: " . $primeiro['time_nome'] . " (ID: " . $primeiro['time_id'] . ", Pontos: " . $primeiro['pontos_total'] . ")");
         }
         
         return [
@@ -573,33 +549,23 @@ try {
     
     // Buscar 1º lugares para Ouro A
     $times_ouro_a = [];
-    error_log("DEBUG OURO A - Buscando 1º lugares nos grupos: " . implode(', ', array_map(function($n) use ($numeroParaLetra) { return 'Grupo ' . $numeroParaLetra($n); }, $grupos_ouro_a)));
     foreach ($grupos_ouro_a as $num_grupo) {
-        error_log("DEBUG OURO A - Processando grupo $num_grupo...");
         $time = $buscar_1lugar_grupo($num_grupo);
         if ($time) {
             $times_ouro_a[] = $time;
-            error_log("DEBUG OURO A - Time encontrado e adicionado: " . $time['time_nome'] . " do " . $time['grupo_nome'] . " (Pontos: " . $time['pontos_total'] . ")");
         } else {
-            error_log("DEBUG OURO A - Nenhum time encontrado no grupo $num_grupo");
         }
     }
-    error_log("DEBUG OURO A - Total de times encontrados: " . count($times_ouro_a));
     
     // Buscar 1º lugares para Ouro B
     $times_ouro_b = [];
-    error_log("DEBUG OURO B - Buscando 1º lugares nos grupos: " . implode(', ', array_map(function($n) use ($numeroParaLetra) { return 'Grupo ' . $numeroParaLetra($n); }, $grupos_ouro_b)));
     foreach ($grupos_ouro_b as $num_grupo) {
-        error_log("DEBUG OURO B - Processando grupo $num_grupo...");
         $time = $buscar_1lugar_grupo($num_grupo);
         if ($time) {
             $times_ouro_b[] = $time;
-            error_log("DEBUG OURO B - Time encontrado e adicionado: " . $time['time_nome'] . " do " . $time['grupo_nome'] . " (Pontos: " . $time['pontos_total'] . ")");
         } else {
-            error_log("DEBUG OURO B - Nenhum time encontrado no grupo $num_grupo");
         }
     }
-    error_log("DEBUG OURO B - Total de times encontrados: " . count($times_ouro_b));
     
     // Buscar todos os 2º lugares de todos os grupos (A a F)
     $todos_segundos_lugares = [];
@@ -660,78 +626,53 @@ try {
     // Criar grupos Prata A e Prata B
     // PRATA A: 3° melhor 2° lugar, 5° melhor 2° lugar, 1° melhor 3° lugar, 3° melhor 3° lugar
     $times_prata_a = [];
-    error_log("DEBUG PRATA A - Total 2º lugares: " . count($todos_segundos_lugares));
-    error_log("DEBUG PRATA A - Total 3º lugares: " . count($todos_terceiros_lugares));
     
     if (count($todos_segundos_lugares) >= 3) {
         $times_prata_a[] = $todos_segundos_lugares[2]; // 3° melhor 2° lugar
-        error_log("DEBUG PRATA A - Adicionado 3º melhor 2º lugar: " . $todos_segundos_lugares[2]['time_nome']);
     } else {
-        error_log("DEBUG PRATA A - Não há 3º melhor 2º lugar (total: " . count($todos_segundos_lugares) . ")");
     }
     if (count($todos_segundos_lugares) >= 5) {
         $times_prata_a[] = $todos_segundos_lugares[4]; // 5° melhor 2° lugar
-        error_log("DEBUG PRATA A - Adicionado 5º melhor 2º lugar: " . $todos_segundos_lugares[4]['time_nome']);
     } else {
-        error_log("DEBUG PRATA A - Não há 5º melhor 2º lugar (total: " . count($todos_segundos_lugares) . ")");
     }
     if (!empty($todos_terceiros_lugares)) {
         $times_prata_a[] = $todos_terceiros_lugares[0]; // 1° melhor 3° lugar
-        error_log("DEBUG PRATA A - Adicionado 1º melhor 3º lugar: " . $todos_terceiros_lugares[0]['time_nome']);
     } else {
-        error_log("DEBUG PRATA A - Não há 1º melhor 3º lugar (lista vazia)");
     }
     if (count($todos_terceiros_lugares) >= 3) {
         $times_prata_a[] = $todos_terceiros_lugares[2]; // 3° melhor 3° lugar
-        error_log("DEBUG PRATA A - Adicionado 3º melhor 3º lugar: " . $todos_terceiros_lugares[2]['time_nome']);
     } else {
-        error_log("DEBUG PRATA A - Não há 3º melhor 3º lugar (total: " . count($todos_terceiros_lugares) . ")");
     }
     
-    error_log("DEBUG PRATA A - Total de times no grupo: " . count($times_prata_a));
     
     // PRATA B: 4° melhor 2° lugar, 6° melhor 2° lugar, 2° melhor 3° lugar, 4° melhor 3° lugar
     $times_prata_b = [];
-    error_log("DEBUG PRATA B - Total 2º lugares: " . count($todos_segundos_lugares));
-    error_log("DEBUG PRATA B - Total 3º lugares: " . count($todos_terceiros_lugares));
     
     if (count($todos_segundos_lugares) >= 4) {
         $times_prata_b[] = $todos_segundos_lugares[3]; // 4° melhor 2° lugar
-        error_log("DEBUG PRATA B - Adicionado 4º melhor 2º lugar: " . $todos_segundos_lugares[3]['time_nome']);
     } else {
-        error_log("DEBUG PRATA B - Não há 4º melhor 2º lugar (total: " . count($todos_segundos_lugares) . ")");
     }
     if (count($todos_segundos_lugares) >= 6) {
         $times_prata_b[] = $todos_segundos_lugares[5]; // 6° melhor 2° lugar
-        error_log("DEBUG PRATA B - Adicionado 6º melhor 2º lugar: " . $todos_segundos_lugares[5]['time_nome']);
     } else {
-        error_log("DEBUG PRATA B - Não há 6º melhor 2º lugar (total: " . count($todos_segundos_lugares) . ")");
     }
     if (count($todos_terceiros_lugares) >= 2) {
         $times_prata_b[] = $todos_terceiros_lugares[1]; // 2° melhor 3° lugar
-        error_log("DEBUG PRATA B - Adicionado 2º melhor 3º lugar: " . $todos_terceiros_lugares[1]['time_nome']);
     } else {
-        error_log("DEBUG PRATA B - Não há 2º melhor 3º lugar (total: " . count($todos_terceiros_lugares) . ")");
     }
     if (count($todos_terceiros_lugares) >= 4) {
         $times_prata_b[] = $todos_terceiros_lugares[3]; // 4° melhor 3° lugar
-        error_log("DEBUG PRATA B - Adicionado 4º melhor 3º lugar: " . $todos_terceiros_lugares[3]['time_nome']);
     } else {
-        error_log("DEBUG PRATA B - Não há 4º melhor 3º lugar (total: " . count($todos_terceiros_lugares) . ")");
     }
     
-    error_log("DEBUG PRATA B - Total de times no grupo: " . count($times_prata_b));
     
     // Criar grupos Bronze A e Bronze B
     // BRONZE A: 5° melhor 3° lugar + 4º lugar da chave 1, 4º lugar da chave 3, 4º lugar da chave 5
     $times_bronze_a = [];
-    error_log("DEBUG BRONZE A - Total 3º lugares: " . count($todos_terceiros_lugares));
     
     if (count($todos_terceiros_lugares) >= 5) {
         $times_bronze_a[] = $todos_terceiros_lugares[4]; // 5° melhor 3° lugar
-        error_log("DEBUG BRONZE A - Adicionado 5º melhor 3º lugar: " . $todos_terceiros_lugares[4]['time_nome']);
     } else {
-        error_log("DEBUG BRONZE A - Não há 5º melhor 3º lugar (total: " . count($todos_terceiros_lugares) . ")");
     }
     
     // Adicionar 4º lugares dos grupos ímpares (A, C, E)
@@ -741,24 +682,18 @@ try {
         if ($quarto) {
             $times_bronze_a[] = $quarto;
             $letra_grupo = $numeroParaLetra($num_grupo);
-            error_log("DEBUG BRONZE A - Adicionado 4º lugar do Grupo $letra_grupo: " . $quarto['time_nome']);
         } else {
             $letra_grupo = $numeroParaLetra($num_grupo);
-            error_log("DEBUG BRONZE A - Não há 4º lugar no Grupo $letra_grupo");
         }
     }
     
-    error_log("DEBUG BRONZE A - Total de times no grupo: " . count($times_bronze_a));
     
     // BRONZE B: 6° melhor 3° lugar + 4º lugar do grupo B, 4º lugar do grupo D, 4º lugar do grupo F
     $times_bronze_b = [];
-    error_log("DEBUG BRONZE B - Total 3º lugares: " . count($todos_terceiros_lugares));
     
     if (count($todos_terceiros_lugares) >= 6) {
         $times_bronze_b[] = $todos_terceiros_lugares[5]; // 6° melhor 3° lugar
-        error_log("DEBUG BRONZE B - Adicionado 6º melhor 3º lugar: " . $todos_terceiros_lugares[5]['time_nome']);
     } else {
-        error_log("DEBUG BRONZE B - Não há 6º melhor 3º lugar (total: " . count($todos_terceiros_lugares) . ")");
     }
     
     // Adicionar 4º lugares dos grupos pares (B, D, F)
@@ -768,14 +703,11 @@ try {
         if ($quarto) {
             $times_bronze_b[] = $quarto;
             $letra_grupo = $numeroParaLetra($num_grupo);
-            error_log("DEBUG BRONZE B - Adicionado 4º lugar do Grupo $letra_grupo: " . $quarto['time_nome']);
         } else {
             $letra_grupo = $numeroParaLetra($num_grupo);
-            error_log("DEBUG BRONZE B - Não há 4º lugar no Grupo $letra_grupo");
         }
     }
     
-    error_log("DEBUG BRONZE B - Total de times no grupo: " . count($times_bronze_b));
     
     // Verificar se encontrou times suficientes
     if (empty($times_ouro_a) && empty($times_ouro_b) && empty($times_prata_a) && empty($times_prata_b) && empty($times_bronze_a) && empty($times_bronze_b)) {
@@ -817,7 +749,6 @@ try {
                 'jogos_finalizados' => $total_jogos
             ];
             
-            error_log("DEBUG CLASSIFICAÇÃO - Grupo: $grupo_nome (ID: $grupo_id) - Classificação: $total_grupo registros, Jogos finalizados: $total_jogos");
         }
         
         $mensagem_erro = 'Nenhum time encontrado nos grupos especificados.';
@@ -872,15 +803,12 @@ try {
                 executeQuery($pdo, "DELETE FROM torneio_grupo_times WHERE grupo_id = ?", [$grupo_ouro_a_id]);
                 executeQuery($pdo, "DELETE FROM torneio_classificacao WHERE grupo_id = ?", [$grupo_ouro_a_id]);
             } else {
-                error_log("DEBUG: Criando grupo Ouro A...");
                 $sql_grupo_ouro_a = "INSERT INTO torneio_grupos (torneio_id, nome, ordem) VALUES (?, ?, ?)";
                 $stmt_grupo_ouro_a = $pdo->prepare($sql_grupo_ouro_a);
-                error_log("DEBUG: Executando INSERT para Ouro A com valores: torneio_id=$torneio_id, nome='2ª Fase - Ouro A', ordem=100");
                 $result_ouro_a = $stmt_grupo_ouro_a->execute([$torneio_id, "2ª Fase - Ouro A", 100]);
                 
                 if (!$result_ouro_a) {
                     $error_info = $pdo->errorInfo();
-                    error_log("DEBUG: ERRO ao criar grupo Ouro A: " . json_encode($error_info));
                     if ($pdo->inTransaction()) {
                         $pdo->rollBack();
                     }
@@ -900,8 +828,6 @@ try {
                 }
                 
                 $grupo_ouro_a_id = (int)$pdo->lastInsertId();
-                error_log("DEBUG: Grupo Ouro A criado com ID: $grupo_ouro_a_id");
-                error_log("DEBUG: Transação ainda ativa após criar Ouro A: " . ($pdo->inTransaction() ? 'SIM' : 'NÃO'));
             }
             
             $grupos_criados['Ouro A'] = ['id' => $grupo_ouro_a_id, 'times' => $times_ouro_a];
@@ -963,10 +889,8 @@ try {
                                          VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0.00, 0)";
                             $result_class = executeQuery($pdo, $sql_class, [$torneio_id, $time['time_id'], $grupo_ouro_a_id]);
                             if ($result_class) {
-                                error_log("DEBUG: Classificação inicial criada para time {$time['time_id']} no grupo Ouro A (ID=$grupo_ouro_a_id)");
                             } else {
                                 $error_info = $pdo->errorInfo();
-                                error_log("DEBUG: ERRO ao criar classificação inicial para time {$time['time_id']}: " . ($error_info[2] ?? 'Desconhecido'));
                             }
                         } catch (PDOException $e) {
                             // Se falhar, a classificação já existe (pode ter sido criada em outro lugar)
@@ -992,15 +916,12 @@ try {
                 executeQuery($pdo, "DELETE FROM torneio_grupo_times WHERE grupo_id = ?", [$grupo_ouro_b_id]);
                 executeQuery($pdo, "DELETE FROM torneio_classificacao WHERE grupo_id = ?", [$grupo_ouro_b_id]);
             } else {
-                error_log("DEBUG: Criando grupo Ouro B...");
                 $sql_grupo_ouro_b = "INSERT INTO torneio_grupos (torneio_id, nome, ordem) VALUES (?, ?, ?)";
                 $stmt_grupo_ouro_b = $pdo->prepare($sql_grupo_ouro_b);
-                error_log("DEBUG: Executando INSERT para Ouro B...");
                 $result_ouro_b = $stmt_grupo_ouro_b->execute([$torneio_id, "2ª Fase - Ouro B", 101]);
                 
                 if (!$result_ouro_b) {
                     $error_info = $pdo->errorInfo();
-                    error_log("DEBUG: ERRO ao criar grupo Ouro B: " . json_encode($error_info));
                     if ($pdo->inTransaction()) {
                         $pdo->rollBack();
                     }
@@ -1020,8 +941,6 @@ try {
                 }
                 
                 $grupo_ouro_b_id = (int)$pdo->lastInsertId();
-                error_log("DEBUG: Grupo Ouro B criado com ID: $grupo_ouro_b_id");
-                error_log("DEBUG: Transação ainda ativa após criar Ouro B: " . ($pdo->inTransaction() ? 'SIM' : 'NÃO'));
             }
             
             $grupos_criados['Ouro B'] = ['id' => $grupo_ouro_b_id, 'times' => $times_ouro_b];
@@ -1080,10 +999,8 @@ try {
     }
     
     // Criar Prata A
-    error_log("DEBUG - Tentando criar Prata A. Total de times: " . count($times_prata_a));
     if (!empty($times_prata_a)) {
         try {
-            error_log("DEBUG - Iniciando criação do grupo Prata A");
             $sql_check_prata_a = "SELECT id FROM torneio_grupos WHERE torneio_id = ? AND nome = ?";
             $stmt_check_prata_a = executeQuery($pdo, $sql_check_prata_a, [$torneio_id, "2ª Fase - Prata A"]);
             $grupo_prata_a_existente = $stmt_check_prata_a ? $stmt_check_prata_a->fetch() : null;
@@ -1114,10 +1031,8 @@ try {
             }
             
             $grupos_criados['Prata A'] = ['id' => $grupo_prata_a_id, 'times' => $times_prata_a];
-            error_log("DEBUG - Grupo Prata A criado com ID: " . $grupo_prata_a_id . ". Total de times: " . count($times_prata_a));
             
             foreach ($times_prata_a as $time) {
-                error_log("DEBUG - Adicionando time ao Prata A: " . $time['time_nome'] . " (ID: " . $time['time_id'] . ")");
                 $sql_add_time = "INSERT INTO torneio_grupo_times (grupo_id, time_id) VALUES (?, ?)";
                 executeQuery($pdo, $sql_add_time, [$grupo_prata_a_id, $time['time_id']]);
                 
@@ -1151,7 +1066,6 @@ try {
                 }
             }
         } catch (PDOException $e) {
-            error_log("DEBUG - ERRO ao criar Prata A: " . $e->getMessage());
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -1163,14 +1077,11 @@ try {
             exit();
         }
     } else {
-        error_log("DEBUG - Prata A não foi criado porque times_prata_a está vazio");
     }
     
     // Criar Prata B
-    error_log("DEBUG - Tentando criar Prata B. Total de times: " . count($times_prata_b));
     if (!empty($times_prata_b)) {
         try {
-            error_log("DEBUG - Iniciando criação do grupo Prata B");
             $sql_check_prata_b = "SELECT id FROM torneio_grupos WHERE torneio_id = ? AND nome = ?";
             $stmt_check_prata_b = executeQuery($pdo, $sql_check_prata_b, [$torneio_id, "2ª Fase - Prata B"]);
             $grupo_prata_b_existente = $stmt_check_prata_b ? $stmt_check_prata_b->fetch() : null;
@@ -1201,10 +1112,8 @@ try {
             }
             
             $grupos_criados['Prata B'] = ['id' => $grupo_prata_b_id, 'times' => $times_prata_b];
-            error_log("DEBUG - Grupo Prata B criado com ID: " . $grupo_prata_b_id . ". Total de times: " . count($times_prata_b));
             
             foreach ($times_prata_b as $time) {
-                error_log("DEBUG - Adicionando time ao Prata B: " . $time['time_nome'] . " (ID: " . $time['time_id'] . ")");
                 $sql_add_time = "INSERT INTO torneio_grupo_times (grupo_id, time_id) VALUES (?, ?)";
                 executeQuery($pdo, $sql_add_time, [$grupo_prata_b_id, $time['time_id']]);
                 
@@ -1238,7 +1147,6 @@ try {
                 }
             }
         } catch (PDOException $e) {
-            error_log("DEBUG - ERRO ao criar Prata B: " . $e->getMessage());
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -1250,14 +1158,11 @@ try {
             exit();
         }
     } else {
-        error_log("DEBUG - Prata B não foi criado porque times_prata_b está vazio");
     }
     
     // Criar Bronze A
-    error_log("DEBUG - Tentando criar Bronze A. Total de times: " . count($times_bronze_a));
     if (!empty($times_bronze_a)) {
         try {
-            error_log("DEBUG - Iniciando criação do grupo Bronze A");
             $sql_check_bronze_a = "SELECT id FROM torneio_grupos WHERE torneio_id = ? AND nome = ?";
             $stmt_check_bronze_a = executeQuery($pdo, $sql_check_bronze_a, [$torneio_id, "2ª Fase - Bronze A"]);
             $grupo_bronze_a_existente = $stmt_check_bronze_a ? $stmt_check_bronze_a->fetch() : null;
@@ -1288,10 +1193,8 @@ try {
             }
             
             $grupos_criados['Bronze A'] = ['id' => $grupo_bronze_a_id, 'times' => $times_bronze_a];
-            error_log("DEBUG - Grupo Bronze A criado com ID: " . $grupo_bronze_a_id . ". Total de times: " . count($times_bronze_a));
             
             foreach ($times_bronze_a as $time) {
-                error_log("DEBUG - Adicionando time ao Bronze A: " . $time['time_nome'] . " (ID: " . $time['time_id'] . ")");
                 $sql_add_time = "INSERT INTO torneio_grupo_times (grupo_id, time_id) VALUES (?, ?)";
                 executeQuery($pdo, $sql_add_time, [$grupo_bronze_a_id, $time['time_id']]);
                 
@@ -1325,7 +1228,6 @@ try {
                 }
             }
         } catch (PDOException $e) {
-            error_log("DEBUG - ERRO ao criar Bronze A: " . $e->getMessage());
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -1337,14 +1239,11 @@ try {
             exit();
         }
     } else {
-        error_log("DEBUG - Bronze A não foi criado porque times_bronze_a está vazio");
     }
     
     // Criar Bronze B
-    error_log("DEBUG - Tentando criar Bronze B. Total de times: " . count($times_bronze_b));
     if (!empty($times_bronze_b)) {
         try {
-            error_log("DEBUG - Iniciando criação do grupo Bronze B");
             $sql_check_bronze_b = "SELECT id FROM torneio_grupos WHERE torneio_id = ? AND nome = ?";
             $stmt_check_bronze_b = executeQuery($pdo, $sql_check_bronze_b, [$torneio_id, "2ª Fase - Bronze B"]);
             $grupo_bronze_b_existente = $stmt_check_bronze_b ? $stmt_check_bronze_b->fetch() : null;
@@ -1375,10 +1274,8 @@ try {
             }
             
             $grupos_criados['Bronze B'] = ['id' => $grupo_bronze_b_id, 'times' => $times_bronze_b];
-            error_log("DEBUG - Grupo Bronze B criado com ID: " . $grupo_bronze_b_id . ". Total de times: " . count($times_bronze_b));
             
             foreach ($times_bronze_b as $time) {
-                error_log("DEBUG - Adicionando time ao Bronze B: " . $time['time_nome'] . " (ID: " . $time['time_id'] . ")");
                 $sql_add_time = "INSERT INTO torneio_grupo_times (grupo_id, time_id) VALUES (?, ?)";
                 executeQuery($pdo, $sql_add_time, [$grupo_bronze_b_id, $time['time_id']]);
                 
@@ -1412,7 +1309,6 @@ try {
                 }
             }
         } catch (PDOException $e) {
-            error_log("DEBUG - ERRO ao criar Bronze B: " . $e->getMessage());
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -1424,17 +1320,13 @@ try {
             exit();
         }
     } else {
-        error_log("DEBUG - Bronze B não foi criado porque times_bronze_b está vazio");
     }
     
     // DEBUG: Verificar se ainda está em transação antes de commitar
     if ($pdo->inTransaction()) {
-        error_log("DEBUG FINAL - Fazendo commit da transação...");
         try {
             $pdo->commit();
-            error_log("DEBUG FINAL - Commit realizado com sucesso!");
         } catch (PDOException $e) {
-            error_log("DEBUG FINAL - ERRO ao fazer commit: " . $e->getMessage());
             echo json_encode([
                 'success' => false,
                 'message' => 'Erro ao finalizar criação dos grupos: ' . $e->getMessage(),
@@ -1443,16 +1335,13 @@ try {
             exit();
         }
     } else {
-        error_log("DEBUG FINAL - AVISO: Não há transação ativa para commitar!");
     }
     
     // DEBUG: Verificar se os grupos foram realmente criados após o commit
     $sql_verificar_grupos = "SELECT id, nome FROM torneio_grupos WHERE torneio_id = ? AND nome LIKE '2ª Fase%' ORDER BY ordem ASC";
     $stmt_verificar = executeQuery($pdo, $sql_verificar_grupos, [$torneio_id]);
     $grupos_verificados = $stmt_verificar ? $stmt_verificar->fetchAll(PDO::FETCH_ASSOC) : [];
-    error_log("DEBUG FINAL - Grupos verificados após commit: " . count($grupos_verificados));
     foreach ($grupos_verificados as $grupo_ver) {
-        error_log("DEBUG FINAL - Grupo verificado: " . $grupo_ver['nome'] . " (ID: " . $grupo_ver['id'] . ")");
     }
     
     // Preparar lista de debug
@@ -1707,15 +1596,6 @@ try {
         ];
     }
     
-    error_log("DEBUG FINAL - Grupos criados: " . json_encode(array_keys($grupos_criados)));
-    error_log("DEBUG FINAL - Prata A: " . (isset($grupos_criados['Prata A']) ? "SIM (ID: " . $grupos_criados['Prata A']['id'] . ")" : "NÃO"));
-    error_log("DEBUG FINAL - Prata B: " . (isset($grupos_criados['Prata B']) ? "SIM (ID: " . $grupos_criados['Prata B']['id'] . ")" : "NÃO"));
-    error_log("DEBUG FINAL - Bronze A: " . (isset($grupos_criados['Bronze A']) ? "SIM (ID: " . $grupos_criados['Bronze A']['id'] . ")" : "NÃO"));
-    error_log("DEBUG FINAL - Bronze B: " . (isset($grupos_criados['Bronze B']) ? "SIM (ID: " . $grupos_criados['Bronze B']['id'] . ")" : "NÃO"));
-    error_log("DEBUG FINAL - Total times Prata A: " . count($times_prata_a));
-    error_log("DEBUG FINAL - Total times Prata B: " . count($times_prata_b));
-    error_log("DEBUG FINAL - Total times Bronze A: " . count($times_bronze_a));
-    error_log("DEBUG FINAL - Total times Bronze B: " . count($times_bronze_b));
     
     // DEBUG: Verificar se as classificações foram criadas
     foreach ($grupos_criados as $nome_grupo => $dados_grupo) {
@@ -1723,29 +1603,24 @@ try {
         $sql_check_class = "SELECT COUNT(*) as total FROM torneio_classificacao WHERE torneio_id = ? AND grupo_id = ?";
         $stmt_check_class = executeQuery($pdo, $sql_check_class, [$torneio_id, $grupo_id_debug]);
         $total_class = $stmt_check_class ? (int)$stmt_check_class->fetch()['total'] : 0;
-        error_log("DEBUG FINAL - Classificações criadas para $nome_grupo (ID: $grupo_id_debug): $total_class registros");
         
         // Verificar times no grupo
         $sql_check_times = "SELECT COUNT(*) as total FROM torneio_grupo_times WHERE grupo_id = ?";
         $stmt_check_times = executeQuery($pdo, $sql_check_times, [$grupo_id_debug]);
         $total_times = $stmt_check_times ? (int)$stmt_check_times->fetch()['total'] : 0;
-        error_log("DEBUG FINAL - Times no grupo $nome_grupo (ID: $grupo_id_debug): $total_times times");
     }
     
     // DEBUG: Verificar todos os grupos da 2ª fase criados
     $sql_grupos_2fase_debug = "SELECT id, nome FROM torneio_grupos WHERE torneio_id = ? AND nome LIKE '2ª Fase%' ORDER BY ordem";
     $stmt_grupos_2fase_debug = executeQuery($pdo, $sql_grupos_2fase_debug, [$torneio_id]);
     $grupos_2fase_debug = $stmt_grupos_2fase_debug ? $stmt_grupos_2fase_debug->fetchAll(PDO::FETCH_ASSOC) : [];
-    error_log("DEBUG FINAL - Todos os grupos da 2ª fase no banco: " . json_encode($grupos_2fase_debug));
     
     // DEBUG: Verificar novamente os grupos antes de retornar sucesso
     $sql_verificar_final = "SELECT id, nome FROM torneio_grupos WHERE torneio_id = ? AND nome LIKE '2ª Fase%' ORDER BY ordem ASC";
     $stmt_verificar_final = executeQuery($pdo, $sql_verificar_final, [$torneio_id]);
     $grupos_verificados_final = $stmt_verificar_final ? $stmt_verificar_final->fetchAll(PDO::FETCH_ASSOC) : [];
-    error_log("DEBUG FINAL - Grupos verificados ANTES de retornar JSON: " . count($grupos_verificados_final));
     
     if (empty($grupos_verificados_final)) {
-        error_log("DEBUG FINAL - ERRO CRÍTICO: Nenhum grupo encontrado após commit! Algo deu errado.");
         echo json_encode([
             'success' => false,
             'message' => 'Erro: Os grupos foram criados mas não foram encontrados no banco de dados. Verifique os logs do servidor.',

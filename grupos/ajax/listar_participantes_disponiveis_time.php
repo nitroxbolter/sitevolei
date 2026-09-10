@@ -37,18 +37,33 @@ if (!$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
     exit();
 }
 
-// Buscar participantes do jogo que não estão neste time (ou estão em outros times)
+// Buscar somente participantes da lista principal; suplentes ficam fora dos times até o admin remover/promover alguém
+$max_participantes = (int)($jogo['max_participantes'] ?? 0);
+$participantes = [];
+
 $sql = "SELECT gjp.id AS participante_id, gjp.usuario_id, u.nome, u.foto_perfil
         FROM grupo_jogo_participantes gjp
         LEFT JOIN usuarios u ON u.id = gjp.usuario_id
         WHERE gjp.jogo_id = ?
-        AND gjp.id NOT IN (
-            SELECT participante_id FROM grupo_jogo_time_integrantes 
-            WHERE time_id = ?
-        )
-        ORDER BY u.nome";
-$stmt = executeQuery($pdo, $sql, [$jogo_id, $time_id]);
-$participantes = $stmt ? $stmt->fetchAll() : [];
+        ORDER BY gjp.data_inscricao ASC";
+$stmt = executeQuery($pdo, $sql, [$jogo_id]);
+$todos_participantes = $stmt ? $stmt->fetchAll() : [];
+
+if ($max_participantes > 0) {
+    $todos_participantes = array_slice($todos_participantes, 0, $max_participantes);
+}
+
+foreach ($todos_participantes as $participante) {
+    $sql = "SELECT id FROM grupo_jogo_time_integrantes WHERE participante_id = ? AND time_id = ?";
+    $stmt = executeQuery($pdo, $sql, [$participante['participante_id'], $time_id]);
+    if (!$stmt || !$stmt->fetch()) {
+        $participantes[] = $participante;
+    }
+}
+
+usort($participantes, function($a, $b) {
+    return strcasecmp((string)($a['nome'] ?? ''), (string)($b['nome'] ?? ''));
+});
 
 echo json_encode([
     'success' => true,

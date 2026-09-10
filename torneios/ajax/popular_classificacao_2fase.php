@@ -8,6 +8,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {

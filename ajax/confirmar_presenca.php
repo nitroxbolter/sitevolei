@@ -3,6 +3,10 @@ session_start();
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -15,55 +19,71 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-$jogo_id = (int)$_POST['jogo_id'];
-$status = sanitizar($_POST['status']);
-$usuario_id = $_SESSION['user_id'];
+$jogo_id = (int)($_POST['jogo_id'] ?? 0);
+$status = sanitizar($_POST['status'] ?? '');
+$usuario_id = (int)$_SESSION['user_id'];
 
-// Validar dados
-if (empty($jogo_id) || !in_array($status, ['Confirmado', 'Ausente'])) {
+if ($jogo_id <= 0 || !in_array($status, ['Confirmado', 'Ausente'], true)) {
     echo json_encode(['success' => false, 'message' => 'Dados inválidos']);
     exit();
 }
 
-// Verificar se o jogo existe e está aberto
-$sql = "SELECT * FROM jogos WHERE id = ? AND status = 'Aberto' AND data_jogo > NOW()";
-$stmt = executeQuery($pdo, $sql, [$jogo_id]);
-$jogo = $stmt ? $stmt->fetch() : false;
+try {
+    $pdo->beginTransaction();
 
-if (!$jogo) {
-    echo json_encode(['success' => false, 'message' => 'Jogo não encontrado ou não disponível']);
-    exit();
-}
+    $stmt = executeQuery($pdo, "SELECT * FROM jogos WHERE id = ? AND status = 'Aberto' AND data_jogo > NOW() FOR UPDATE", [$jogo_id]);
+    $jogo = $stmt ? $stmt->fetch() : false;
 
-// Verificar se o usuário pode participar (membro do grupo)
-$sql = "SELECT gm.id FROM grupo_membros gm 
-        JOIN grupos g ON gm.grupo_id = g.id 
-        WHERE gm.usuario_id = ? AND g.id = ? AND gm.ativo = 1";
-$stmt = executeQuery($pdo, $sql, [$usuario_id, $jogo['grupo_id']]);
-$membro = $stmt ? $stmt->fetch() : false;
+    if (!$jogo) {
+        $pdo->rollBack();
+        echo json_encode(['success' => false, 'message' => 'Jogo não encontrado ou não disponível']);
+        exit();
+    }
 
-if (!$membro) {
-    echo json_encode(['success' => false, 'message' => 'Você não é membro deste grupo']);
-    exit();
-}
+    if (!empty($jogo['grupo_id'])) {
+        $sql = "SELECT gm.id FROM grupo_membros gm WHERE gm.usuario_id = ? AND gm.grupo_id = ? AND gm.ativo = 1";
+        $stmt = executeQuery($pdo, $sql, [$usuario_id, (int)$jogo['grupo_id']]);
+        $membro = $stmt ? $stmt->fetch() : false;
 
-// Confirmar ou cancelar presença
-$sql = "INSERT INTO confirmacoes_presenca (jogo_id, usuario_id, status) 
-        VALUES (?, ?, ?) 
-        ON DUPLICATE KEY UPDATE status = ?";
-$result = executeQuery($pdo, $sql, [$jogo_id, $usuario_id, $status, $status]);
+        if (!$membro) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Você não é membro deste grupo']);
+            exit();
+        }
+    }
 
-if ($result) {
-    // Atualizar vagas disponíveis
-    $sql = "UPDATE jogos SET vagas_disponiveis = max_jogadores - (
-                SELECT COUNT(*) FROM confirmacoes_presenca 
-                WHERE jogo_id = ? AND status = 'Confirmado'
-            ) WHERE id = ?";
-    executeQuery($pdo, $sql, [$jogo_id, $jogo_id]);
-    
+    $stmtAtual = executeQuery($pdo, "SELECT status FROM confirmacoes_presenca WHERE jogo_id = ? AND usuario_id = ? FOR UPDATE", [$jogo_id, $usuario_id]);
+    $presencaAtual = $stmtAtual ? $stmtAtual->fetch() : false;
+
+    if ($status === 'Confirmado' && (!$presencaAtual || $presencaAtual['status'] !== 'Confirmado')) {
+        $stmtCount = executeQuery($pdo, "SELECT COUNT(*) AS total FROM confirmacoes_presenca WHERE jogo_id = ? AND status = 'Confirmado'", [$jogo_id]);
+        $confirmados = $stmtCount ? (int)($stmtCount->fetch()['total'] ?? 0) : 0;
+        if ($confirmados >= (int)$jogo['max_jogadores']) {
+            $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => 'Sem vagas disponíveis']);
+            exit();
+        }
+    }
+
+    $sql = "INSERT INTO confirmacoes_presenca (jogo_id, usuario_id, status)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE status = ?";
+    $result = executeQuery($pdo, $sql, [$jogo_id, $usuario_id, $status, $status]);
+
+    if (!$result) {
+        throw new Exception('Erro ao processar presença.');
+    }
+
+    recalcularVagasJogo($pdo, $jogo_id);
+    $pdo->commit();
+
     $mensagem = $status === 'Confirmado' ? 'Presença confirmada com sucesso!' : 'Presença cancelada com sucesso!';
     echo json_encode(['success' => true, 'message' => $mensagem]);
-} else {
+} catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    error_log('Erro ao confirmar presença: ' . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Erro ao processar solicitação']);
 }
 ?>

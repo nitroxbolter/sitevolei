@@ -20,15 +20,106 @@ function requestMobileLandscape() {
 }
 
 ["pointerdown", "touchstart", "click"].forEach((eventName) => {
-    window.addEventListener(eventName, requestMobileLandscape, { once: true, passive: true });
+    window.addEventListener(eventName, requestMobileLandscape, { once: true, passive: false });
 });
 
+function requestMobileFullscreenWhenPossible() {
+    requestMobileLandscape();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+    requestMobileFullscreenWhenPossible();
+    initAdminDebugLogModal();
+
     const fullscreenButton = document.getElementById("fullscreen-button");
     if (fullscreenButton) {
         fullscreenButton.addEventListener("click", () => requestFullscreenMode(true));
     }
 });
+
+window.addEventListener("load", requestMobileFullscreenWhenPossible, { once: true });
+
+function isDesktopDebugUiAllowed() {
+    const touchOnly = window.matchMedia("(hover: none) and (pointer: coarse)").matches || navigator.maxTouchPoints > 0;
+    return isAdminDebugEnabled() && !touchOnly;
+}
+
+function buildCurrentAdminDebugText() {
+    if (!isAdminDebugEnabled()) return 'Debug disponivel somente para admin.';
+
+    const parts = [];
+    if (adminDebugLogHistory.length) {
+        parts.push(adminDebugLogHistory.join('\n\n================ HISTORICO =================\n\n'));
+    }
+
+    if (rallyLog) {
+        const current = [...rallyLog.lines];
+        completedShotLogs.forEach((shot, index) => current.push(formatShotLog(shot, index + 1)));
+        if (activeShotLog) {
+            current.push(formatShotLog({ ...activeShotLog, result: activeShotLog.result || 'em andamento' }, completedShotLogs.length + 1));
+        }
+        current.push(`placar atual: jogador ${score.player} x ${score.opponent} adversario`);
+        current.push(`sets atuais: jogador ${score.playerSets} x ${score.opponentSets} adversario`);
+        current.push(`estado atual: ${state}`);
+        parts.push(current.join('\n'));
+    } else if (lastCompletedLogText && !adminDebugLogHistory.length) {
+        parts.push(lastCompletedLogText);
+    }
+
+    if (lastDebugSavePath) parts.push(`ultimo arquivo salvo: ${lastDebugSavePath}`);
+    return parts.length ? parts.join('\n\n') : 'Nenhum log iniciado ainda. Inicie um saque para começar o debug.';
+}
+
+function updateAdminDebugLogModal() {
+    const content = document.getElementById('debug-log-content');
+    if (!content) return;
+    content.textContent = buildCurrentAdminDebugText();
+}
+
+function clearAdminDebugLogModal() {
+    adminDebugLogHistory = [];
+    rallyLog = null;
+    activeShotLog = null;
+    completedShotLogs = [];
+    lastCompletedLogText = '';
+    lastCompletedLogName = 'volei-log-ultimo.txt';
+    lastDebugSavePath = '';
+    try {
+        localStorage.removeItem('ultimoLogVolei');
+    } catch (_err) {}
+    updateAdminDebugLogModal();
+}
+
+function initAdminDebugLogModal() {
+    if (!isDesktopDebugUiAllowed()) return;
+    const modal = document.getElementById('debug-log-modal');
+    const openButton = document.getElementById('debug-log-button');
+    const closeButton = document.getElementById('debug-log-close');
+    const clearButton = document.getElementById('debug-log-clear');
+    const refreshButton = document.getElementById('debug-log-refresh');
+    if (!modal || !openButton) return;
+
+    const openModal = () => {
+        updateAdminDebugLogModal();
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+    };
+    const closeModal = () => {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+    };
+
+    openButton.addEventListener('click', openModal);
+    if (closeButton) closeButton.addEventListener('click', closeModal);
+    if (refreshButton) refreshButton.addEventListener('click', updateAdminDebugLogModal);
+    if (clearButton) clearButton.addEventListener('click', clearAdminDebugLogModal);
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeModal();
+    });
+    window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
+    });
+}
 
 const config = {
     type: Phaser.AUTO,
@@ -85,8 +176,8 @@ const PLAYER = {
     // Se a bola/régua estiverem "saindo das costas", aumente `headOffsetY` e/ou `ballAboveHead`.
     headOffsetY: 92,
     ballAboveHead: 26,
-    speedX: 330,
-    speedY: 250,
+    speedX: 250,
+    speedY: 185,
     serveSpeedY: 210
 };
 
@@ -107,7 +198,7 @@ const BALL = {
     gravityZFlightPreNet: -260,
     gravityZFlightPostNet: -340,
     tossTargetZ: 130,
-    hitWindowZ: 100,
+    hitWindowZ: 118,
     hitMinZ: 20,
     serveSideVelocity: 140
 };
@@ -260,7 +351,9 @@ let score = { player: 0, opponent: 0, playerSets: 0, opponentSets: 0 };
 let playerPoseEvent;
 let liftChargeStart = 0;
 let hitPowerRatio = 0;
+let queuedServeHitAt = 0;
 let lastPlayerAttackPower = 0;
+let lastPlayerShotKind = 'ATTACK';
 let opponentReceiveAttemptedForPlayerHit = false;
 let lastAttack = '---';
 let opponentBack;
@@ -298,6 +391,12 @@ let completedShotLogs = [];
 let lastCompletedLogText = '';
 let lastCompletedLogName = 'volei-log-ultimo.txt';
 let lastLogSaveError = '';
+let lastDebugSavePath = '';
+let adminDebugLogHistory = [];
+
+function isAdminDebugEnabled() {
+    return Boolean(window.VOLEI_DEBUG_ADMIN);
+}
 
 function preload() {
     this.load.on('loaderror', (file) => {
@@ -712,6 +811,7 @@ function handleServeInput(scene) {
             const targetZ = 125;
 
             state = 'TOSS';
+            queuedServeHitAt = 0;
             ballZ = 0;
             ballVZ = Math.sqrt(2 * Math.abs(BALL.gravityZToss) * targetZ) * LIFT_CHARGE.vzScale;
             liftChargeStart = 0;
@@ -726,6 +826,15 @@ function handleServeInput(scene) {
     if (state === 'TOSS' && ballVZ < 0 && ballZ <= BALL.hitWindowZ) {
         state = 'HIT_WINDOW';
         ball.setTint(0xff2626);
+
+        const queuedAge = scene.time.now - queuedServeHitAt;
+        if (queuedServeHitAt > 0 && queuedAge <= 180 && (isJumping || playerZ > 8)) {
+            queuedServeHitAt = 0;
+            const q = getAttackQuality(ballZ, BALL.hitWindowZ);
+            performServeHitInstant(scene, q);
+            return;
+        }
+        queuedServeHitAt = 0;
     }
 
     // Pulo do Jogador
@@ -821,11 +930,21 @@ function handleAirAttack(scene) {
         }
     });
 
-    if (distToBall < 60 && ballZ > 40) {
-        performRallyHit(scene);
-    } else if (state === 'HIT_WINDOW') {
+    if (state === 'HIT_WINDOW') {
         const q = getAttackQuality(ballZ, BALL.hitWindowZ);
         performServeHitInstant(scene, q);
+        return;
+    }
+
+    if (state === 'TOSS') {
+        const canQueueServe = ballVZ < 0 && ballZ <= BALL.hitWindowZ + 24 && (isJumping || playerZ > 8);
+        queuedServeHitAt = canQueueServe ? scene.time.now : 0;
+        showStatusMessage(scene, canQueueServe ? 'SAQUE ARMADO' : 'PULA PARA SACAR', 650);
+        return;
+    }
+
+    if (distToBall < 60 && ballZ > 40) {
+        performRallyHit(scene);
     }
 }
 
@@ -839,6 +958,58 @@ function handleGroundReceive(scene) {
             receiver.setTexture('playerBack');
         }
     });
+}
+
+function performPlayerFreeball(scene, receiver) {
+    state = 'FLYING';
+    gamePhase = 'RALLY';
+    lastTouch = 'PLAYER_HIT';
+    lastPlayerShotKind = 'ATTACK';
+    lastPlayerAttackPower = 0.02;
+    opponentReceiveAttemptedForPlayerHit = false;
+
+    ballBody.x = receiver.x;
+    ballBody.y = receiver.y - 18;
+    ballZ = Math.max(ballZ, 55);
+    ballVZ = 190;
+
+    const flightTime = 1.85;
+    const targetX = Phaser.Math.Clamp(receiver.x + Phaser.Math.Between(-70, 70), COURT.minX + 70, COURT.maxX - 70);
+    const targetY = NET.y - Phaser.Math.Between(105, 165);
+    const vx = (targetX - ballBody.x) / flightTime;
+    const vy = (targetY - ballBody.y) / flightTime;
+    ballBody.setVelocity(
+        Phaser.Math.Clamp(vx, -PHYS_CLAMP.maxVX, PHYS_CLAMP.maxVX),
+        Phaser.Math.Clamp(vy, -PHYS_CLAMP.maxVY, PHYS_CLAMP.maxVY)
+    );
+
+    beginShotLog('MANCHETE 3 TOQUE', 'JOGADOR', {
+        force: lastPlayerAttackPower.toFixed(2),
+        quality: controlledRole
+    });
+    setShotCalculations({
+        'modelo': 'bola de graca lenta no terceiro toque',
+        'origem': `x ${Math.round(ballBody.x)} y ${Math.round(ballBody.y)} z ${Math.round(ballZ)}`,
+        'alvo': `x ${Math.round(targetX)} y ${Math.round(targetY)}`,
+        'tempo voo': `${flightTime.toFixed(3)}s`,
+        'velocidade aplicada': `vx ${Math.round(ballBody.body.velocity.x)} vy ${Math.round(ballBody.body.velocity.y)} vz ${Math.round(ballVZ)}`
+    });
+    setShotVelocity(ballBody.body.velocity.x, ballBody.body.velocity.y, ballVZ);
+
+    playerHitPoseUntil = scene.time.now + 420;
+    scene.time.delayedCall(520, () => {
+        if (receiver.texture && receiver.texture.key === 'playerMachete') {
+            receiver.setTexture('playerBack');
+        }
+        playerHitPoseUntil = 0;
+        if (state === 'FLYING' && lastTouch === 'PLAYER_HIT') {
+            setControlledRole('RECEPTOR');
+        }
+    });
+
+    trail.start();
+    scene.cameras.main.shake(80, 0.003);
+    addHitEffect(scene, { shake: 0.002 });
 }
 
 function updateBallPhysics(scene) {
@@ -921,11 +1092,18 @@ function updateBallPhysics(scene) {
             (bolaVindoParaAdversario || lastTouch === 'OPP_PASS' || lastTouch === 'OPP_SET');
         const depthNow = ballBody.y - NET.y; // 0 na rede; negativo no lado adversário
         const firstOpponentTouch = canOpponentPlayBall && bolaVindoParaAdversario && lastTouch !== 'OPP_PASS' && lastTouch !== 'OPP_SET';
-        const activeReceiver = firstOpponentTouch ? getOpponentReceiverForBall() : null;
+        if (firstOpponentTouch && canOpponentSetterTakeLowServe()) {
+            opponentSetterTakeLowServe(scene);
+            return;
+        }
+
+        const opponentShouldLetOut = firstOpponentTouch && shouldOpponentLetPlayerShotOut();
+        const activeReceiver = firstOpponentTouch && !opponentShouldLetOut ? getOpponentReceiverForBall() : null;
         if (firstOpponentTouch) {
-            moveOrReturnOpponentReceiver(opponentBack, OPPONENT_AI.backHome, activeReceiver === opponentBack, 0.12);
-            moveOrReturnOpponentReceiver(oppLeft, OPPONENT_AI.leftHome, activeReceiver === oppLeft, 0.1);
-            moveOrReturnOpponentReceiver(oppRight, OPPONENT_AI.rightHome, activeReceiver === oppRight, 0.1);
+            const receiverTrackSpeed = lastPlayerShotKind === 'SERVE' ? 0.22 : 0.12;
+            moveOrReturnOpponentReceiver(opponentBack, OPPONENT_AI.backHome, activeReceiver === opponentBack, receiverTrackSpeed);
+            moveOrReturnOpponentReceiver(oppLeft, OPPONENT_AI.leftHome, activeReceiver === oppLeft, receiverTrackSpeed);
+            moveOrReturnOpponentReceiver(oppRight, OPPONENT_AI.rightHome, activeReceiver === oppRight, receiverTrackSpeed);
         } else {
             returnOpponentToHome(opponentBack, OPPONENT_AI.backHome, 0.04);
             returnOpponentToHome(oppLeft, OPPONENT_AI.leftHome, 0.04);
@@ -937,11 +1115,15 @@ function updateBallPhysics(scene) {
             { sprite: oppLeft, home: OPPONENT_AI.leftHome },
             { sprite: oppRight, home: OPPONENT_AI.rightHome }
         ];
-        for (const item of receivers) {
-            if (firstOpponentTouch && activeReceiver === item.sprite && canOpponentReceive(item.sprite, item.home)) {
-                if (!tryOpponentReceivePlayerAttack(scene, item.sprite)) return;
-                opponentPassToSetter(scene, item.sprite);
-                return;
+        if (opponentShouldLetOut) {
+            markOpponentLetOutPrediction();
+        } else {
+            for (const item of receivers) {
+                if (firstOpponentTouch && activeReceiver === item.sprite && canOpponentReceive(item.sprite, item.home)) {
+                    if (!tryOpponentReceivePlayerAttack(scene, item.sprite)) return;
+                    opponentPassToSetter(scene, item.sprite);
+                    return;
+                }
             }
         }
 
@@ -1027,6 +1209,11 @@ function updateBallPhysics(scene) {
                     // ignore
                 } else {
                     lastPlayerPassMs = scene.time.now;
+                    if (lastTouch === 'PLAYER_SET') {
+                        performPlayerFreeball(scene, p);
+                        return;
+                    }
+
                     lastTouch = 'PLAYER_PASS';
                     lastContactMark = { x: ballBody.x, y: ballBody.y, t: scene.time.now };
                     // Força a bola a ir para o levantador (sem "quicar" no chão)
@@ -1100,6 +1287,9 @@ function updateBallPhysics(scene) {
             if (isNetFaultByClosestCrossing()) {
                 finishShotLog('bateu na rede');
                 awardPoint(scene, getPointWinnerAfterLastTouchFault(), 'net');
+            } else if (isPlayerAttackOutOnOpponentCourt()) {
+                finishShotLog('fora da quadra');
+                awardPoint(scene, false, 'out');
             } else {
                 finishShotLog('tocou no chao');
                 finishRally(scene);
@@ -1324,7 +1514,41 @@ function isNetFaultByClosestCrossing() {
     return closestNetCrossing.z < NET.heightZ;
 }
 
+function formatCourtDebugTable() {
+    const quadrants = [
+        ['ADVERSARIO_ESQUERDA', COURT.minX, COURT.centerX, OPPONENT_COURT.minY, OPPONENT_AI.zoneSplitY],
+        ['ADVERSARIO_DIREITA', COURT.centerX, COURT.maxX, OPPONENT_COURT.minY, OPPONENT_AI.zoneSplitY],
+        ['JOGADOR_ESQUERDA', COURT.minX, COURT.centerX, NET.y, COURT.maxY],
+        ['JOGADOR_DIREITA', COURT.centerX, COURT.maxX, NET.y, COURT.maxY]
+    ];
+    return [
+        '| item | valor |',
+        '| --- | --- |',
+        `| canvas | ${COURT.width} x ${COURT.height} px |`,
+        `| largura jogavel X | ${COURT.minX} ate ${COURT.maxX} (${COURT.maxX - COURT.minX}px) |`,
+        `| distancia total Y | ${OPPONENT_COURT.minY} ate ${COURT.maxY} (${COURT.maxY - OPPONENT_COURT.minY}px) |`,
+        `| centro X | ${COURT.centerX} |`,
+        `| rede Y | ${NET.y} |`,
+        `| altura da rede Z | ${NET.heightZ} |`,
+        `| escala Z | ${BALL.zToPixels} px por Z |`,
+        `| lado adversario | Y ${OPPONENT_COURT.minY} ate ${OPPONENT_COURT.maxY} |`,
+        `| lado jogador | Y ${NET.y} ate ${COURT.maxY} |`,
+        '',
+        '| quadrante | X tela | Y tela | X quadra | Y profundidade |',
+        '| --- | --- | --- | --- | --- |',
+        ...quadrants.map(([name, minX, maxX, minY, maxY]) => `| ${name} | ${minX} ate ${maxX} | ${minY} ate ${maxY} | ${screenXToWidth(minX)} ate ${screenXToWidth(maxX)} | ${screenYToDepth(minY)} ate ${screenYToDepth(maxY)} |`),
+        ''
+    ];
+}
+
 function startRallyLog(server) {
+    if (!isAdminDebugEnabled()) {
+        rallyLog = null;
+        completedShotLogs = [];
+        activeShotLog = null;
+        return;
+    }
+
     rallyLogIndex += 1;
     completedShotLogs = [];
     activeShotLog = null;
@@ -1333,26 +1557,19 @@ function startRallyLog(server) {
         server,
         startedAt: new Date().toISOString(),
         lines: [
-            `LOG VOLEI #${rallyLogIndex}`,
-            `inicio: ${new Date().toLocaleString('pt-BR')}`,
+            `LOG DEBUG VOLEI #${rallyLogIndex}`,
+            `inicio do jogo: ${new Date().toLocaleString('pt-BR')}`,
             `status: SAQUE`,
             `sacador: ${server}`,
             '',
-            'DIMENSOES DA QUADRA',
-            `canvas: ${COURT.width} x ${COURT.height} px`,
-            `centroX: ${COURT.centerX}`,
-            `limiteX: ${COURT.minX} ate ${COURT.maxX}`,
-            `redeY: ${NET.y}`,
-            `lado jogador Y: ${NET.y} ate ${COURT.maxY}`,
-            `lado adversario Y aproximado: ${OPPONENT_COURT.minY} ate ${OPPONENT_COURT.maxY}`,
-            `altura da rede Z: ${NET.heightZ}`,
-            `escala Z para pixels: ${BALL.zToPixels}`,
-            ''
+            'TABELA DA QUADRA',
+            ...formatCourtDebugTable()
         ]
     };
 }
-
 function beginShotLog(type, actor, details = {}) {
+    if (!isAdminDebugEnabled()) return;
+    if (activeShotLog) finishShotLog(`encerrado ao iniciar ${type}`);
     activeShotLog = {
         type,
         actor,
@@ -1362,12 +1579,14 @@ function beginShotLog(type, actor, details = {}) {
             screenY: Math.round(ballBody.y),
             widthX: screenXToWidth(ballBody.x),
             depthY: screenYToDepth(ballBody.y),
-            z: Math.round(ballZ)
+            z: Math.round(ballZ),
+            playerZ: Math.round(playerZ || 0)
         },
         velocity: null,
         calculations: null,
         net: null,
         landing: null,
+        receive: null,
         result: null
     };
 }
@@ -1397,6 +1616,31 @@ function recordShotNet(zAtNet, cleared) {
     };
 }
 
+function ensureShotNetFromCurrentTrajectory(source = 'calculo') {
+    if (!activeShotLog || !ballBody?.body) return;
+    if (activeShotLog.net && activeShotLog.net.z !== undefined) return;
+
+    const vy = ballBody.body.velocity.y;
+    if (Math.abs(vy) < 1) return;
+
+    const tToNet = (NET.y - ballBody.y) / vy;
+    if (!Number.isFinite(tToNet) || tToNet < 0) return;
+
+    const gravity = getGravityZForState();
+    const zAtNet = ballZ + ballVZ * tToNet + 0.5 * gravity * tToNet * tToNet;
+    const xAtNet = ballBody.x + ballBody.body.velocity.x * tToNet;
+    activeShotLog.net = {
+        z: Math.round(zAtNet),
+        netHeightZ: NET.heightZ,
+        aboveNetZ: Math.round(zAtNet - NET.heightZ),
+        cleared: zAtNet >= NET.heightZ,
+        x: Math.round(xAtNet),
+        widthX: screenXToWidth(xAtNet),
+        time: `${tToNet.toFixed(3)}s`,
+        source
+    };
+}
+
 function recordShotLanding() {
     if (!activeShotLog) return;
     activeShotLog.landing = {
@@ -1408,8 +1652,28 @@ function recordShotLanding() {
     };
 }
 
+function recordOpponentReceiveDebug(receiver, action, details = {}) {
+    if (!activeShotLog || !receiver || !ballBody) return;
+    const dist = Phaser.Math.Distance.Between(ballBody.x, ballBody.y, receiver.x, receiver.y);
+    activeShotLog.receive = {
+        action,
+        receiverX: Math.round(receiver.x),
+        receiverY: Math.round(receiver.y),
+        receiverWidthX: screenXToWidth(receiver.x),
+        receiverDepthY: screenYToDepth(receiver.y),
+        ballX: Math.round(ballBody.x),
+        ballY: Math.round(ballBody.y),
+        ballWidthX: screenXToWidth(ballBody.x),
+        ballDepthY: screenYToDepth(ballBody.y),
+        ballZ: Math.round(ballZ),
+        distance: Math.round(dist),
+        ...details
+    };
+}
+
 function finishShotLog(result = '') {
     if (!activeShotLog) return;
+    ensureShotNetFromCurrentTrajectory('fim da jogada');
     activeShotLog.result = result;
     completedShotLogs.push(activeShotLog);
     activeShotLog = null;
@@ -1420,6 +1684,7 @@ function formatShotLog(shot, index) {
     const v = shot.velocity || {};
     const n = shot.net || {};
     const l = shot.landing || {};
+    const r = shot.receive || {};
     const c = shot.calculations || {};
     const calculationLines = Object.keys(c).length
         ? [
@@ -1435,13 +1700,20 @@ function formatShotLog(shot, index) {
         `forca: ${d.force ?? '---'}`,
         `qualidade: ${d.quality ?? '---'}`,
         `altura toque bola Z: ${shot.touch.z}`,
+        `altura player ao bater Z: ${shot.touch.playerZ ?? '---'}`,
         `ponto toque: X ${shot.touch.widthX} | Y ${shot.touch.depthY} (screen ${shot.touch.screenX}, ${shot.touch.screenY})`,
         `velocidade: vx ${v.vx ?? '---'} | vy ${v.vy ?? '---'} | vz ${v.vz ?? '---'} | total ${v.speed ?? '---'}`,
-        `altura na rede Z: ${n.z ?? '---'}`,
+        `cruzamento rede: X ${n.widthX ?? '---'} | Y 0 | Z ${n.z ?? '---'} (screen ${n.x ?? '---'}, ${NET.y})`,
+        `tempo ate rede real: ${n.time ?? '---'} | origem rede: ${n.source ?? '---'}`,
         `altura da rede Z: ${n.netHeightZ ?? NET.heightZ}`,
         `folga acima da rede Z: ${n.aboveNetZ ?? '---'}`,
         `passou da rede: ${n.cleared === undefined ? '---' : n.cleared ? 'SIM' : 'NAO'}`,
         `toque no chao: X ${l.widthX ?? '---'} | Y ${l.depthY ?? '---'} | lado ${l.side ?? '---'} (screen ${l.screenX ?? '---'}, ${l.screenY ?? '---'})`,
+        `manchete adversaria: ${r.action ?? '---'}`,
+        `ponto manchete: X ${r.ballWidthX ?? '---'} | Y ${r.ballDepthY ?? '---'} | Z ${r.ballZ ?? '---'} (screen ${r.ballX ?? '---'}, ${r.ballY ?? '---'})`,
+        `distancia bola-adversario na manchete: ${r.distance ?? '---'}`,
+        `receptor adversario: X ${r.receiverWidthX ?? '---'} | Y ${r.receiverDepthY ?? '---'} (screen ${r.receiverX ?? '---'}, ${r.receiverY ?? '---'})`,
+        `raio recepcao: ${r.receiveRadius ?? '---'} | chance: ${r.successChance ?? '---'} | resultado recepcao: ${r.receiveResult ?? '---'}`,
         `resultado: ${shot.result || '---'}`,
         ''
     ].join('\n');
@@ -1456,10 +1728,13 @@ async function finalizeAndDownloadRallyLog(pointWinner) {
     lines.push(`vencedor do ponto: ${pointWinner}`);
     lines.push(`placar: jogador ${score.player} x ${score.opponent} adversario`);
     lines.push(`sets: jogador ${score.playerSets} x ${score.opponentSets} adversario`);
-    lines.push(`fim: ${new Date().toLocaleString('pt-BR')}`);
+    lines.push(`fim do jogo: ${new Date().toLocaleString('pt-BR')}`);
 
     const text = lines.join('\n');
     lastCompletedLogText = text;
+    adminDebugLogHistory.push(text);
+    if (adminDebugLogHistory.length > 30) adminDebugLogHistory.shift();
+    updateAdminDebugLogModal();
     lastCompletedLogName = `volei-log-${String(rallyLog.id).padStart(3, '0')}.txt`;
     try {
         localStorage.setItem('ultimoLogVolei', text);
@@ -1467,18 +1742,19 @@ async function finalizeAndDownloadRallyLog(pointWinner) {
         // LocalStorage can be disabled for file URLs in some browsers.
     }
 
-    await saveLogToServer(lastCompletedLogName, text);
+    await saveDebugLogToServer(lastCompletedLogName, text);
 }
 
-async function saveLogToServer(filename, text) {
+async function saveDebugLogToServer(filename, text) {
     lastLogSaveError = '';
+    if (!isAdminDebugEnabled()) return false;
     if (window.location.protocol === 'file:') {
         lastLogSaveError = 'abra pelo Browser em http://127.0.0.1:8080/';
         return false;
     }
 
     try {
-        const response = await fetch('save_log.php', {
+        const response = await fetch('save_debug_log.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filename, text })
@@ -1487,10 +1763,38 @@ async function saveLogToServer(filename, text) {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const result = await response.json();
         if (!result.ok) throw new Error(result.error || 'falha ao salvar');
+        lastDebugSavePath = result.file || '';
         return true;
     } catch (err) {
         lastLogSaveError = err && err.message ? err.message : String(err);
         console.warn('Nao foi possivel salvar log.txt automaticamente:', lastLogSaveError);
+        return false;
+    }
+}
+
+async function saveVictoryToServer(pointResult) {
+    if (!pointResult || pointResult.matchWinner !== 'PLAYER') return false;
+    if (window.location.protocol === 'file:') return false;
+
+    try {
+        const response = await fetch('save_victory.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                winner: pointResult.matchWinner,
+                playerSets: score.playerSets,
+                opponentSets: score.opponentSets,
+                targetSets: MATCH.setsToWinMatch,
+                currentSetTargetPoints: getCurrentSetTargetPoints()
+            })
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const result = await response.json();
+        if (!result.ok) throw new Error(result.error || 'falha ao salvar vitoria');
+        return true;
+    } catch (err) {
+        console.warn('Nao foi possivel salvar a pontuacao da vitoria:', err && err.message ? err.message : String(err));
         return false;
     }
 }
@@ -1539,6 +1843,46 @@ function returnOpponentToHome(sprite, home, speed) {
     sprite.y += (home.y - sprite.y) * speed;
 }
 
+function canOpponentSetterTakeLowServe() {
+    if (lastPlayerShotKind !== 'SERVE') return false;
+    if (!ballBody?.body) return false;
+    if (ballBody.body.velocity.y >= 0) return false;
+
+    const lowServeMinZ = NET.heightZ + 1;
+    const lowServeMaxZ = NET.heightZ + 18;
+    const nearNetMinY = NET.y - 44;
+    const nearNetMaxY = NET.y + 10;
+
+    return (
+        ballZ >= lowServeMinZ &&
+        ballZ <= lowServeMaxZ &&
+        ballBody.y >= nearNetMinY &&
+        ballBody.y <= nearNetMaxY &&
+        Math.abs(ballBody.x - opponentFront.x) <= OPPONENT_AI.setRadius + 34
+    );
+}
+
+function opponentSetterTakeLowServe(scene) {
+    opponentReceiveAttemptedForPlayerHit = true;
+    lastTouch = 'OPP_PASS';
+    ballBody.x = opponentFront.x;
+    ballBody.y = opponentFront.y;
+    ballZ = Math.max(ballZ, NET.heightZ + 8);
+    ballBody.setVelocity(0);
+
+    setShotCalculations({
+        ...(activeShotLog?.calculations || {}),
+        'decisao defesa IA': 'levantador pegou saque baixo',
+        'faixa saque baixo': `${NET.heightZ + 1} ate ${NET.heightZ + 18}`,
+        'altura contato levantador': Math.round(ballZ)
+    });
+
+    opponentFront.setTexture('oppLevantador');
+    scene.time.delayedCall(180, () => opponentSetToAttacker(scene));
+    scene.cameras.main.shake(70, 0.003);
+    addHitEffect(scene, { shake: 0.002 });
+}
+
 function getOpponentReceiverForBall() {
     if (!ballBody) return null;
     if (isBallInOpponentZone(OPPONENT_AI.backHome.zone)) return opponentBack;
@@ -1557,6 +1901,50 @@ function isBallInOpponentZone(zone) {
     );
 }
 
+function getPredictedLandingPoint() {
+    if (!ballBody?.body) return null;
+
+    const tToGround = estimateTimeToGround(ballZ, ballVZ, getGravityZForState());
+    if (!Number.isFinite(tToGround) || tToGround <= 0) return null;
+
+    return {
+        x: ballBody.x + ballBody.body.velocity.x * tToGround,
+        y: ballBody.y + ballBody.body.velocity.y * tToGround
+    };
+}
+
+function isLandingInsideOpponentCourt(point, margin = 0) {
+    if (!point) return true;
+
+    return (
+        point.x >= COURT.minX - margin &&
+        point.x <= COURT.maxX + margin &&
+        point.y >= OPPONENT_COURT.minY - margin &&
+        point.y <= OPPONENT_COURT.maxY + margin
+    );
+}
+
+function shouldOpponentLetPlayerShotOut() {
+    if (lastTouch !== 'PLAYER_HIT') return false;
+
+    const landing = getPredictedLandingPoint();
+    if (!landing) return false;
+
+    return !isLandingInsideOpponentCourt(landing, 8);
+}
+
+function markOpponentLetOutPrediction() {
+    const landing = getPredictedLandingPoint();
+    if (!landing) return;
+
+    setShotCalculations({
+        ...(activeShotLog?.calculations || {}),
+        'decisao defesa IA': 'deixou sair',
+        'previsao queda IA': `x ${Math.round(landing.x)} y ${Math.round(landing.y)}`,
+        'limites quadra adversaria': `${OPPONENT_COURT.minY} ate ${OPPONENT_COURT.maxY}`
+    });
+}
+
 function canOpponentReceive(sprite, home) {
     if (!sprite || !ballBody) return false;
     const insideRange =
@@ -1565,8 +1953,10 @@ function canOpponentReceive(sprite, home) {
         ballBody.y >= home.y - home.rangeY &&
         ballBody.y <= home.y + home.rangeY;
     const insideZone = isBallInOpponentZone(home.zone);
-    const closeEnough = Phaser.Math.Distance.Between(ballBody.x, ballBody.y, sprite.x, sprite.y) < OPPONENT_AI.receiveRadius;
-    return insideZone && insideRange && closeEnough && ballZ < 130 && ballZ > 8;
+    const receiveRadius = lastPlayerShotKind === 'SERVE' ? OPPONENT_AI.receiveRadius + 18 : OPPONENT_AI.receiveRadius;
+    const maxReceiveZ = lastPlayerShotKind === 'SERVE' ? 145 : 130;
+    const closeEnough = Phaser.Math.Distance.Between(ballBody.x, ballBody.y, sprite.x, sprite.y) < receiveRadius;
+    return insideZone && insideRange && closeEnough && ballZ < maxReceiveZ && ballZ > 8;
 }
 
 function tryOpponentReceivePlayerAttack(scene, receiver) {
@@ -1574,26 +1964,51 @@ function tryOpponentReceivePlayerAttack(scene, receiver) {
     if (opponentReceiveAttemptedForPlayerHit) return false;
 
     opponentReceiveAttemptedForPlayerHit = true;
+    const isServeReceive = lastPlayerShotKind === 'SERVE';
+    if (isServeReceive) {
+        receiver.x += (ballBody.x - receiver.x) * 0.45;
+        receiver.y += (ballBody.y - receiver.y) * 0.35;
+    }
+
     const dist = Phaser.Math.Distance.Between(ballBody.x, ballBody.y, receiver.x, receiver.y);
-    const distanceRatio = Phaser.Math.Clamp(dist / OPPONENT_AI.receiveRadius, 0, 1);
-    const successChance = Phaser.Math.Clamp(
-        OPPONENT_AI.receiveSuccessBase -
-        (lastPlayerAttackPower * OPPONENT_AI.receiveStrongAttackPenalty) -
-        (distanceRatio * OPPONENT_AI.receiveDistancePenalty),
-        0.4,
-        0.9
+    const receiveRadius = isServeReceive ? OPPONENT_AI.receiveRadius + 18 : OPPONENT_AI.receiveRadius;
+    const distanceRatio = Phaser.Math.Clamp(dist / receiveRadius, 0, 1);
+    const baseChance = isServeReceive ? 0.98 : 0.62;
+    const powerPenalty = isServeReceive ? 0.12 : 0.38;
+    const distancePenalty = isServeReceive ? 0.04 : 0.18;
+    const minChance = isServeReceive ? 0.82 : 0.25;
+    const maxChance = isServeReceive ? 0.99 : 0.78;
+    let successChance = Phaser.Math.Clamp(
+        baseChance -
+        (lastPlayerAttackPower * powerPenalty) -
+        (distanceRatio * distancePenalty),
+        minChance,
+        maxChance
     );
+    if (isServeReceive && dist <= 28 && ballZ <= 145) {
+        successChance = Math.max(successChance, 0.97);
+    }
 
     setShotCalculations({
         ...(activeShotLog?.calculations || {}),
         'chance defesa IA': `${Math.round(successChance * 100)}%`,
+        'tipo ataque jogador': lastPlayerShotKind,
         'forca ataque jogador': lastPlayerAttackPower.toFixed(2),
         'distancia defesa IA': Math.round(dist)
     });
 
-    if (Math.random() <= successChance) return true;
+    if (Math.random() <= successChance) {
+        recordOpponentReceiveDebug(receiver, 'MACHETE', {
+            receiveRadius: Math.round(receiveRadius),
+            successChance: `${Math.round(successChance * 100)}%`,
+            receiveResult: 'recebida e levantada'
+        });
+        finishShotLog(isServeReceive ? 'saque recebido pela IA' : 'ataque recebido pela IA');
+        return true;
+    }
 
-    const missedOut = Math.random() < 0.45;
+    const missedOutChance = isServeReceive ? 0.08 : 0.35;
+    const missedOut = Math.random() < missedOutChance;
     receiver.setTexture('oppMachete');
     scene.time.delayedCall(500, () => {
         if (receiver.texture && receiver.texture.key === 'oppMachete') receiver.setTexture('oppParado');
@@ -1601,21 +2016,54 @@ function tryOpponentReceivePlayerAttack(scene, receiver) {
     scene.cameras.main.shake(150, 0.01);
     addHitEffect(scene, { shake: 0.009 });
 
+    lastTouch = 'OPP_PASS';
+    ballBody.x = receiver.x;
+    ballBody.y = receiver.y;
+
     if (missedOut) {
-        lastTouch = 'OPP_PASS';
-        ballBody.x = receiver.x;
-        ballBody.y = receiver.y;
-        ballVZ = 120;
+        recordOpponentReceiveDebug(receiver, 'MACHETE', {
+            receiveRadius: Math.round(receiveRadius),
+            successChance: `${Math.round(successChance * 100)}%`,
+            receiveResult: 'bateu nos bracos e saiu'
+        });
+        ballVZ = isServeReceive ? 105 : 120;
         const side = receiver.x < COURT.centerX ? -1 : 1;
-        ballBody.setVelocity(side * 360, -260);
-        finishShotLog('defesa adversaria para fora');
+        ballBody.setVelocity(side * 300, isServeReceive ? -180 : -260);
+        finishShotLog(isServeReceive ? 'recepcao de saque para fora' : 'defesa adversaria para fora');
         return false;
     }
 
+    if (isServeReceive) {
+        recordOpponentReceiveDebug(receiver, 'MACHETE', {
+            receiveRadius: Math.round(receiveRadius),
+            successChance: `${Math.round(successChance * 100)}%`,
+            receiveResult: 'recepcao ruim para o levantador'
+        });
+        ballZ = Math.max(ballZ, 28);
+        ballVZ = 220;
+        const flightTime = 0.95;
+        const vx = (opponentFront.x - ballBody.x) / flightTime;
+        const vy = (opponentFront.y - ballBody.y) / flightTime;
+        ballBody.setVelocity(vx, vy);
+        finishShotLog('recepcao de saque ruim');
+        return false;
+    }
+
+    recordOpponentReceiveDebug(receiver, 'MACHETE', {
+        receiveRadius: Math.round(receiveRadius),
+        successChance: `${Math.round(successChance * 100)}%`,
+        receiveResult: 'falhou na defesa do ataque'
+    });
+    finishShotLog('defesa adversaria falhou');
     return false;
 }
 
 function opponentPassToSetter(scene, receiver) {
+    recordOpponentReceiveDebug(receiver, 'MACHETE', {
+        receiveRadius: Math.round(OPPONENT_AI.receiveRadius),
+        successChance: '100%',
+        receiveResult: 'passe para o levantador'
+    });
     lastTouch = 'OPP_PASS';
     const targetX = opponentFront.x;
     const targetY = opponentFront.y;
@@ -1759,6 +2207,19 @@ function performOpponentAttack(scene, attacker) {
     addHitEffect(scene, { shake: 0.01 });
 }
 
+function isPlayerAttackOutOnOpponentCourt() {
+    if (lastTouch !== 'PLAYER_HIT') return false;
+    if (!ballBody) return false;
+
+    const marginX = 10;
+    return (
+        ballBody.y < OPPONENT_COURT.minY ||
+        ballBody.y > OPPONENT_COURT.maxY ||
+        ballBody.x < COURT.minX - marginX ||
+        ballBody.x > COURT.maxX + marginX
+    );
+}
+
 function finishRally(scene) {
     awardPoint(scene, ballBody.y < NET.y);
 }
@@ -1771,12 +2232,15 @@ function awardPoint(scene, playerScored, reason = 'point') {
     state = 'POINT';
     const pointResult = addPoint(playerScored);
     finalizeAndDownloadRallyLog(playerScored ? 'PLAYER' : 'OPPONENT');
+    if (pointResult.matchWinner === 'PLAYER') saveVictoryToServer(pointResult);
     if (pointResult.matchWinner) {
         showStatusMessage(scene, pointResult.matchWinner === 'PLAYER' ? 'VITORIA' : 'DERROTA', 1800, pointResult.matchWinner === 'PLAYER' ? '#22ff88' : '#ff2626');
     } else if (pointResult.setWinner) {
         showStatusMessage(scene, pointResult.setWinner === 'PLAYER' ? 'SET' : 'SET RIVAL', 1600, pointResult.setWinner === 'PLAYER' ? '#22ff88' : '#ff4d4d');
     } else if (reason === 'net' && !playerScored) {
         showStatusMessage(scene, 'REDE', 1400, '#ff2626');
+    } else if (reason === 'out') {
+        showStatusMessage(scene, 'FORA', 1400, '#ff2626');
     } else {
         showStatusMessage(scene, 'PONTO', 1400);
     }
@@ -1854,8 +2318,9 @@ function screenXToWidth(x) {
 }
 
 function performServeHitInstant(scene, power) {
-    // Power comes from timing/height quality.
+    // Serve has its own power model: timing/height can make it stronger than a rally attack.
     const ratio = power.label === 'RUIM' ? 0.25 : power.label === 'MEDIO' ? 0.6 : 0.95;
+    const servePowerRatio = Phaser.Math.Clamp(Math.max(hitPowerRatio, ratio), 0.25, 1);
 
     state = 'FLYING';
     lastAttack = power.label;
@@ -1869,7 +2334,7 @@ function performServeHitInstant(scene, power) {
     setPlayerPose(scene, 'playerHit', 420);
     doPlayerJump(scene);
     beginShotLog('SAQUE', 'JOGADOR', {
-        force: hitPowerRatio.toFixed(2),
+        force: servePowerRatio.toFixed(2),
         quality: power.label
     });
 
@@ -1886,14 +2351,15 @@ function performServeHitInstant(scene, power) {
     const flightT = Number.isFinite(tToGround) && tToGround > 0 ? tToGround : 0.75;
 
     // Formula adjusted to compensate for gravity drop post-net.
-    // Target depth relative to net: -50 (min) to -360 (max).
-    const baseDepth = -50 + (-310 * hitPowerRatio);
+    // Serve lands deeper and faster than rally attacks when timing is good.
+    const targetDepth = Phaser.Math.Linear(-45, -275, servePowerRatio);
+    const qualityOffset = power.label === 'RUIM' ? 58 : power.label === 'MEDIO' ? 22 : 0;
+    const overshootRisk = servePowerRatio > 0.97 && power.label === 'BOM'
+        ? Phaser.Math.Linear(0, -34, (servePowerRatio - 0.97) / 0.03)
+        : 0;
+    const finalDepth = targetDepth + qualityOffset + overshootRisk;
 
-    // Quality multiplier: RUIM reduces power, BOM/MEDIO keeps it.
-    const qualityMult = power.label === 'RUIM' ? 0.6 : 1.0;
-    const targetDepth = baseDepth * qualityMult;
-
-    const targetY = NET.y + targetDepth;
+    const targetY = NET.y + finalDepth;
 
     const targetX = x0 + calculateServeSideVelocity() * 0.55;
     const vx = (targetX - x0) / flightT;
@@ -1902,9 +2368,12 @@ function performServeHitInstant(scene, power) {
     // Marca início do rali após sacar
     gamePhase = 'RALLY';
     lastTouch = 'PLAYER_HIT';
+    lastPlayerShotKind = 'SERVE';
+    lastPlayerAttackPower = servePowerRatio;
+    opponentReceiveAttemptedForPlayerHit = false;
 
-    // Reduz um pouco a velocidade geral do ataque
-    const speedMult = 0.85;
+    // Saque usa velocidade propria, mais forte que o ataque comum.
+    const speedMult = Phaser.Math.Linear(0.84, 0.94, servePowerRatio);
     ballBody.setVelocity(
         Phaser.Math.Clamp(vx * speedMult, -PHYS_CLAMP.maxVX, PHYS_CLAMP.maxVX),
         Phaser.Math.Clamp(vy * speedMult, -PHYS_CLAMP.maxVY, PHYS_CLAMP.maxVY)
@@ -1915,7 +2384,7 @@ function performServeHitInstant(scene, power) {
     // -------- Arc model (ensure clearance at the net) --------
     // Start with a baseline up impulse from bucket, then make sure Z at net crossing
     // is above the net height + clearance.
-    ballVZ = Phaser.Math.Clamp(power.up, PHYS_CLAMP.minVZ, PHYS_CLAMP.maxVZ);
+    ballVZ = Phaser.Math.Clamp(power.up + (20 * servePowerRatio), PHYS_CLAMP.minVZ, PHYS_CLAMP.maxVZ);
     const tToNet = (NET.y - y0) / vy; // vy is negative when going to opponent
     const initialVZ = ballVZ;
     let zAtNetBeforeAssist = '---';
@@ -1934,10 +2403,13 @@ function performServeHitInstant(scene, power) {
     }
     setShotCalculations({
         'forca carregada': hitPowerRatio.toFixed(3),
+        'forca final saque': servePowerRatio.toFixed(3),
         'qualidade saque': power.label,
-        'multiplicador qualidade': qualityMult.toFixed(2),
-        'profundidade base': `${baseDepth.toFixed(1)} = -50 + (-310 * ${hitPowerRatio.toFixed(3)})`,
-        'profundidade alvo': `${targetDepth.toFixed(1)} = ${baseDepth.toFixed(1)} * ${qualityMult.toFixed(2)}`,
+        'profundidade base': `${targetDepth.toFixed(1)} = linear(-45, -275, ${servePowerRatio.toFixed(3)})`,
+        'ajuste qualidade': qualityOffset.toFixed(1),
+        'risco fora': overshootRisk.toFixed(1),
+        'profundidade alvo': finalDepth.toFixed(1),
+        'limites quadra adversaria': `${OPPONENT_COURT.minY - NET.y} ate ${OPPONENT_COURT.maxY - NET.y}`,
         'origem': `x ${Math.round(x0)} y ${Math.round(y0)} z ${Math.round(ballZ)}`,
         'alvo': `x ${Math.round(targetX)} y ${Math.round(targetY)}`,
         'tempo ate chao': `${flightT.toFixed(3)}s`,
@@ -1994,9 +2466,11 @@ function resetServe() {
     pointLocked = false;
     state = 'READY';
     gamePhase = 'SERVE';
+    queuedServeHitAt = 0;
     lastTouch = 'NONE';
     desiredAttackRole = 'RIGHT';
     lastPlayerAttackPower = 0;
+    lastPlayerShotKind = 'ATTACK';
     opponentReceiveAttemptedForPlayerHit = false;
     resetVirtualInput();
     resetPlayerFormation(nextServer === 'PLAYER');
@@ -2464,20 +2938,7 @@ function createTouchControls(scene) {
     const header = document.querySelector('header');
     if (!wrapper || !header) return;
 
-    const dpad = document.createElement('div');
-    dpad.className = 'mobile-touch-controls mobile-dpad';
-    dpad.setAttribute('aria-label', 'Direcional');
-
-    [
-        { direction: 'up', label: '^', className: 'mobile-dir-up' },
-        { direction: 'left', label: '<', className: 'mobile-dir-left' },
-        { direction: 'right', label: '>', className: 'mobile-dir-right' },
-        { direction: 'down', label: 'v', className: 'mobile-dir-down' }
-    ].forEach((control) => {
-        const button = createDomTouchButton(control.label, `mobile-dir-btn ${control.className}`);
-        bindVirtualTouch(button, () => setVirtualDirection(control.direction, true), () => setVirtualDirection(control.direction, false));
-        dpad.appendChild(button);
-    });
+    const dpad = createVirtualJoystick();
 
     const actionPad = document.createElement('div');
     actionPad.className = 'mobile-touch-controls mobile-action-pad';
@@ -2496,6 +2957,69 @@ function createTouchControls(scene) {
     wrapper.insertBefore(dpad, document.getElementById('game-container'));
     header.appendChild(actionPad);
     touchControls.push(dpad, actionPad);
+}
+
+function createVirtualJoystick() {
+    const joystick = document.createElement('div');
+    joystick.className = 'mobile-touch-controls mobile-joystick';
+    joystick.setAttribute('aria-label', 'Joystick de movimento');
+
+    const base = document.createElement('div');
+    base.className = 'mobile-joystick-base';
+
+    const knob = document.createElement('div');
+    knob.className = 'mobile-joystick-knob';
+
+    joystick.append(base, knob);
+
+    const maxDistance = 42;
+    const deadZone = 10;
+
+    const update = (event) => {
+        const rect = joystick.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const rawX = event.clientX - centerX;
+        const rawY = event.clientY - centerY;
+        const distance = Math.min(maxDistance, Math.hypot(rawX, rawY));
+        const angle = Math.atan2(rawY, rawX);
+        const x = Math.cos(angle) * distance;
+        const y = Math.sin(angle) * distance;
+
+        knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+
+        setVirtualDirection('left', x < -deadZone);
+        setVirtualDirection('right', x > deadZone);
+        setVirtualDirection('up', y < -deadZone);
+        setVirtualDirection('down', y > deadZone);
+    };
+
+    const release = () => {
+        joystick.classList.remove('is-active');
+        knob.style.transform = 'translate(-50%, -50%)';
+        clearVirtualDirections();
+    };
+
+    joystick.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        joystick.setPointerCapture?.(event.pointerId);
+        joystick.classList.add('is-active');
+        update(event);
+    });
+    joystick.addEventListener('pointermove', (event) => {
+        if (!joystick.classList.contains('is-active')) return;
+        event.preventDefault();
+        update(event);
+    });
+    joystick.addEventListener('pointerup', (event) => {
+        event.preventDefault();
+        release();
+    });
+    joystick.addEventListener('pointercancel', release);
+    joystick.addEventListener('lostpointercapture', release);
+    joystick.addEventListener('contextmenu', (event) => event.preventDefault());
+
+    return joystick;
 }
 
 function createDomTouchButton(label, className) {
@@ -2529,6 +3053,10 @@ function bindVirtualTouch(button, down, up) {
 
 function setVirtualDirection(direction, down) {
     virtualInput[direction] = down;
+}
+
+function clearVirtualDirections() {
+    ['left', 'right', 'up', 'down'].forEach((direction) => setVirtualDirection(direction, false));
 }
 
 function pressVirtualButton(action) {
@@ -2874,6 +3402,7 @@ function performRallyHit(scene) {
     opponentReceiveAttemptedForPlayerHit = false;
     const attackPower = Phaser.Math.Clamp((ballZ - 45) / 85, 0, 1);
     lastPlayerAttackPower = attackPower;
+    lastPlayerShotKind = 'ATTACK';
     const targetDepth = Phaser.Math.Linear(230, 250, attackPower);
     const targetY = NET.y - targetDepth;
     const flightTime = Phaser.Math.Linear(0.94, 0.72, attackPower);
@@ -2888,24 +3417,33 @@ function performRallyHit(scene) {
         ? controlledRole
         : attacker.x < COURT.centerX ? 'LEFT' : 'RIGHT';
     const targetInsideX = attackRole === 'LEFT' ? COURT.centerX + 95 : COURT.centerX - 95;
-    const inwardVx = (targetInsideX - ballBody.x) / flightTime;
-    const forwardVy = (targetY - ballBody.y) / flightTime;
+    const desiredVx = (targetInsideX - ballBody.x) / flightTime;
+    const desiredVy = (targetY - ballBody.y) / flightTime;
+    const maxAttackVX = Phaser.Math.Linear(380, 560, attackPower);
+    const appliedVx = Phaser.Math.Clamp(desiredVx, -maxAttackVX, maxAttackVX);
+    const appliedVy = Phaser.Math.Clamp(desiredVy, -620, -330);
+    const realLandingX = ballBody.x + appliedVx * flightTime;
+    const realLandingY = ballBody.y + appliedVy * flightTime;
 
-    ballBody.setVelocity(
-        Phaser.Math.Clamp(inwardVx, -320, 320),
-        Phaser.Math.Clamp(forwardVy, -620, -330)
-    );
+    ballBody.setVelocity(appliedVx, appliedVy);
+    ensureShotNetFromCurrentTrajectory('calculo inicial');
     setShotCalculations({
         'modelo': 'corte jogador',
         'lado ataque': attackRole,
         'forca pela altura': attackPower.toFixed(2),
         'altura do contato': Math.round(ballZ),
-        'origem': `x ${Math.round(ballBody.x)} y ${Math.round(ballBody.y)} z ${Math.round(ballZ)}`,
-        'alvo x interno': Math.round(targetInsideX),
-        'profundidade alvo': Math.round(targetDepth),
+        'origem screen': `x ${Math.round(ballBody.x)} y ${Math.round(ballBody.y)} z ${Math.round(ballZ)}`,
+        'origem quadra': `x ${screenXToWidth(ballBody.x)} y ${screenYToDepth(ballBody.y)} z ${Math.round(ballZ)}`,
+        'alvo solicitado screen': `x ${Math.round(targetInsideX)} y ${Math.round(targetY)}`,
+        'alvo solicitado quadra': `x ${screenXToWidth(targetInsideX)} y ${screenYToDepth(targetY)}`,
+        'alvo real estimado screen': `x ${Math.round(realLandingX)} y ${Math.round(realLandingY)}`,
+        'alvo real estimado quadra': `x ${screenXToWidth(realLandingX)} y ${screenYToDepth(realLandingY)}`,
+        'profundidade alvo': `${Math.round(targetDepth)} = Y quadra ${screenYToDepth(targetY)}`,
         'tempo voo': `${flightTime.toFixed(3)}s`,
-        'formula vx': `(${Math.round(targetInsideX)} - ${Math.round(ballBody.x)}) / ${flightTime.toFixed(3)} = ${Math.round(inwardVx)}`,
-        'formula vy': `(${Math.round(targetY)} - ${Math.round(ballBody.y)}) / ${flightTime.toFixed(3)} = ${Math.round(forwardVy)}`,
+        'vx necessario': Math.round(desiredVx),
+        'vy necessario': Math.round(desiredVy),
+        'limite vx ataque': Math.round(maxAttackVX),
+        'vx cortado pelo limite': Math.abs(desiredVx) > maxAttackVX ? 'SIM' : 'NAO',
         'vz corte': ballVZ,
         'velocidade aplicada': `vx ${Math.round(ballBody.body.velocity.x)} vy ${Math.round(ballBody.body.velocity.y)} vz ${Math.round(ballVZ)}`,
         'velocidade total aplicada': Math.round(Math.hypot(ballBody.body.velocity.x, ballBody.body.velocity.y, ballVZ))

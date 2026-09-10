@@ -39,16 +39,28 @@ if (!$sou_admin_grupo && !isAdmin($pdo, $_SESSION['user_id'])) {
 
 // Processar ações
 if ($_POST) {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: grupo.php?id='.(int)$grupo_id);
+        exit();
+    }
+
     $acao = $_POST['acao'] ?? '';
     if ($acao === 'atualizar_grupo') {
-        $nome = trim($_POST['nome'] ?? '');
-        $local = trim($_POST['local_principal'] ?? '');
-        $descricao = trim($_POST['descricao'] ?? '');
-        $modalidade = trim($_POST['modalidade'] ?? '');
+        $nome = trim(strip_tags($_POST['nome'] ?? ''));
+        $local = trim(strip_tags($_POST['local_principal'] ?? ''));
+        $descricao = trim(strip_tags($_POST['descricao'] ?? ''));
+        $modalidade = trim(strip_tags($_POST['modalidade'] ?? ''));
         $logoCropped = $_POST['logo_cropped'] ?? '';
+        $modalidadesPermitidas = ['', 'Vôlei', 'Vôlei Quadra', 'Vôlei Areia', 'Beach Tênis'];
+        if (!in_array($modalidade, $modalidadesPermitidas, true)) { $modalidade = ''; }
 
         if ($nome === '' || $local === '') {
             $_SESSION['mensagem'] = 'Nome e Local são obrigatórios.';
+            $_SESSION['tipo_mensagem'] = 'danger';
+        } elseif (mb_strlen($nome) > 100 || mb_strlen($local) > 200 || mb_strlen($descricao) > 5000) {
+            $_SESSION['mensagem'] = 'Algum campo ultrapassou o tamanho permitido.';
             $_SESSION['tipo_mensagem'] = 'danger';
         } else {
             // Atualizar com modalidade se a coluna existir
@@ -65,11 +77,12 @@ if ($_POST) {
             }
 
             // Processar nova logo (opcional)
-            if ($ok && !empty($logoCropped) && preg_match('/^data:image\/(png|jpeg);base64,/', $logoCropped)) {
+            if ($ok && !empty($logoCropped) && strlen($logoCropped) <= 3 * 1024 * 1024 && preg_match('/^data:image\/(png|jpeg);base64,/', $logoCropped)) {
                 $dadosBase64 = preg_replace('/^data:image\/(png|jpeg);base64,/', '', $logoCropped);
                 $dadosBase64 = str_replace(' ', '+', $dadosBase64);
                 $binario = base64_decode($dadosBase64);
-                if ($binario !== false) {
+                $dimensoesLogo = $binario !== false ? @getimagesizefromstring($binario) : false;
+                if ($dimensoesLogo !== false && function_exists('imagecreatefromstring')) {
                     // Criar registro de logo
                     $stmtLogo = executeQuery($pdo, "INSERT INTO logos_grupos (caminho) VALUES ('')", []);
                     if ($stmtLogo) {
@@ -77,10 +90,10 @@ if ($_POST) {
                         $dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'arquivos' . DIRECTORY_SEPARATOR . 'logosgrupos';
                         if (!is_dir($dir)) { @mkdir($dir, 0777, true); }
                         $arquivo = $dir . DIRECTORY_SEPARATOR . $novoLogoId . '.png';
-                        // Redimensionar se GD disponível; caso não, salvar como veio
-                        if (function_exists('imagecreatefromstring')) {
-                            $src = @imagecreatefromstring($binario);
-                            if ($src) {
+                        // Redimensionar no servidor para 128x128.
+                        $saved = false;
+                        $src = @imagecreatefromstring($binario);
+                        if ($src) {
                                 $dst = imagecreatetruecolor(128, 128);
                                 imagealphablending($dst, false);
                                 imagesavealpha($dst, true);
@@ -90,11 +103,6 @@ if ($_POST) {
                                 $saved = imagepng($dst, $arquivo);
                                 imagedestroy($dst);
                                 imagedestroy($src);
-                            } else {
-                                $saved = (file_put_contents($arquivo, $binario) !== false);
-                            }
-                        } else {
-                            $saved = (file_put_contents($arquivo, $binario) !== false);
                         }
                         if ($saved) {
                             $relPath = 'assets/arquivos/logosgrupos/' . $novoLogoId . '.png';
@@ -224,6 +232,12 @@ if ($_POST) {
     }
     if ($acao === 'remover_membro') {
         $usuario_id = (int)($_POST['usuario_id'] ?? 0);
+        if ($usuario_id && $usuario_id === (int)($grupo['administrador_id'] ?? 0)) {
+            $_SESSION['mensagem'] = 'Não é possível remover o administrador do grupo.';
+            $_SESSION['tipo_mensagem'] = 'danger';
+            header('Location: grupo.php?id='.(int)$grupo_id);
+            exit();
+        }
         if ($usuario_id) {
             $sql = "DELETE FROM grupo_membros WHERE grupo_id = ? AND usuario_id = ?";
             if (executeQuery($pdo, $sql, [$grupo_id, $usuario_id])) {
@@ -279,10 +293,12 @@ include '../../includes/header.php';
             </a>
             <a href="../grupos.php" class="btn btn-outline-primary"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
             <form method="POST" onsubmit="return confirm('Marcar este grupo como inativo?');">
+                <?php echo csrfInput(); ?>
                 <input type="hidden" name="acao" value="inativar_grupo">
                 <button type="submit" class="btn btn-warning"><i class="fas fa-ban me-1"></i>Inativar</button>
             </form>
             <form method="POST" onsubmit="return confirm('Tem certeza que deseja excluir este grupo?');">
+                <?php echo csrfInput(); ?>
                 <input type="hidden" name="acao" value="excluir_grupo">
                 <button type="submit" class="btn btn-danger"><i class="fas fa-trash me-1"></i>Excluir Grupo</button>
             </form>
@@ -298,6 +314,7 @@ include '../../includes/header.php';
             </div>
             <div class="card-body">
                 <form method="POST" id="formEditarGrupo">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="acao" value="atualizar_grupo">
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -412,6 +429,7 @@ include '../../includes/header.php';
                                         <td><span class="badge bg-secondary"><?php echo htmlspecialchars($m['nivel']); ?></span></td>
                                         <td>
                                             <form method="POST" onsubmit="return confirm('Remover este membro?');" style="display:inline-block;">
+                                                <?php echo csrfInput(); ?>
                                                 <input type="hidden" name="acao" value="remover_membro">
                                                 <input type="hidden" name="usuario_id" value="<?php echo (int)$m['id']; ?>">
                                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-user-times"></i></button>

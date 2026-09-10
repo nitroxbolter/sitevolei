@@ -466,35 +466,50 @@ canvas {
         -webkit-tap-highlight-color: transparent;
     }
 
-    .mobile-dpad {
+    .mobile-joystick {
         grid-column: 1;
         grid-row: 1;
         position: relative;
-        width: 120px;
-        height: 120px;
+        width: 128px;
+        height: 128px;
         align-self: end;
         justify-self: center;
         margin-bottom: 8px;
         border-radius: 50%;
-        background: rgba(7, 17, 31, 0.72);
+        background: rgba(7, 17, 31, 0.66);
         border: 2px solid rgba(255, 255, 255, 0.28);
         box-shadow: inset 0 0 0 1px rgba(77, 148, 255, 0.25);
     }
 
-    .mobile-dpad::after {
-        content: "";
+    .mobile-joystick-base {
+        position: absolute;
+        inset: 18px;
+        border-radius: 50%;
+        background:
+            radial-gradient(circle at center, rgba(255, 255, 255, 0.12) 0 18%, transparent 19%),
+            linear-gradient(rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)) center / 2px 100% no-repeat,
+            linear-gradient(90deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.12)) center / 100% 2px no-repeat;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    .mobile-joystick-knob {
         position: absolute;
         left: 50%;
         top: 50%;
-        width: 34px;
-        height: 34px;
+        width: 54px;
+        height: 54px;
         transform: translate(-50%, -50%);
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(47, 125, 255, 0.82);
+        border: 2px solid rgba(255, 255, 255, 0.42);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+        pointer-events: none;
     }
 
-    .mobile-dir-btn,
+    .mobile-joystick.is-active .mobile-joystick-knob {
+        background: rgba(47, 125, 255, 0.96);
+    }
+
     .mobile-action-btn {
         border: 0;
         color: #fff;
@@ -504,41 +519,9 @@ canvas {
         touch-action: none;
     }
 
-    .mobile-dir-btn {
-        position: absolute;
-        width: 54px;
-        height: 54px;
-        border-radius: 50%;
-        background: rgba(47, 125, 255, 0.2);
-        font-size: 1.7rem;
-        line-height: 1;
-    }
-
-    .mobile-dir-btn:active,
-    .mobile-dir-btn.is-pressed,
     .mobile-action-btn:active,
     .mobile-action-btn.is-pressed {
         background: rgba(47, 125, 255, 0.84);
-    }
-
-    .mobile-dir-up {
-        left: 33px;
-        top: 2px;
-    }
-
-    .mobile-dir-down {
-        left: 33px;
-        bottom: 2px;
-    }
-
-    .mobile-dir-left {
-        left: 2px;
-        top: 33px;
-    }
-
-    .mobile-dir-right {
-        right: 2px;
-        top: 33px;
     }
 
     .mobile-action-pad {
@@ -620,5 +603,112 @@ canvas {
     #game-wrapper {
         visibility: hidden;
         pointer-events: none;
+    }
+}
+
+#debug-log-button {
+    border: 0;
+    border-radius: 999px;
+    padding: 10px 16px;
+    background: #00e5ff;
+    color: #061016;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(0, 229, 255, 0.2);
+}
+
+#debug-log-button:hover {
+    filter: brightness(1.08);
+}
+
+.debug-log-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+}
+
+.debug-log-modal.is-open {
+    display: flex;
+}
+
+.debug-log-window {
+    width: min(980px, 94vw);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid rgba(0, 229, 255, 0.35);
+    border-radius: 18px;
+    background: #07111f;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+
+.debug-log-header,
+.debug-log-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.debug-log-header h2 {
+    margin: 0;
+    color: #00e5ff;
+    font-size: 1.1rem;
+}
+
+#debug-log-close,
+#debug-log-clear,
+#debug-log-refresh {
+    border: 0;
+    border-radius: 10px;
+    padding: 9px 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+#debug-log-close {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 1.5rem;
+}
+
+#debug-log-clear {
+    background: #ff4d4d;
+    color: #fff;
+}
+
+#debug-log-refresh {
+    background: #ffd700;
+    color: #171100;
+}
+
+#debug-log-content {
+    min-height: 360px;
+    max-height: 65vh;
+    overflow: auto;
+    padding: 14px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #d8f8ff;
+    font: 12px/1.45 Consolas, Monaco, 'Courier New', monospace;
+    white-space: pre-wrap;
+}
+
+@media (hover: none) and (pointer: coarse), (max-width: 840px) {
+    #debug-log-button,
+    .debug-log-modal {
+        display: none !important;
     }
 }

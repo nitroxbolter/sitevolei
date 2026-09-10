@@ -3,6 +3,10 @@ session_start();
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 if (!isLoggedIn()) {
     $_SESSION['mensagem'] = 'Usuário não logado';
     $_SESSION['tipo_mensagem'] = 'danger';
@@ -17,15 +21,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit();
 }
 
-$titulo = sanitizar($_POST['titulo']);
+$titulo = sanitizar($_POST['titulo'] ?? '');
 $grupo_id = (int)($_POST['grupo_id'] ?? 0);
-$data_jogo = $_POST['data_jogo'];
-$data_fim_jogo = $_POST['data_fim_jogo'] ?? null;
-$local = sanitizar($_POST['local']);
-$max_jogadores = (int)$_POST['max_jogadores'];
-$nivel_sugerido = sanitizar($_POST['nivel_sugerido']);
-$descricao = sanitizar($_POST['descricao']);
-$modalidade = sanitizar($_POST['modalidade'] ?? '');
+$data_jogo = normalizarDataHoraInput($_POST['data_jogo'] ?? '');
+$data_fim_jogo = normalizarDataHoraInput($_POST['data_fim_jogo'] ?? '');
+$local = sanitizar($_POST['local'] ?? '');
+$max_jogadores = (int)($_POST['max_jogadores'] ?? 0);
+$nivel_sugerido = normalizarNivelJogo($_POST['nivel_sugerido'] ?? '');
+$descricao = sanitizar($_POST['descricao'] ?? '');
+$modalidade = normalizarModalidadeJogo($_POST['modalidade'] ?? '');
 $contato = sanitizar($_POST['contato'] ?? '');
 $usuario_id = $_SESSION['user_id'];
 
@@ -37,8 +41,15 @@ if (empty($titulo) || empty($data_jogo) || empty($local)) {
     exit();
 }
 
-if ($max_jogadores <= 0) {
-    $_SESSION['mensagem'] = 'Informe uma quantidade válida de jogadores';
+if ($max_jogadores < 1 || $max_jogadores > 200) {
+    $_SESSION['mensagem'] = 'Informe uma quantidade válida de jogadores entre 1 e 200';
+    $_SESSION['tipo_mensagem'] = 'danger';
+    header('Location: ../jogos.php');
+    exit();
+}
+
+if ($data_jogo === '') {
+    $_SESSION['mensagem'] = 'Informe uma data/hora válida para o jogo';
     $_SESSION['tipo_mensagem'] = 'danger';
     header('Location: ../jogos.php');
     exit();
@@ -46,6 +57,13 @@ if ($max_jogadores <= 0) {
 
 if (!empty($data_fim_jogo) && strtotime($data_fim_jogo) <= strtotime($data_jogo)) {
     $_SESSION['mensagem'] = 'A data/hora de término deve ser posterior ao início do jogo';
+    $_SESSION['tipo_mensagem'] = 'danger';
+    header('Location: ../jogos.php');
+    exit();
+}
+
+if (mb_strlen($titulo) > 100 || mb_strlen($local) > 200 || mb_strlen($descricao) > 5000 || mb_strlen($contato) > 1000) {
+    $_SESSION['mensagem'] = 'Algum campo ultrapassou o tamanho permitido.';
     $_SESSION['tipo_mensagem'] = 'danger';
     header('Location: ../jogos.php');
     exit();

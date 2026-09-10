@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -18,11 +22,21 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $jogo_id = (int)($_POST['jogo_id'] ?? 0);
 $nome = sanitizar($_POST['nome'] ?? '');
 $descricao = sanitizar($_POST['descricao'] ?? '');
-$data_jogo = $_POST['data_jogo'] ?? '';
+$data_jogo = normalizarDataHoraInput($_POST['data_jogo'] ?? '');
 $local = sanitizar($_POST['local'] ?? '');
 
 if ($jogo_id <= 0 || empty($nome) || empty($data_jogo)) {
     echo json_encode(['success' => false, 'message' => 'Preencha todos os campos obrigatórios.']);
+    exit();
+}
+
+if ($data_jogo === '') {
+    echo json_encode(['success' => false, 'message' => 'Informe uma data/hora válida.']);
+    exit();
+}
+
+if (mb_strlen($nome) > 100 || mb_strlen($local) > 200 || mb_strlen($descricao) > 5000) {
+    echo json_encode(['success' => false, 'message' => 'Algum campo ultrapassou o tamanho permitido.']);
     exit();
 }
 

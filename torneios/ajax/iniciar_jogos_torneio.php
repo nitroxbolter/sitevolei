@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -71,7 +75,6 @@ foreach ($times_raw as $time) {
     
     // Verificar se o time realmente pertence ao torneio
     if ((int)$time['torneio_id'] !== (int)$torneio_id) {
-        error_log("AVISO: Time ID {$time['id']} pertence ao torneio {$time['torneio_id']}, mas estamos processando torneio $torneio_id");
         continue; // Pular times que não pertencem ao torneio
     }
     

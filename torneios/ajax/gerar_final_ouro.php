@@ -8,6 +8,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -46,7 +50,6 @@ $debug_messages = [];
 function addDebug($msg) {
     global $debug_messages;
     $debug_messages[] = date('H:i:s') . ' - ' . $msg;
-    error_log("DEBUG: " . $msg);
 }
 
 try {

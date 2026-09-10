@@ -1,3 +1,13 @@
+<?php
+session_start();
+require_once __DIR__ . '/../includes/db_connect.php';
+
+$voleiDebugAdmin = false;
+if (isLoggedIn()) {
+    $voleiDebugUser = getUserById($pdo, (int) $_SESSION['user_id']);
+    $voleiDebugAdmin = $voleiDebugUser && strcasecmp((string) ($voleiDebugUser['email'] ?? ''), 'admin@gmail.com') === 0;
+}
+?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -31,6 +41,9 @@
                     </div>
                 </div>
             </div>
+            <?php if ($voleiDebugAdmin): ?>
+                <button id="debug-log-button" type="button" aria-label="Ver debug do jogo">DEBUG LOG</button>
+            <?php endif; ?>
             <button id="fullscreen-button" type="button" aria-label="Tela cheia">TELA CHEIA</button>
         </header>
         
@@ -46,6 +59,25 @@
         </footer>
     </div>
 
+    <?php if ($voleiDebugAdmin): ?>
+        <div id="debug-log-modal" class="debug-log-modal" aria-hidden="true">
+            <div class="debug-log-window" role="dialog" aria-modal="true" aria-labelledby="debug-log-title">
+                <div class="debug-log-header">
+                    <h2 id="debug-log-title">Log debug do jogo</h2>
+                    <button id="debug-log-close" type="button" aria-label="Fechar log">×</button>
+                </div>
+                <pre id="debug-log-content">Nenhum log iniciado ainda.</pre>
+                <div class="debug-log-actions">
+                    <button id="debug-log-clear" type="button">Limpar log</button>
+                    <button id="debug-log-refresh" type="button">Atualizar</button>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <script>
+        window.VOLEI_DEBUG_ADMIN = <?php echo $voleiDebugAdmin ? 'true' : 'false'; ?>;
+    </script>
     <script src="game.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>

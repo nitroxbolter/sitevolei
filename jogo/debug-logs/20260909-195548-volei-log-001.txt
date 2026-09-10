@@ -1,0 +1,71 @@
+LOG DEBUG VOLEI #1
+inicio do jogo: 09/09/2026, 16:55:42
+status: SAQUE
+sacador: PLAYER
+
+TABELA DA QUADRA
+| item | valor |
+| --- | --- |
+| canvas | 800 x 600 px |
+| largura jogavel X | 92 ate 708 (616px) |
+| distancia total Y | 78 ate 570 (492px) |
+| centro X | 400 |
+| rede Y | 320 |
+| altura da rede Z | 114 |
+| escala Z | 0.72 px por Z |
+| lado adversario | Y 78 ate 304 |
+| lado jogador | Y 320 ate 570 |
+
+| quadrante | X tela | Y tela | X quadra | Y profundidade |
+| --- | --- | --- | --- | --- |
+| ADVERSARIO_ESQUERDA | 92 ate 400 | 78 ate 198 | -308 ate 0 | -242 ate -122 |
+| ADVERSARIO_DIREITA | 400 ate 708 | 78 ate 198 | 0 ate 308 | -242 ate -122 |
+| JOGADOR_ESQUERDA | 92 ate 400 | 320 ate 570 | -308 ate 0 | 0 ate 250 |
+| JOGADOR_DIREITA | 400 ate 708 | 320 ate 570 | 0 ate 308 | 0 ate 250 |
+
+JOGADA 1: SAQUE
+CALCULOS
+forca carregada: 0.517
+forca final saque: 0.600
+qualidade saque: MEDIO
+profundidade base: -183.0 = linear(-45, -275, 0.600)
+ajuste qualidade: 22.0
+risco fora: 0.0
+profundidade alvo: -161.0
+limites quadra adversaria: -242 ate -16
+origem: x 400 y 532 z 95
+alvo: x 400 y 159
+tempo ate chao: 2.048s
+velocidade bruta: vx 0 vy -182
+multiplicador velocidade: 0.90
+velocidade aplicada: vx 0 vy -164 vz 232
+velocidade total aplicada: 284
+gravidade voo: -260
+vz inicial: 232
+tempo ate rede: 1.164s
+z na rede antes ajuste: 189
+assistencia rede: 0
+
+ator: JOGADOR
+forca: 0.60
+qualidade: MEDIO
+altura toque bola Z: 95
+altura player ao bater Z: 89
+ponto toque: X 0 | Y 212 (screen 400, 532)
+velocidade: vx 0 | vy -164 | vz 232 | total 284
+altura na rede Z: 175
+altura da rede Z: 114
+folga acima da rede Z: 61
+passou da rede: SIM
+toque no chao: X 0 | Y -97 | lado ADVERSARIO (screen 400, 223)
+manchete adversaria: ---
+ponto manchete: X --- | Y --- | Z --- (screen ---, ---)
+distancia bola-adversario na manchete: ---
+receptor adversario: X --- | Y --- (screen ---, ---)
+raio recepcao: --- | chance: --- | resultado recepcao: ---
+resultado: tocou no chao
+
+vencedor do ponto: PLAYER
+placar: jogador 1 x 0 adversario
+sets: jogador 0 x 0 adversario
+fim do jogo: 09/09/2026, 16:55:48

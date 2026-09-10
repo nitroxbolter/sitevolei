@@ -116,7 +116,6 @@ if (count($times) > 0) {
     $ordens = array_column($times, 'ordem');
     $ordensUnicas = array_unique($ordens);
     if (count($ordens) !== count($ordensUnicas)) {
-        error_log("AVISO: Times com ordens duplicadas encontradas no torneio ID: " . $torneio_id);
         // Corrigir ordens duplicadas
         $ordensUsadas = [];
         foreach ($times as &$time) {

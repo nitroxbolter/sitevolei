@@ -8,6 +8,13 @@ requireAdmin($pdo);
 
 // Processar ações
 if ($_POST) {
+    if (!csrfTokenValido()) {
+        $_SESSION['mensagem'] = 'Sua sessão expirou. Atualize a página e tente novamente.';
+        $_SESSION['tipo_mensagem'] = 'danger';
+        header('Location: grupos_jogos.php');
+        exit();
+    }
+
     $acao = $_POST['acao'] ?? '';
     
     switch ($acao) {
@@ -300,6 +307,7 @@ include '../../includes/header.php';
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form method="POST" style="display: inline;">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="acao" value="remover_grupo">
                     <input type="hidden" name="grupo_id" id="grupoIdRemover">
                     <button type="submit" class="btn btn-danger">Remover Grupo</button>
@@ -324,6 +332,7 @@ include '../../includes/header.php';
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form method="POST" style="display: inline;">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="acao" value="inativar_grupo">
                     <input type="hidden" name="grupo_id" id="grupoIdInativar">
                     <button type="submit" class="btn btn-warning">Inativar Grupo</button>
@@ -348,6 +357,7 @@ include '../../includes/header.php';
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form method="POST" style="display: inline;">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="acao" value="reativar_grupo">
                     <input type="hidden" name="grupo_id" id="grupoIdReativar">
                     <button type="submit" class="btn btn-success">Reativar Grupo</button>
@@ -372,6 +382,7 @@ include '../../includes/header.php';
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form method="POST" style="display: inline;">
+                    <?php echo csrfInput(); ?>
                     <input type="hidden" name="acao" value="remover_jogo">
                     <input type="hidden" name="jogo_id" id="jogoIdRemover">
                     <button type="submit" class="btn btn-danger">Remover Jogo</button>

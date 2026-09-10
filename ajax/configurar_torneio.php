@@ -3,6 +3,10 @@ session_start();
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -39,7 +43,6 @@ $quantidade_times = isset($_POST['quantidade_times']) ? (int)$_POST['quantidade_
 $integrantes_por_time = isset($_POST['integrantes_por_time']) && $_POST['integrantes_por_time'] !== '' ? (int)$_POST['integrantes_por_time'] : null;
 
 // Debug sempre (para identificar o problema)
-error_log("=== DEBUG CONFIGURAR TORNEIO ===");
 error_log("POST completo: " . print_r($_POST, true));
 error_log("GET completo: " . print_r($_GET, true));
 error_log("REQUEST completo: " . print_r($_REQUEST, true));

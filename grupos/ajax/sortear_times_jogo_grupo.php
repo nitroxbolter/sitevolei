@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -40,10 +44,16 @@ if (!$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
     exit();
 }
 
-// Buscar participantes
-$sql = "SELECT * FROM grupo_jogo_participantes WHERE jogo_id = ? ORDER BY RAND()";
+// Buscar somente participantes da lista principal; suplentes não entram no sorteio automaticamente
+$max_participantes = (int)($jogo['max_participantes'] ?? 0);
+$sql = "SELECT * FROM grupo_jogo_participantes WHERE jogo_id = ? ORDER BY data_inscricao ASC";
 $stmt = executeQuery($pdo, $sql, [$jogo_id]);
-$participantes = $stmt ? $stmt->fetchAll() : [];
+$participantes_ordenados = $stmt ? $stmt->fetchAll() : [];
+if ($max_participantes > 0) {
+    $participantes_ordenados = array_slice($participantes_ordenados, 0, $max_participantes);
+}
+shuffle($participantes_ordenados);
+$participantes = $participantes_ordenados;
 
 if (empty($participantes)) {
     echo json_encode(['success' => false, 'message' => 'Nenhum participante cadastrado.']);

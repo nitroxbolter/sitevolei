@@ -13,10 +13,6 @@ if (!isLoggedIn()) {
 $grupo_id = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
 $jogo_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// Debug: verificar se os parâmetros estão sendo recebidos corretamente
-error_log("DEBUG jogo_grupo.php - grupo_id: " . $grupo_id . ", jogo_id: " . $jogo_id);
-error_log("DEBUG jogo_grupo.php - GET completo: " . print_r($_GET, true));
-
 if ($grupo_id <= 0) {
     $_SESSION['mensagem'] = 'Grupo inválido.';
     $_SESSION['tipo_mensagem'] = 'danger';
@@ -77,6 +73,13 @@ $participantes = [];
 $times = [];
 $partidas = [];
 $classificacao = [];
+$max_suplentes = 4;
+$max_participantes_config = 0;
+$participantes_principais = [];
+$participantes_suplentes = [];
+$total_vagas_com_suplentes = 0;
+$total_titulares_preenchidos = 0;
+$total_suplentes_preenchidos = 0;
 
 if ($jogo_id > 0) {
     // Carregar jogo existente
@@ -87,7 +90,6 @@ if ($jogo_id > 0) {
             // Se houver transação, não fazemos nada aqui
         }
         
-        error_log("DEBUG - Iniciando busca do jogo. jogo_id: $jogo_id, grupo_id: $grupo_id");
         
         // Usar fetchAll() para garantir que a query seja completamente executada
         $sql = "SELECT * FROM grupo_jogos WHERE id = ? AND grupo_id = ?";
@@ -95,7 +97,6 @@ if ($jogo_id > 0) {
         
         if (!$stmt) {
             $error = $pdo->errorInfo();
-            error_log("DEBUG - Erro ao preparar: " . print_r($error, true));
             throw new Exception('Erro ao preparar query: ' . ($error[2] ?? 'Erro desconhecido'));
         }
         
@@ -103,7 +104,6 @@ if ($jogo_id > 0) {
         
         if (!$result) {
             $error = $stmt->errorInfo();
-            error_log("DEBUG - Erro ao executar: " . print_r($error, true));
             $stmt->closeCursor();
             throw new Exception('Erro ao executar query: ' . ($error[2] ?? 'Erro desconhecido'));
         }
@@ -114,7 +114,6 @@ if ($jogo_id > 0) {
         
         $jogo = !empty($resultados) ? $resultados[0] : null;
         
-        error_log("DEBUG - Resultado: " . ($jogo ? "Jogo encontrado: " . $jogo['nome'] : 'Jogo não encontrado'));
         
         if (!$jogo || empty($jogo)) {
             $_SESSION['mensagem'] = 'Jogo não encontrado. Verifique se o jogo existe e pertence a este grupo.';
@@ -124,13 +123,11 @@ if ($jogo_id > 0) {
         }
         
     } catch (PDOException $e) {
-        error_log("DEBUG - Erro PDO: " . $e->getMessage());
         $_SESSION['mensagem'] = 'Erro ao buscar jogo. Tente novamente.';
         $_SESSION['tipo_mensagem'] = 'danger';
         header('Location: ../jogos_grupo.php?grupo_id=' . $grupo_id);
         exit();
     } catch (Exception $e) {
-        error_log("DEBUG - Erro: " . $e->getMessage());
         $_SESSION['mensagem'] = 'Erro ao buscar jogo. Verifique se o jogo existe.';
         $_SESSION['tipo_mensagem'] = 'danger';
         header('Location: ../jogos_grupo.php?grupo_id=' . $grupo_id);
@@ -145,6 +142,21 @@ if ($jogo_id > 0) {
             ORDER BY gjp.data_inscricao";
     $stmt = executeQuery($pdo, $sql, [$jogo_id]);
     $participantes = $stmt ? $stmt->fetchAll() : [];
+
+    $max_suplentes = 4;
+    $max_participantes_config = (int)($jogo['max_participantes'] ?? 0);
+    $total_config_times = (int)($jogo['quantidade_times'] ?? 0) * (int)($jogo['integrantes_por_time'] ?? 0);
+    if ($max_participantes_config <= 0 && $total_config_times > 0) {
+        $max_participantes_config = $total_config_times;
+    }
+    if ($max_participantes_config <= 0) {
+        $max_participantes_config = max(count($participantes), 4);
+    }
+    $participantes_principais = array_slice($participantes, 0, $max_participantes_config);
+    $participantes_suplentes = array_slice($participantes, $max_participantes_config, $max_suplentes);
+    $total_titulares_preenchidos = count($participantes_principais);
+    $total_suplentes_preenchidos = count($participantes_suplentes);
+    $total_vagas_com_suplentes = $max_participantes_config + $max_suplentes;
     
     // Limpar times duplicados primeiro (manter apenas o primeiro de cada nome/ordem)
     $sql = "DELETE t1 FROM grupo_jogo_times t1
@@ -178,9 +190,7 @@ if ($jogo_id > 0) {
     $times_raw = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
     
     // Debug: verificar quantos times foram encontrados no banco
-    error_log("DEBUG - Total de times encontrados no banco (raw): " . count($times_raw));
     foreach ($times_raw as $t) {
-        error_log("DEBUG - Time raw: ID=" . $t['id'] . ", Nome=" . $t['nome'] . ", Ordem=" . $t['ordem']);
     }
     
     // Remover duplicatas baseado em ID (manter apenas um de cada ID) - igual ao sistema de torneios
@@ -197,9 +207,7 @@ if ($jogo_id > 0) {
     $times = $times_unicos;
     
     // Debug: verificar quantos times únicos após remoção
-    error_log("DEBUG - Total de times únicos após remoção: " . count($times));
     foreach ($times as $t) {
-        error_log("DEBUG - Time único: ID=" . $t['id'] . ", Nome=" . $t['nome'] . ", Ordem=" . $t['ordem']);
     }
     
     // Limpar duplicatas antes de buscar integrantes
@@ -376,7 +384,15 @@ include '../../includes/header.php';
                     <div class="row mt-2">
                         <div class="col-md-3">
                             <strong>Participantes:</strong><br>
-                            <?php echo count($participantes); ?>
+                            <?php echo $total_titulares_preenchidos; ?><?php echo $max_participantes_config > 0 ? ' / ' . $max_participantes_config : ''; ?>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Lista principal:</strong><br>
+                            <?php echo $max_participantes_config ?: '-'; ?> vagas
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Suplentes:</strong><br>
+                            4 vagas
                         </div>
                     </div>
                 </div>
@@ -433,7 +449,7 @@ include '../../includes/header.php';
             <div class="card-header d-flex justify-content-between align-items-center" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#collapseParticipantes" aria-expanded="<?php echo empty($times) ? 'true' : 'false'; ?>" aria-controls="collapseParticipantes">
                 <h5 class="mb-0 d-flex align-items-center gap-2">
                     <i class="fas fa-chevron-<?php echo empty($times) ? 'down' : 'right'; ?> transition-all"></i>
-                    Participantes <span class="badge bg-primary"><?php echo count($participantes); ?></span>
+                    Participantes <span class="badge bg-primary"><?php echo $total_titulares_preenchidos; ?><?php echo $max_participantes_config > 0 ? ' / ' . $max_participantes_config : ''; ?></span>
                 </h5>
                 <div onclick="event.stopPropagation();">
                     <?php if ($jogo['status'] === 'Lista Aberta'): ?>
@@ -451,47 +467,86 @@ include '../../includes/header.php';
             <div class="card-body">
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <h6>Participantes Inscritos</h6>
+                        <h6>Lista Principal</h6>
                         <div id="listaParticipantes" class="list-group" style="max-height: 400px; overflow-y: auto;">
-                            <?php foreach ($participantes as $p): ?>
-                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <?php for ($vaga = 1; $vaga <= $max_participantes_config; $vaga++): ?>
+                                <?php $p = $participantes_principais[$vaga - 1] ?? null; ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center <?php echo $p ? '' : 'text-muted bg-light'; ?>">
                                     <div class="d-flex align-items-center gap-2">
-                                        <?php if ($p['usuario_id']): ?>
+                                        <span class="badge bg-secondary" style="min-width:34px;"><?php echo $vaga; ?></span>
+                                        <?php if ($p && $p['usuario_id']): ?>
                                             <?php
                                             $avatar = '../../assets/arquivos/logo.png';
                                             if (!empty($p['foto_perfil'])) {
                                                 if (strpos($p['foto_perfil'], 'http') === 0 || strpos($p['foto_perfil'], '/') === 0) {
-                                                    // URL absoluta ou caminho absoluto
                                                     $avatar = $p['foto_perfil'];
                                                 } elseif (strpos($p['foto_perfil'], '../../assets/') === 0 || strpos($p['foto_perfil'], '../assets/') === 0 || strpos($p['foto_perfil'], 'assets/') === 0) {
-                                                    // Já tem assets/, garantir que comece com ../../
                                                     if (strpos($p['foto_perfil'], '../../') !== 0) {
-                                                        if (strpos($p['foto_perfil'], '../') === 0) {
-                                                            $avatar = '../' . ltrim($p['foto_perfil'], '/');
-                                                        } else {
-                                                            $avatar = '../../' . ltrim($p['foto_perfil'], '/');
-                                                        }
+                                                        $avatar = strpos($p['foto_perfil'], '../') === 0 ? '../' . ltrim($p['foto_perfil'], '/') : '../../' . ltrim($p['foto_perfil'], '/');
                                                     } else {
                                                         $avatar = $p['foto_perfil'];
                                                     }
                                                 } else {
-                                                    // Apenas nome do arquivo, adicionar caminho completo
                                                     $avatar = '../../assets/arquivos/' . ltrim($p['foto_perfil'], '/');
                                                 }
                                             }
                                             ?>
                                             <img src="<?php echo htmlspecialchars($avatar); ?>" class="rounded-circle" width="32" height="32" style="object-fit:cover;" alt="Avatar">
                                             <span><?php echo htmlspecialchars($p['usuario_nome']); ?></span>
+                                        <?php else: ?>
+                                            <span>Vaga disponível</span>
                                         <?php endif; ?>
                                     </div>
-                                    <button class="btn btn-sm btn-danger" onclick="removerParticipante(<?php echo $p['id']; ?>)">
-                                        <i class="fas fa-times"></i>
-                                    </button>
+                                    <?php if ($p): ?>
+                                        <button class="btn btn-sm btn-danger" onclick="removerParticipante(<?php echo $p['id']; ?>)">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
-                            <?php endforeach; ?>
+                            <?php endfor; ?>
                         </div>
+
+                        <h6 class="mt-3">Suplentes <span class="badge bg-warning text-dark"><?php echo $total_suplentes_preenchidos; ?> / 4</span></h6>
+                        <div id="listaSuplentes" class="list-group" style="max-height: 240px; overflow-y: auto;">
+                            <?php for ($vaga = 1; $vaga <= $max_suplentes; $vaga++): ?>
+                                <?php $p = $participantes_suplentes[$vaga - 1] ?? null; ?>
+                                <div class="list-group-item d-flex justify-content-between align-items-center <?php echo $p ? 'border-warning' : 'text-muted bg-light'; ?>">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-warning text-dark" style="min-width:34px;">S<?php echo $vaga; ?></span>
+                                        <?php if ($p && $p['usuario_id']): ?>
+                                            <?php
+                                            $avatar = '../../assets/arquivos/logo.png';
+                                            if (!empty($p['foto_perfil'])) {
+                                                if (strpos($p['foto_perfil'], 'http') === 0 || strpos($p['foto_perfil'], '/') === 0) {
+                                                    $avatar = $p['foto_perfil'];
+                                                } elseif (strpos($p['foto_perfil'], '../../assets/') === 0 || strpos($p['foto_perfil'], '../assets/') === 0 || strpos($p['foto_perfil'], 'assets/') === 0) {
+                                                    if (strpos($p['foto_perfil'], '../../') !== 0) {
+                                                        $avatar = strpos($p['foto_perfil'], '../') === 0 ? '../' . ltrim($p['foto_perfil'], '/') : '../../' . ltrim($p['foto_perfil'], '/');
+                                                    } else {
+                                                        $avatar = $p['foto_perfil'];
+                                                    }
+                                                } else {
+                                                    $avatar = '../../assets/arquivos/' . ltrim($p['foto_perfil'], '/');
+                                                }
+                                            }
+                                            ?>
+                                            <img src="<?php echo htmlspecialchars($avatar); ?>" class="rounded-circle" width="32" height="32" style="object-fit:cover;" alt="Avatar">
+                                            <span><?php echo htmlspecialchars($p['usuario_nome']); ?></span>
+                                        <?php else: ?>
+                                            <span>Vaga de suplente disponível</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if ($p): ?>
+                                        <button class="btn btn-sm btn-danger" onclick="removerParticipante(<?php echo $p['id']; ?>)">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endfor; ?>
+                        </div>
+                        <small class="text-muted d-block mt-2">Ao preencher a lista principal, os próximos inscritos entram automaticamente como suplentes.</small>
                     </div>
-                    <div class="col-md-6">
+<div class="col-md-6">
                         <h6>Adicionar do Grupo</h6>
                         <div id="listaMembros" class="list-group" style="max-height: 400px; overflow-y: auto;">
                             <?php 
@@ -549,7 +604,7 @@ include '../../includes/header.php';
                     <form id="formConfigModalidadeParticipantes" class="form-config-modalidade">
                         <input type="hidden" name="jogo_id" value="<?php echo $jogo_id; ?>">
                         <div class="row">
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-3 mb-3">
                                 <label for="modalidade_participantes" class="form-label">Modalidade *</label>
                                 <select class="form-control" id="modalidade_participantes" name="modalidade" required>
                                     <option value="">Selecione...</option>
@@ -560,17 +615,22 @@ include '../../includes/header.php';
                                 </select>
                                 <small class="text-muted" id="avisoModalidade"></small>
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-3 mb-3">
+                                <label for="max_participantes_participantes" class="form-label">Participantes Máximos *</label>
+                                <input type="number" class="form-control" id="max_participantes_participantes" name="max_participantes" min="4" required value="<?php echo $max_participantes_config ?: ''; ?>">
+                                <small class="text-muted">Lista principal. Suplentes: 4 fixos.</small>
+                            </div>
+                            <div class="col-md-3 mb-3">
                                 <label for="quantidade_times_participantes" class="form-label">Quantidade de Times *</label>
                                 <input type="number" class="form-control" id="quantidade_times_participantes" name="quantidade_times" min="2" required value="<?php echo $jogo['quantidade_times'] ?? ''; ?>" readonly>
-                                <small class="text-muted"><i class="fas fa-info-circle"></i> Calculado automaticamente</small>
+                                <small class="text-muted"><i class="fas fa-info-circle"></i> Calculado pelo máximo</small>
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-3 mb-3">
                                 <label for="integrantes_por_time_participantes" class="form-label">Integrantes por Time *</label>
                                 <input type="number" class="form-control" id="integrantes_por_time_participantes" name="integrantes_por_time" min="2" required value="<?php echo $jogo['integrantes_por_time'] ?? ''; ?>" readonly>
                                 <small class="text-muted">Definido pela modalidade</small>
-                                <small class="text-muted d-block mt-1">Participantes disponíveis: <strong id="totalParticipantesDisponiveis"><?php echo count($participantes); ?></strong></small>
-                                <small class="text-muted d-block mt-1">Total necessário: <span id="totalNecessarioParticipantes">0</span> participantes</small>
+                                <small class="text-muted d-block mt-1">Titulares: <strong id="totalParticipantesDisponiveis"><?php echo $total_titulares_preenchidos; ?></strong> / <span id="totalComSuplentes"><?php echo $max_participantes_config ?: 0; ?></span></small>
+                                <small class="text-muted d-block mt-1">Lista principal: <span id="totalNecessarioParticipantes">0</span> participantes</small>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-primary">
@@ -597,6 +657,7 @@ include '../../includes/header.php';
             <div class="card-body">
                 <form id="formConfigModalidade">
                     <input type="hidden" name="jogo_id" value="<?php echo $jogo_id; ?>">
+                    <input type="hidden" id="max_participantes" name="max_participantes" value="<?php echo ((int)($jogo['quantidade_times'] ?? 0)) * ((int)($jogo['integrantes_por_time'] ?? 0)); ?>">
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="modalidade" class="form-label">Modalidade *</label>
@@ -1040,8 +1101,9 @@ function removerParticipante(participanteId) {
 
 // Atualizar contador de participantes
 function atualizarContadorParticipantes() {
-    const totalParticipantes = $('#listaParticipantes .list-group-item').length;
-    $('h5:contains("Participantes") .badge').text(totalParticipantes);
+    const titulares = $('#listaParticipantes .list-group-item').not('.text-muted').length;
+    const maxTitulares = parseInt($('#max_participantes_participantes').val()) || titulares;
+    $('h5:contains("Participantes") .badge').text(titulares + ' / ' + maxTitulares);
 }
 
 // Configurar modalidade (formulário dentro de participantes)
@@ -1052,25 +1114,31 @@ $('#formConfigModalidadeParticipantes').on('submit', function(e) {
     const modalidade = $('#modalidade_participantes').val();
     const integrantesPorTime = modalidadeIntegrantes[modalidade] || 0;
     let quantidadeTimes = parseInt($('#quantidade_times_participantes').val()) || 0;
-    
-    // Se não tiver quantidade de times, calcular novamente
-    if (!quantidadeTimes && modalidade && integrantesPorTime > 0 && totalParticipantes > 0) {
-        quantidadeTimes = Math.floor(totalParticipantes / integrantesPorTime);
+    const maxParticipantes = parseInt($('#max_participantes_participantes').val()) || 0;
+    // Calcular quantidade de times pelo máximo da lista principal
+    if (!quantidadeTimes && modalidade && integrantesPorTime > 0 && maxParticipantes > 0) {
+        quantidadeTimes = Math.floor(maxParticipantes / integrantesPorTime);
     }
-    
+
     const totalUtilizado = quantidadeTimes * integrantesPorTime;
-    const sobra = totalParticipantes - totalUtilizado;
-    
-    if (quantidadeTimes < 2) {
-        showAlert('É necessário pelo menos 2 times para esta modalidade.', 'danger');
+    const sobra = maxParticipantes - totalUtilizado;
+    const excessoComSuplentes = totalParticipantes - (maxParticipantes + 4);
+
+    if (quantidadeTimes < 2 || maxParticipantes < integrantesPorTime * 2) {
+        showAlert('A lista principal precisa comportar pelo menos 2 times.', 'danger');
         return;
     }
-    
-    if (sobra > 0) {
-        showAlert('Esta modalidade não é viável. Sobrariam ' + sobra + ' participante' + (sobra > 1 ? 's' : '') + ' de fora. Escolha outra modalidade.', 'danger');
+
+    if (sobra !== 0) {
+        showAlert('O máximo da lista principal precisa fechar times completos para esta modalidade. Use um múltiplo de ' + integrantesPorTime + '.', 'danger');
         return;
     }
-    
+
+    if (excessoComSuplentes > 0) {
+        showAlert('A lista comporta ' + maxParticipantes + ' titulares e 4 suplentes. Remova ' + excessoComSuplentes + ' participante' + (excessoComSuplentes > 1 ? 's' : '') + ' antes de salvar.', 'danger');
+        return;
+    }
+
     // Garantir que os valores estão corretos antes de enviar
     $('#quantidade_times_participantes').val(quantidadeTimes);
     $('#integrantes_por_time_participantes').val(integrantesPorTime);
@@ -1101,42 +1169,43 @@ const modalidadeIntegrantes = {
 
 // Total de participantes disponíveis
 const totalParticipantes = <?php echo count($participantes); ?>;
+const totalTitulares = <?php echo $total_titulares_preenchidos; ?>;
+const totalSuplentes = <?php echo $total_suplentes_preenchidos; ?>;
 
 // Calcular quantidade de times automaticamente
 function calcularQuantidadeTimes() {
     const modalidade = $('#modalidade_participantes').val();
     const integrantesPorTime = modalidadeIntegrantes[modalidade] || 0;
-    
-    if (modalidade && integrantesPorTime > 0 && totalParticipantes > 0) {
-        // Definir integrantes por time
+    const maxParticipantes = parseInt($('#max_participantes_participantes').val()) || 0;
+
+    if (modalidade && integrantesPorTime > 0 && maxParticipantes > 0) {
         $('#integrantes_por_time_participantes').val(integrantesPorTime);
-        
-        // Calcular quantidade de times (arredondar para baixo)
-        const quantidadeTimes = Math.floor(totalParticipantes / integrantesPorTime);
+
+        const quantidadeTimes = Math.floor(maxParticipantes / integrantesPorTime);
         const totalUtilizado = quantidadeTimes * integrantesPorTime;
-        const sobra = totalParticipantes - totalUtilizado;
-        
-        // Verificar se é viável (divisível sem sobras e mínimo 2 times)
-        const viavel = (quantidadeTimes >= 2 && sobra === 0);
-        
-        if (viavel) {
+        const sobra = maxParticipantes - totalUtilizado;
+        const totalComSuplentes = maxParticipantes + 4;
+        const suplentesAtuais = Math.max(0, totalParticipantes - maxParticipantes);
+        $('#totalComSuplentes').text(maxParticipantes);
+
+        if (quantidadeTimes >= 2 && sobra === 0) {
             $('#quantidade_times_participantes').val(quantidadeTimes);
             $('#totalNecessarioParticipantes').text(totalUtilizado);
-            $('#avisoModalidade').text('✓ Todos os ' + totalParticipantes + ' participantes serão utilizados em ' + quantidadeTimes + ' times.').removeClass('text-danger').addClass('text-success');
-            $('#formConfigModalidadeParticipantes button[type="submit"]').prop('disabled', false);
-        } else if (quantidadeTimes >= 2 && sobra > 0) {
-            // Se tem times suficientes mas sobra participantes, mostrar aviso mas permitir tentar salvar
-            $('#quantidade_times_participantes').val(quantidadeTimes);
-            $('#totalNecessarioParticipantes').text(totalUtilizado);
-            $('#avisoModalidade').text('⚠ Esta modalidade não é viável. Sobrariam ' + sobra + ' participante' + (sobra > 1 ? 's' : '') + ' de fora. Escolha outra modalidade.').removeClass('text-success').addClass('text-danger');
-            $('#formConfigModalidadeParticipantes button[type="submit"]').prop('disabled', true);
+            const textoSuplentes = suplentesAtuais > 0
+                ? ' Suplentes atuais: ' + Math.min(suplentesAtuais, 4) + '/4.'
+                : ' Suplentes serão preenchidos após lotar a lista principal.';
+            $('#avisoModalidade').text('✓ Lista principal com ' + totalUtilizado + ' vagas em ' + quantidadeTimes + ' times.' + textoSuplentes).removeClass('text-danger').addClass('text-success');
+            $('#formConfigModalidadeParticipantes button[type="submit"]').prop('disabled', totalParticipantes > totalComSuplentes);
+            if (totalParticipantes > totalComSuplentes) {
+                $('#avisoModalidade').text('⚠ Há mais inscritos que o limite de titulares + 4 suplentes. Remova excedentes antes de salvar.').removeClass('text-success').addClass('text-danger');
+            }
         } else {
-            $('#quantidade_times_participantes').val('');
-            $('#totalNecessarioParticipantes').text('0');
+            $('#quantidade_times_participantes').val(quantidadeTimes >= 2 ? quantidadeTimes : '');
+            $('#totalNecessarioParticipantes').text(totalUtilizado || '0');
             if (quantidadeTimes < 2) {
-                $('#avisoModalidade').text('⚠ Não há participantes suficientes. Mínimo necessário: ' + (integrantesPorTime * 2) + ' participantes.').removeClass('text-success').addClass('text-danger');
-            } else if (sobra > 0) {
-                $('#avisoModalidade').text('⚠ Esta modalidade não é viável. Sobrariam ' + sobra + ' participante' + (sobra > 1 ? 's' : '') + ' de fora. Escolha outra modalidade.').removeClass('text-success').addClass('text-danger');
+                $('#avisoModalidade').text('⚠ A lista principal precisa comportar pelo menos 2 times: mínimo ' + (integrantesPorTime * 2) + ' participantes.').removeClass('text-success').addClass('text-danger');
+            } else {
+                $('#avisoModalidade').text('⚠ O máximo precisa ser múltiplo de ' + integrantesPorTime + '. Hoje sobra ' + sobra + ' vaga sem fechar time.').removeClass('text-success').addClass('text-danger');
             }
             $('#formConfigModalidadeParticipantes button[type="submit"]').prop('disabled', true);
         }
@@ -1144,13 +1213,14 @@ function calcularQuantidadeTimes() {
         $('#integrantes_por_time_participantes').val('');
         $('#quantidade_times_participantes').val('');
         $('#totalNecessarioParticipantes').text('0');
+        $('#totalComSuplentes').text('0');
         $('#avisoModalidade').text('').removeClass('text-success text-danger');
         $('#formConfigModalidadeParticipantes button[type="submit"]').prop('disabled', false);
     }
 }
 
 // Quando a modalidade mudar, calcular automaticamente
-$('#modalidade_participantes').on('change', function() {
+$('#modalidade_participantes, #max_participantes_participantes').on('change input', function() {
     calcularQuantidadeTimes();
 });
 
@@ -1193,8 +1263,10 @@ $('#formConfigModalidade').on('submit', function(e) {
 $('#quantidade_times, #integrantes_por_time').on('input', function() {
     const qtd = parseInt($('#quantidade_times').val()) || 0;
     const integrantes = parseInt($('#integrantes_por_time').val()) || 0;
-    $('#totalNecessario').text(qtd * integrantes);
-});
+    const total = qtd * integrantes;
+    $('#totalNecessario').text(total);
+    $('#max_participantes').val(total);
+}).trigger('input');
 <?php endif; ?>
 
 // Criar times

@@ -3,6 +3,10 @@ session_start();
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) { echo json_encode(['success'=>false,'message'=>'Não autenticado']); exit(); }
@@ -45,6 +49,8 @@ try {
         throw new Exception('Não foi possível aprovar a solicitação.');
     }
 
+    recalcularVagasJogo($pdo, $jogo_id);
+
     $pdo->commit();
 
     // Notificar usuário aceito no jogo
@@ -60,7 +66,8 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    echo json_encode(['success'=>false,'message'=>$e->getMessage()]);
+    error_log('Erro ao aprovar participação no jogo: ' . $e->getMessage());
+    echo json_encode(['success'=>false,'message'=>'Erro ao aprovar participação.']);
     exit();
 }
 

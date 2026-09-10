@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -41,7 +45,7 @@ if (!$sou_admin && !isAdmin($pdo, $_SESSION['user_id'])) {
 }
 
 // Verificar se o jogo já tem times criados ou partidas iniciadas
-if (!empty($jogo['modalidade']) && ($jogo['status'] === 'Times Criados' || $jogo['status'] === 'Em Andamento')) {
+if (in_array($jogo['status'], ['Times Criados', 'Em Andamento', 'Finalizado', 'Arquivado'], true)) {
     echo json_encode(['success' => false, 'message' => 'Não é possível reabrir a lista. O jogo já tem times criados ou partidas em andamento.']);
     exit();
 }

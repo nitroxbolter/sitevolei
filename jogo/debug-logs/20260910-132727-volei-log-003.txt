@@ -1,0 +1,62 @@
+LOG DEBUG VOLEI #3
+inicio do jogo: 10/09/2026, 10:27:24
+status: SAQUE
+sacador: OPPONENT
+
+TABELA DA QUADRA
+| item | valor |
+| --- | --- |
+| canvas | 800 x 600 px |
+| largura jogavel X | 92 ate 708 (616px) |
+| distancia total Y | 78 ate 570 (492px) |
+| centro X | 400 |
+| rede Y | 320 |
+| altura da rede Z | 114 |
+| escala Z | 0.72 px por Z |
+| lado adversario | Y 78 ate 304 |
+| lado jogador | Y 320 ate 570 |
+
+| quadrante | X tela | Y tela | X quadra | Y profundidade |
+| --- | --- | --- | --- | --- |
+| ADVERSARIO_ESQUERDA | 92 ate 400 | 78 ate 198 | -308 ate 0 | -242 ate -122 |
+| ADVERSARIO_DIREITA | 400 ate 708 | 78 ate 198 | 0 ate 308 | -242 ate -122 |
+| JOGADOR_ESQUERDA | 92 ate 400 | 320 ate 570 | -308 ate 0 | 0 ate 250 |
+| JOGADOR_DIREITA | 400 ate 708 | 320 ate 570 | 0 ate 308 | 0 ate 250 |
+
+JOGADA 1: SAQUE
+CALCULOS
+modelo: saque automatico IA
+origem: x 400 y 184 z 139
+alvo: x 465 y 500
+tempo voo: 1.180s
+formula vx: (465 - 400) / 1.180 = 55
+formula vy: (500 - 184) / 1.180 = 268
+velocidade aplicada: vx 55 vy 268 vz 83
+velocidade total aplicada: 286
+gravidade voo: -340
+formula vz: (0 - 139 - 0.5 * -340 * 1.180^2) / 1.180
+
+ator: ADVERSARIO
+forca: saque automatico
+qualidade: ataque
+altura toque bola Z: 139
+altura player ao bater Z: 0
+ponto toque: X 0 | Y -136 (screen 400, 184)
+velocidade: vx 55 | vy 268 | vz 83 | total 286
+cruzamento rede: X --- | Y 0 | Z --- (screen ---, 320)
+tempo ate rede real: --- | origem rede: ---
+altura da rede Z: 114
+folga acima da rede Z: ---
+passou da rede: ---
+toque no chao: X 65 | Y 182 | lado JOGADOR (screen 465, 502)
+manchete adversaria: ---
+ponto manchete: X --- | Y --- | Z --- (screen ---, ---)
+distancia bola-adversario na manchete: ---
+receptor adversario: X --- | Y --- (screen ---, ---)
+raio recepcao: --- | chance: --- | resultado recepcao: ---
+resultado: tocou no chao
+
+vencedor do ponto: OPPONENT
+placar: jogador 0 x 3 adversario
+sets: jogador 0 x 0 adversario
+fim do jogo: 10/09/2026, 10:27:27

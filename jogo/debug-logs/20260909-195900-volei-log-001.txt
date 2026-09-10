@@ -1,0 +1,68 @@
+LOG DEBUG VOLEI #1
+inicio do jogo: 09/09/2026, 16:58:48
+status: SAQUE
+sacador: PLAYER
+
+TABELA DA QUADRA
+| item | valor |
+| --- | --- |
+| canvas | 800 x 600 px |
+| largura jogavel X | 92 ate 708 (616px) |
+| distancia total Y | 78 ate 570 (492px) |
+| centro X | 400 |
+| rede Y | 320 |
+| altura da rede Z | 114 |
+| escala Z | 0.72 px por Z |
+| lado adversario | Y 78 ate 304 |
+| lado jogador | Y 320 ate 570 |
+
+| quadrante | X tela | Y tela | X quadra | Y profundidade |
+| --- | --- | --- | --- | --- |
+| ADVERSARIO_ESQUERDA | 92 ate 400 | 78 ate 198 | -308 ate 0 | -242 ate -122 |
+| ADVERSARIO_DIREITA | 400 ate 708 | 78 ate 198 | 0 ate 308 | -242 ate -122 |
+| JOGADOR_ESQUERDA | 92 ate 400 | 320 ate 570 | -308 ate 0 | 0 ate 250 |
+| JOGADOR_DIREITA | 400 ate 708 | 320 ate 570 | 0 ate 308 | 0 ate 250 |
+
+JOGADA 1: ATAQUE
+CALCULOS
+modelo: corte jogador
+lado ataque: LEFT
+forca pela altura: 1.00
+altura do contato: 273
+origem: x 144 y 376 z 273
+alvo x interno: 495
+profundidade alvo: 250
+tempo voo: 0.720s
+formula vx: (495 - 144) / 0.720 = 487
+formula vy: (70 - 376) / 0.720 = -425
+vz corte: -320
+velocidade aplicada: vx 320 vy -425 vz -320
+velocidade total aplicada: 621
+chance defesa IA: 25%
+tipo ataque jogador: ATTACK
+forca ataque jogador: 1.00
+distancia defesa IA: 36
+
+ator: JOGADOR
+forca: 1.00
+qualidade: LEFT
+altura toque bola Z: 273
+altura player ao bater Z: 109
+ponto toque: X -256 | Y 56 (screen 144, 376)
+velocidade: vx 320 | vy -425 | vz -320 | total 621
+altura na rede Z: ---
+altura da rede Z: 114
+folga acima da rede Z: ---
+passou da rede: ---
+toque no chao: X --- | Y --- | lado --- (screen ---, ---)
+manchete adversaria: MACHETE
+ponto manchete: X -163 | Y -68 | Z 123 (screen 237, 252)
+distancia bola-adversario na manchete: 0
+receptor adversario: X -163 | Y -68 (screen 237, 252)
+raio recepcao: 48 | chance: 25% | resultado recepcao: falhou na defesa do ataque
+resultado: defesa adversaria falhou
+
+vencedor do ponto: PLAYER
+placar: jogador 1 x 0 adversario
+sets: jogador 0 x 0 adversario
+fim do jogo: 09/09/2026, 16:59:00

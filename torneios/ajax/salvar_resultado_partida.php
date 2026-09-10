@@ -52,6 +52,10 @@ if (session_status() === PHP_SESSION_NONE) {
 try {
     @require_once '../../includes/db_connect.php';
     @require_once '../../includes/functions.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
 } catch (Exception $e) {
     returnJsonError('Erro ao carregar arquivos: ' . $e->getMessage());
 } catch (Error $e) {
@@ -174,9 +178,6 @@ try {
     }
     
     // Log para debug
-    error_log("DEBUG: Atualizando partida ID $partida_id na tabela $tabela_partida");
-    error_log("DEBUG: SQL: $sql_update");
-    error_log("DEBUG: Parâmetros: pontos_time1=$pontos_time1, pontos_time2=$pontos_time2, vencedor_id=" . ($vencedor_id ?? 'NULL') . ", status=$status");
     
     $stmt_update = executeQuery($pdo, $sql_update, [$pontos_time1, $pontos_time2, $vencedor_id, $status, $partida_id]);
     
@@ -193,13 +194,10 @@ try {
     $rows_affected = 0;
     if ($stmt_update && is_object($stmt_update) && $stmt_update instanceof PDOStatement) {
         $rows_affected = $stmt_update->rowCount();
-        error_log("DEBUG: Linhas afetadas: $rows_affected");
         if ($rows_affected === 0) {
-            error_log("AVISO: Nenhuma linha foi atualizada para partida ID $partida_id na tabela $tabela_partida. Verificar se a partida existe.");
             // Não lançar exceção aqui, apenas logar, pois pode ser que a partida já esteja atualizada
         }
     } else {
-        error_log("DEBUG: executeQuery retornou: " . gettype($stmt_update) . " (não é PDOStatement)");
     }
     
     // Buscar modalidade do torneio (necessário para várias verificações)
@@ -329,7 +327,6 @@ try {
             $grupo_info = $stmt_check_grupo_tipo ? $stmt_check_grupo_tipo->fetch() : null;
             $is_grupo_2fase = $grupo_info && strpos($grupo_info['nome'], '2ª Fase') !== false;
             
-            error_log("DEBUG: Recalculando classificação para grupo_id: $grupo_id_para_recalc, torneio_id: {$partida['torneio_id']}, é 2ª fase: " . ($is_grupo_2fase ? 'SIM' : 'NÃO'));
             
             if ($grupo_id_para_recalc) {
                 if ($is_grupo_2fase || $is_2fase_partida) {
@@ -390,22 +387,16 @@ try {
                 
                 if ($stmt_recalc) {
                     $recalcs_debug = $stmt_recalc->fetchAll();
-                    error_log("DEBUG: Resultados do recálculo para grupo $grupo_id_para_recalc: " . json_encode($recalcs_debug));
-                    error_log("DEBUG: Total de registros retornados pelo recálculo: " . count($recalcs_debug));
                     // Re-executar a query para usar no loop
                     if ($is_grupo_2fase || $is_2fase_partida) {
                         $stmt_recalc = executeQuery($pdo, $sql_recalc, [$grupo_id_para_recalc, $partida['torneio_id'], $grupo_id_para_recalc, $grupo_id_para_recalc, $partida['torneio_id']]);
                     } else {
                         $stmt_recalc = executeQuery($pdo, $sql_recalc, [$partida['torneio_id'], $grupo_id_para_recalc, $partida['torneio_id'], $grupo_id_para_recalc]);
                     }
-                    error_log("DEBUG: Query re-executada. Resultados encontrados: " . ($stmt_recalc ? $stmt_recalc->rowCount() : 0));
                 } else {
-                    error_log("DEBUG: ERRO na execução da query de recálculo");
                     $error_info = $pdo->errorInfo();
-                    error_log("DEBUG: Erro PDO: " . ($error_info[2] ?? 'Desconhecido'));
                 }
             } else {
-                error_log("DEBUG: grupo_id não encontrado para a partida. Usando recálculo geral.");
                 // Se não encontrar grupo_id, usar recálculo geral
                 $sql_recalc = "SELECT 
                     tc.time_id,
@@ -462,14 +453,12 @@ try {
         
         $recalcs = $stmt_recalc ? $stmt_recalc->fetchAll() : [];
         
-        error_log("DEBUG: Total de registros recalculados: " . count($recalcs));
         
         foreach ($recalcs as $recalc) {
             $saldo = (int)$recalc['pontos_pro'] - (int)$recalc['pontos_contra'];
             $average = (int)$recalc['pontos_contra'] > 0 ? (float)$recalc['pontos_pro'] / (float)$recalc['pontos_contra'] : ((int)$recalc['pontos_pro'] > 0 ? 999.99 : 0.00);
             $pontos_total = ((int)$recalc['vitorias'] * 3) + ((int)$recalc['empates'] * 1);
             
-            error_log("DEBUG: Atualizando time_id {$recalc['time_id']} - V: {$recalc['vitorias']}, D: {$recalc['derrotas']}, PF: {$recalc['pontos_pro']}, PS: {$recalc['pontos_contra']}");
             
             // Se for torneio_pro e tiver grupo_id na partida, atualizar com filtro de grupo_id
             // IMPORTANTE: Verificar se é partida da 2ª fase para não afetar a 1ª fase
@@ -483,14 +472,12 @@ try {
                 
                 // Debug: verificar se identificou corretamente
                 if ($is_2fase) {
-                    error_log("DEBUG: Partida da 2ª fase detectada. grupo_id_para_recalc: $grupo_id_para_recalc, grupo_2fase encontrado: " . ($grupo_2fase ? 'SIM (' . $grupo_2fase['nome'] . ')' : 'NÃO'));
                 }
             }
             
             // Atualizar classificação se for 2ª fase (verificar tanto pela fase da partida quanto pelo nome do grupo)
             $deve_atualizar_2fase = $modalidade_torneio === 'torneio_pro' && $tem_grupo_id_classificacao && !empty($grupo_id_para_recalc) && ($is_2fase || $grupo_2fase);
             
-            error_log("DEBUG: Verificando atualização 2ª fase - modalidade=$modalidade_torneio, tem_grupo_id=$tem_grupo_id_classificacao, grupo_id_para_recalc=$grupo_id_para_recalc, is_2fase=" . ($is_2fase ? 'SIM' : 'NÃO') . ", grupo_2fase=" . ($grupo_2fase ? 'SIM (' . ($grupo_2fase['nome'] ?? 'N/A') . ')' : 'NÃO') . ", deve_atualizar=" . ($deve_atualizar_2fase ? 'SIM' : 'NÃO'));
             
             if ($deve_atualizar_2fase) {
                 // Atualizar APENAS classificação da 2ª fase (não afetar 1ª fase)
@@ -563,9 +550,7 @@ try {
                         
                         if ($result_update_2fase === false) {
                             $error_info = $pdo->errorInfo();
-                            error_log("DEBUG: ERRO ao atualizar classificação 2ª fase do time {$recalc['time_id']}: " . ($error_info[2] ?? 'Desconhecido'));
                         } else {
-                            error_log("DEBUG: Classificação 2ª fase atualizada com sucesso para time {$recalc['time_id']} no grupo $grupo_id_update");
                         }
                     } else {
                         // Inserir registro na nova tabela
@@ -588,9 +573,7 @@ try {
                         
                         if ($result_insert_2fase === false) {
                             $error_info = $pdo->errorInfo();
-                            error_log("DEBUG: ERRO ao inserir classificação 2ª fase do time {$recalc['time_id']}: " . ($error_info[2] ?? 'Desconhecido'));
                         } else {
-                            error_log("DEBUG: Classificação 2ª fase inserida com sucesso para time {$recalc['time_id']} no grupo $grupo_id_update");
                         }
                     }
                 } else {
@@ -618,9 +601,7 @@ try {
                         
                         if ($result_update === false) {
                             $error_info = $pdo->errorInfo();
-                            error_log("DEBUG: ERRO ao atualizar classificação do time {$recalc['time_id']}: " . ($error_info[2] ?? 'Desconhecido'));
                         } else {
-                            error_log("DEBUG: Classificação atualizada com sucesso para time {$recalc['time_id']} no grupo $grupo_id_update");
                         }
                     } else {
                         // Inserir registro se não existir
@@ -643,16 +624,13 @@ try {
                         
                         if ($result_insert === false) {
                             $error_info = $pdo->errorInfo();
-                            error_log("DEBUG: ERRO ao inserir classificação do time {$recalc['time_id']}: " . ($error_info[2] ?? 'Desconhecido'));
                         } else {
-                            error_log("DEBUG: Classificação inserida com sucesso para time {$recalc['time_id']} no grupo $grupo_id_update");
                         }
                     }
                 }
                 
                 // ATUALIZAR NOVA TABELA torneio_classificacao_2fase
                 if ($serie_nome && in_array($serie_nome, ['Ouro A', 'Ouro B', 'Prata A', 'Prata B', 'Bronze A', 'Bronze B'])) {
-                    error_log("DEBUG: Tentando atualizar torneio_classificacao_2fase - Série: $serie_nome, Time: {$recalc['time_id']}");
                     
                     // Verificar se a tabela existe
                     $sql_check_table_2fase = "SHOW TABLES LIKE 'torneio_classificacao_2fase'";
@@ -660,14 +638,12 @@ try {
                     $table_exists_2fase = $stmt_check_table_2fase ? $stmt_check_table_2fase->fetch() : null;
                     
                     if ($table_exists_2fase) {
-                        error_log("DEBUG: Tabela torneio_classificacao_2fase existe! Atualizando série: $serie_nome");
                         
                         // Verificar se já existe registro
                         $sql_check_2fase = "SELECT id FROM torneio_classificacao_2fase WHERE torneio_id = ? AND serie = ? AND time_id = ?";
                         $stmt_check_2fase = executeQuery($pdo, $sql_check_2fase, [$partida['torneio_id'], $serie_nome, $recalc['time_id']]);
                         $exists_2fase = $stmt_check_2fase ? $stmt_check_2fase->fetch() : null;
                         
-                        error_log("DEBUG: Verificando registro - torneio_id={$partida['torneio_id']}, serie=$serie_nome, time_id={$recalc['time_id']}, existe=" . ($exists_2fase ? 'SIM' : 'NÃO'));
                         
                         if ($exists_2fase) {
                             // Atualizar
@@ -692,9 +668,7 @@ try {
                             
                             if ($result_update === false) {
                                 $error_info = $pdo->errorInfo();
-                                error_log("DEBUG: ERRO ao atualizar torneio_classificacao_2fase: " . ($error_info[2] ?? 'Desconhecido'));
                             } else {
-                                error_log("DEBUG: ✓ Atualizada classificação 2ª fase - Série: $serie_nome, Time: {$recalc['time_id']}, V:{$recalc['vitorias']}, D:{$recalc['derrotas']}, Pts:$pontos_total");
                             }
                         } else {
                             // Inserir
@@ -718,13 +692,10 @@ try {
                             
                             if ($result_insert === false) {
                                 $error_info = $pdo->errorInfo();
-                                error_log("DEBUG: ERRO ao inserir torneio_classificacao_2fase: " . ($error_info[2] ?? 'Desconhecido'));
                             } else {
-                                error_log("DEBUG: ✓ Inserida classificação 2ª fase - Série: $serie_nome, Time: {$recalc['time_id']}, V:{$recalc['vitorias']}, D:{$recalc['derrotas']}, Pts:$pontos_total");
                             }
                         }
                     } else {
-                        error_log("DEBUG: ⚠ Tabela torneio_classificacao_2fase NÃO existe! Execute o script SQL primeiro.");
                     }
                 }
                 
@@ -856,7 +827,6 @@ try {
                     
                     if ($result_update === false) {
                         $error_info = $pdo->errorInfo();
-                        error_log("DEBUG: ERRO ao atualizar classificação da 1ª fase do time {$recalc['time_id']}: " . ($error_info[2] ?? 'Desconhecido'));
                     }
                 }
             } else {
@@ -943,7 +913,6 @@ try {
                                 $sql_update_pos_2fase = "UPDATE torneio_classificacao_2fase SET posicao = ? WHERE torneio_id = ? AND serie = ? AND time_id = ?";
                                 executeQuery($pdo, $sql_update_pos_2fase, [$posicao_2fase++, $partida['torneio_id'], $serie_nome_pos, $pos_2fase['time_id']]);
                             }
-                            error_log("DEBUG: Posições atualizadas na tabela torneio_classificacao_2fase para série $serie_nome_pos");
                         }
                     }
                 }
@@ -1474,7 +1443,6 @@ try {
                 
                 if ($total_alimentada == 0) {
                     // Alimentar a tabela com os times classificados da 1ª fase
-                    error_log("DEBUG: Alimentando tabela torneio_classificacao_2fase para torneio " . $partida['torneio_id']);
                     
                     try {
                         $pdo->beginTransaction();
@@ -1547,10 +1515,8 @@ try {
                         }
                         
                         $pdo->commit();
-                        error_log("DEBUG: Tabela torneio_classificacao_2fase alimentada com sucesso!");
                     } catch (Exception $e) {
                         $pdo->rollBack();
-                        error_log("DEBUG: Erro ao alimentar torneio_classificacao_2fase: " . $e->getMessage());
                     }
                 }
             }
@@ -1579,7 +1545,6 @@ try {
                     $stmt_check_table_historico = $pdo->query($sql_check_table_historico);
                     $tabela_historico_existe = $stmt_check_table_historico && $stmt_check_table_historico->rowCount() > 0;
                     
-                    error_log("DEBUG ELIMINATORIA: tabela_historico_existe=" . ($tabela_historico_existe ? 'SIM' : 'NÃO'));
                     
                     if ($tabela_historico_existe) {
                         // Buscar informações do grupo
@@ -1590,7 +1555,6 @@ try {
                         if ($grupo_info_elim) {
                             $grupo_id_elim = (int)$grupo_info_elim['id'];
                             $nome_grupo_elim = $grupo_info_elim['nome'];
-                            error_log("DEBUG ELIMINATORIA: nome_grupo={$nome_grupo_elim}, grupo_id={$grupo_id_elim}");
                             
                             // Registrar ambos os times da partida eliminatória
                             $times_partida = [$partida_atualizada['time1_id'], $partida_atualizada['time2_id']];
@@ -1674,27 +1638,21 @@ try {
                                         ]);
                                         
                                         if ($result_insert !== false) {
-                                            error_log("DEBUG ELIMINATORIA: ✓ Inserido time_id={$time_id_elim} na tabela historico (chave_origem_id={$chave_origem_id}, grupo={$time_1fase['grupo_nome']})");
                                         } else {
                                             $error_info = $pdo->errorInfo();
-                                            error_log("DEBUG ELIMINATORIA: ✗ ERRO ao inserir time_id={$time_id_elim}: " . ($error_info[2] ?? 'Desconhecido'));
                                         }
                                     } else {
-                                        error_log("DEBUG ELIMINATORIA: Time_id={$time_id_elim} já existe na tabela historico (chave_origem_id={$chave_origem_id})");
                                     }
                                 } else {
-                                    error_log("DEBUG ELIMINATORIA: ⚠ Não foi possível encontrar dados do time_id={$time_id_elim} na 1ª fase nem na 2ª fase");
                                 }
                             }
                         } else {
-                            error_log("DEBUG ELIMINATORIA: Grupo não encontrado (ID: {$partida_atualizada['grupo_id']})");
                         }
                     }
                 }
             }
         } catch (Exception $e_hist) {
             // Erro ao processar histórico - não é crítico, apenas logar
-            error_log("DEBUG ELIMINATORIA: Erro ao processar histórico: " . $e_hist->getMessage());
         }
     }
     

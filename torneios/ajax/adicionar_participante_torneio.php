@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -29,7 +33,6 @@ $nome_avulso = trim($_POST['nome_avulso'] ?? '');
 $participantes = $_POST['participantes'] ?? [];
 
 // Debug
-error_log("=== DEBUG ADICIONAR PARTICIPANTE TORNEIO ===");
 error_log("POST completo: " . print_r($_POST, true));
 error_log("torneio_id capturado: " . $torneio_id);
 

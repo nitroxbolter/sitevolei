@@ -1,0 +1,75 @@
+LOG DEBUG VOLEI #3
+inicio do jogo: 09/09/2026, 16:55:56
+status: SAQUE
+sacador: PLAYER
+
+TABELA DA QUADRA
+| item | valor |
+| --- | --- |
+| canvas | 800 x 600 px |
+| largura jogavel X | 92 ate 708 (616px) |
+| distancia total Y | 78 ate 570 (492px) |
+| centro X | 400 |
+| rede Y | 320 |
+| altura da rede Z | 114 |
+| escala Z | 0.72 px por Z |
+| lado adversario | Y 78 ate 304 |
+| lado jogador | Y 320 ate 570 |
+
+| quadrante | X tela | Y tela | X quadra | Y profundidade |
+| --- | --- | --- | --- | --- |
+| ADVERSARIO_ESQUERDA | 92 ate 400 | 78 ate 198 | -308 ate 0 | -242 ate -122 |
+| ADVERSARIO_DIREITA | 400 ate 708 | 78 ate 198 | 0 ate 308 | -242 ate -122 |
+| JOGADOR_ESQUERDA | 92 ate 400 | 320 ate 570 | -308 ate 0 | 0 ate 250 |
+| JOGADOR_DIREITA | 400 ate 708 | 320 ate 570 | 0 ate 308 | 0 ate 250 |
+
+JOGADA 1: SAQUE
+CALCULOS
+forca carregada: 0.533
+forca final saque: 0.950
+qualidade saque: BOM
+profundidade base: -263.5 = linear(-45, -275, 0.950)
+ajuste qualidade: 0.0
+risco fora: 0.0
+profundidade alvo: -263.5
+limites quadra adversaria: -242 ate -16
+origem: x 400 y 532 z 114
+alvo: x 400 y 57
+tempo ate chao: 2.537s
+velocidade bruta: vx 0 vy -187
+multiplicador velocidade: 0.93
+velocidade aplicada: vx 0 vy -175 vz 304
+velocidade total aplicada: 351
+gravidade voo: -260
+vz inicial: 304
+tempo ate rede: 1.131s
+z na rede antes ajuste: 291
+assistencia rede: 0
+chance defesa IA: 58%
+tipo ataque jogador: ATTACK
+forca ataque jogador: 0.00
+distancia defesa IA: 10
+
+ator: JOGADOR
+forca: 0.95
+qualidade: BOM
+altura toque bola Z: 114
+altura player ao bater Z: 85
+ponto toque: X 0 | Y 212 (screen 400, 532)
+velocidade: vx 0 | vy -175 | vz 304 | total 351
+altura na rede Z: 292
+altura da rede Z: 114
+folga acima da rede Z: 178
+passou da rede: SIM
+toque no chao: X 0 | Y -191 | lado ADVERSARIO (screen 400, 129)
+manchete adversaria: ---
+ponto manchete: X --- | Y --- | Z --- (screen ---, ---)
+distancia bola-adversario na manchete: ---
+receptor adversario: X --- | Y --- (screen ---, ---)
+raio recepcao: --- | chance: --- | resultado recepcao: ---
+resultado: tocou no chao
+
+vencedor do ponto: PLAYER
+placar: jogador 3 x 0 adversario
+sets: jogador 0 x 0 adversario
+fim do jogo: 09/09/2026, 16:56:01

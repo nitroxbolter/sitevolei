@@ -6,6 +6,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 // Função para retornar erro JSON
@@ -31,7 +35,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Debug: Logar tudo que está sendo recebido
-error_log("=== DEBUG CONFIGURAR TORNEIO ===");
 error_log("POST completo: " . print_r($_POST, true));
 error_log("GET completo: " . print_r($_GET, true));
 error_log("REQUEST completo: " . print_r($_REQUEST, true));

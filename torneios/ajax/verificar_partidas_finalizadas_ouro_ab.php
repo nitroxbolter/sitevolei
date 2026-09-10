@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -34,7 +38,6 @@ $grupo_ouro_b = $stmt_grupo_b ? $stmt_grupo_b->fetch() : null;
 $sql_debug_grupos = "SELECT id, nome FROM torneio_grupos WHERE torneio_id = ? AND nome LIKE '%2ª Fase%'";
 $stmt_debug_grupos = executeQuery($pdo, $sql_debug_grupos, [$torneio_id]);
 $grupos_debug = $stmt_debug_grupos ? $stmt_debug_grupos->fetchAll(PDO::FETCH_ASSOC) : [];
-error_log("DEBUG VERIFICAR - Grupos da 2ª fase encontrados: " . json_encode($grupos_debug));
 
 if (!$grupo_ouro_a || !$grupo_ouro_b) {
     echo json_encode([
@@ -49,16 +52,12 @@ if (!$grupo_ouro_a || !$grupo_ouro_b) {
 $grupo_ouro_a_id = (int)$grupo_ouro_a['id'];
 $grupo_ouro_b_id = (int)$grupo_ouro_b['id'];
 
-error_log("DEBUG VERIFICAR - Grupo Ouro A ID: $grupo_ouro_a_id, Nome: " . $grupo_ouro_a['nome']);
-error_log("DEBUG VERIFICAR - Grupo Ouro B ID: $grupo_ouro_b_id, Nome: " . $grupo_ouro_b['nome']);
 
 // Debug: verificar TODAS as partidas da 2ª fase primeiro
 $sql_debug_todas = "SELECT id, grupo_id, status, tipo_fase, fase FROM torneio_partidas WHERE torneio_id = ? AND fase = '2ª Fase' LIMIT 20";
 $stmt_debug_todas = executeQuery($pdo, $sql_debug_todas, [$torneio_id]);
 $partidas_debug_todas = $stmt_debug_todas ? $stmt_debug_todas->fetchAll(PDO::FETCH_ASSOC) : [];
-error_log("DEBUG VERIFICAR - Total partidas 2ª fase no torneio: " . count($partidas_debug_todas));
 if (count($partidas_debug_todas) > 0) {
-    error_log("DEBUG VERIFICAR - Primeira partida: " . json_encode($partidas_debug_todas[0]));
 }
 
 // Verificar partidas do Ouro A (sem filtro de tipo_fase para garantir que encontra todas)
@@ -73,7 +72,6 @@ $info_partidas_a = $stmt_check_a ? $stmt_check_a->fetch() : ['total' => 0, 'fina
 $sql_debug_a = "SELECT id, status, tipo_fase, fase, grupo_id FROM torneio_partidas WHERE torneio_id = ? AND grupo_id = ? AND fase = '2ª Fase'";
 $stmt_debug_a = executeQuery($pdo, $sql_debug_a, [$torneio_id, $grupo_ouro_a_id]);
 $partidas_debug_a = $stmt_debug_a ? $stmt_debug_a->fetchAll(PDO::FETCH_ASSOC) : [];
-error_log("DEBUG Ouro A - Total partidas encontradas: " . count($partidas_debug_a) . ", Grupo ID: $grupo_ouro_a_id, Total na query COUNT: " . $info_partidas_a['total'] . ", Finalizadas: " . $info_partidas_a['finalizadas']);
 
 // Verificar partidas do Ouro B (sem filtro de tipo_fase para garantir que encontra todas)
 $sql_check_partidas_b = "SELECT COUNT(*) as total, 
@@ -87,11 +85,9 @@ $info_partidas_b = $stmt_check_b ? $stmt_check_b->fetch() : ['total' => 0, 'fina
 $sql_debug_b = "SELECT id, status, tipo_fase, fase, grupo_id FROM torneio_partidas WHERE torneio_id = ? AND grupo_id = ? AND fase = '2ª Fase'";
 $stmt_debug_b = executeQuery($pdo, $sql_debug_b, [$torneio_id, $grupo_ouro_b_id]);
 $partidas_debug_b = $stmt_debug_b ? $stmt_debug_b->fetchAll(PDO::FETCH_ASSOC) : [];
-error_log("DEBUG Ouro B - Total partidas encontradas: " . count($partidas_debug_b) . ", Grupo ID: $grupo_ouro_b_id, Total na query COUNT: " . $info_partidas_b['total'] . ", Finalizadas: " . $info_partidas_b['finalizadas']);
 
 // Se não encontrou partidas pelos grupos, tentar buscar por nome do grupo nas partidas
 if ($info_partidas_a['total'] == 0 || $info_partidas_b['total'] == 0) {
-    error_log("DEBUG VERIFICAR - Não encontrou partidas pelos grupos. Tentando buscar por JOIN com grupos...");
     
     // Tentar buscar partidas fazendo JOIN com grupos
     $sql_alt_a = "SELECT COUNT(*) as total, 
@@ -111,7 +107,6 @@ if ($info_partidas_a['total'] == 0 || $info_partidas_b['total'] == 0) {
     $info_alt_b = $stmt_alt_b ? $stmt_alt_b->fetch() : ['total' => 0, 'finalizadas' => 0];
     
     if ($info_alt_a['total'] > 0 || $info_alt_b['total'] > 0) {
-        error_log("DEBUG VERIFICAR - Encontrou partidas usando JOIN: Ouro A={$info_alt_a['total']}, Ouro B={$info_alt_b['total']}");
         $info_partidas_a = $info_alt_a;
         $info_partidas_b = $info_alt_b;
     }

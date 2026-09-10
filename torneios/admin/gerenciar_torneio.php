@@ -64,8 +64,6 @@ $tem_ordem = in_array('ordem', $columns);
 $tem_nome_avulso = in_array('nome_avulso', $columns);
 
 // Debug
-error_log("Colunas torneio_participantes: " . implode(', ', $columns));
-error_log("Buscando participantes do torneio ID: " . $torneio_id);
 
 // Query básica - funciona mesmo sem nome_avulso
 $sql = "SELECT tp.id, tp.torneio_id, tp.usuario_id, tp.data_inscricao";
@@ -96,16 +94,12 @@ try {
     $participantes = $stmt ? $stmt->fetchAll() : [];
     
     // Debug
-    error_log("SQL executado: " . $sql);
-    error_log("Total de participantes encontrados: " . count($participantes));
     if (count($participantes) > 0) {
-        error_log("Primeiro participante: " . print_r($participantes[0], true));
     } else {
         // Verificar se há participantes na tabela
         $sql_check = "SELECT COUNT(*) as total FROM torneio_participantes WHERE torneio_id = ?";
         $stmt_check = executeQuery($pdo, $sql_check, [$torneio_id]);
         $check_result = $stmt_check ? $stmt_check->fetch() : false;
-        error_log("Total de participantes na tabela para este torneio: " . ($check_result['total'] ?? 0));
     }
 } catch (Exception $e) {
     error_log("Erro ao buscar participantes: " . $e->getMessage());
@@ -2014,7 +2008,6 @@ window.processarAdicionarParticipante = function() {
                                         $temNomeAvulso = isset($p['nome_avulso']) && !empty($p['nome_avulso']);
                                         
                                         // Debug
-                                        error_log("Participante ID: " . $p['id'] . ", usuario_id: " . ($p['usuario_id'] ?? 'NULL') . ", nome_avulso: " . ($p['nome_avulso'] ?? 'NULL'));
                                         
                                         if ($temUsuario): 
                                             $avatar = $p['usuario_foto'] ?: '../../assets/arquivos/logo.png';
@@ -2779,7 +2772,6 @@ if ($timesSalvos && $modalidade):
         });
         
         // Debug: verificar se há partidas retornadas
-        error_log("DEBUG - Total de partidas 2ª fase encontradas: " . count($partidas_2fase) . " (Todos: " . count($partidas_todos) . ", Eliminatórias: " . count($partidas_elim) . ")");
     }
     
     // Verificar se há eliminatórias geradas (antes de usar nas partidas)

@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -124,7 +128,6 @@ try {
         $sql_check = "SELECT id FROM torneio_times WHERE torneio_id = ? AND ordem = ?";
         $stmt_check = executeQuery($pdo, $sql_check, [$torneio_id, $i]);
         if ($stmt_check && $stmt_check->fetch()) {
-            error_log("AVISO: Time com ordem $i já existe para torneio $torneio_id - pulando criação");
             continue;
         }
         
@@ -166,7 +169,6 @@ try {
     $pdo->commit();
     
     if ($total_criado != $quantidade_times) {
-        error_log("AVISO: Esperado criar {$quantidade_times} times, mas foram criados {$total_criado} times no torneio {$torneio_id}");
     }
     
     $mensagem = $times_existentes > 0 

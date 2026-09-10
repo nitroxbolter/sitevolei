@@ -46,6 +46,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -149,12 +153,8 @@ $info_partidas_a = $stmt_check_a ? $stmt_check_a->fetch() : ['total' => 0, 'fina
 $stmt_check_b = executeQuery($pdo, $sql_check_partidas_b, [$torneio_id, $grupo_b_id]);
 $info_partidas_b = $stmt_check_b ? $stmt_check_b->fetch() : ['total' => 0, 'finalizadas' => 0];
 
-error_log("DEBUG: $serie A - Total jogos 'Todos Contra Todos': {$info_partidas_a['total']}, Finalizados: {$info_partidas_a['finalizadas']}");
-error_log("DEBUG: $serie B - Total jogos 'Todos Contra Todos': {$info_partidas_b['total']}, Finalizados: {$info_partidas_b['finalizadas']}");
 
 // Verificar se os jogos da 2ª fase foram criados
-error_log("DEBUG: $serie A - Total jogos 2ª fase (exceto Semi-Final/Final): {$info_partidas_a['total']}, Finalizados: {$info_partidas_a['finalizadas']}");
-error_log("DEBUG: $serie B - Total jogos 2ª fase (exceto Semi-Final/Final): {$info_partidas_b['total']}, Finalizados: {$info_partidas_b['finalizadas']}");
 
 if ($info_partidas_a['total'] == 0 || $info_partidas_b['total'] == 0) {
     echo json_encode([

@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -85,7 +89,6 @@ try {
         $sql_check = "SELECT id FROM grupo_jogo_times WHERE jogo_id = ? AND ordem = ?";
         $stmt_check = executeQuery($pdo, $sql_check, [$jogo_id, $i]);
         if ($stmt_check && $stmt_check->fetch()) {
-            error_log("AVISO: Time com ordem $i já existe para jogo $jogo_id - pulando criação");
             continue;
         }
         
@@ -97,7 +100,6 @@ try {
             $id_criado = (int)$pdo->lastInsertId();
             $ids_criados[] = $id_criado;
             $times_criados++;
-            error_log("DEBUG - Time criado: ID=$id_criado, Nome=$nome, Ordem=$i, Jogo=$jogo_id");
         } else {
             $error = $stmt->errorInfo();
             error_log("Erro ao criar time $i para jogo $jogo_id: " . ($error[2] ?? 'Erro desconhecido'));
@@ -120,7 +122,6 @@ try {
     ];
     
     // Logs detalhados
-    error_log("=== DEBUG CRIAÇÃO DE TIMES ===");
     error_log("Jogo ID: $jogo_id");
     error_log("Quantidade esperada: $quantidade_times");
     error_log("IDs criados durante inserção: " . json_encode($ids_criados));
@@ -149,7 +150,6 @@ try {
     $pdo->commit();
     
     if ($total_criado != $quantidade_times) {
-        error_log("AVISO: Esperado criar {$quantidade_times} times, mas foram criados {$total_criado} times no jogo {$jogo_id}");
     }
     
     $mensagem = $times_existentes > 0 

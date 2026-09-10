@@ -3,6 +3,10 @@ session_start();
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -18,10 +22,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $grupo_id = (int)($_POST['grupo_id'] ?? 0);
 $usuario_id = (int)($_POST['usuario_id'] ?? 0);
 
-// Verificar se usuário atual é admin do grupo
-$sql = "SELECT id FROM grupos WHERE id = ? AND administrador_id = ? AND ativo = 1";
-$stmt = executeQuery($pdo, $sql, [$grupo_id, $_SESSION['user_id']]);
-if (!$stmt || !$stmt->fetch()) {
+// Verificar se usuário atual pode gerenciar o grupo
+$sql = "SELECT administrador_id FROM grupos WHERE id = ? AND ativo = 1";
+$stmt = executeQuery($pdo, $sql, [$grupo_id]);
+$grupo = $stmt ? $stmt->fetch() : false;
+$pode_gerenciar = $grupo && ((int)$grupo['administrador_id'] === (int)$_SESSION['user_id'] || isAdmin($pdo, $_SESSION['user_id']));
+if (!$pode_gerenciar) {
     echo json_encode(['success' => false, 'message' => 'Acesso negado.']);
     exit();
 }

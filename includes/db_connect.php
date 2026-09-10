@@ -1,9 +1,9 @@
 <?php
 // Conexão com o banco de dados
-$host = '127.0.0.1';
+$host = 'localhost';
 $dbname = 'database_vb';
-$username = 'root';
-$password = '';
+$username = 'sitevolei';
+$password = '216b68202934c71c162d84c5a079dcf5';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
@@ -11,7 +11,9 @@ try {
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true); // Habilitar buffered queries para evitar erro de queries não finalizadas
 } catch(PDOException $e) {
-    die("Erro na conexão: " . $e->getMessage());
+    error_log("Erro na conexão com o banco: " . $e->getMessage());
+    http_response_code(500);
+    die("Erro interno ao conectar ao banco de dados.");
 }
 
 // Função para executar queries de forma segura

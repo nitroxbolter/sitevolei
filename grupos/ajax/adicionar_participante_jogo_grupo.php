@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -86,6 +90,22 @@ if ($jogo['lista_aberta'] != 1 || $jogo['status'] !== 'Lista Aberta') {
     exit();
 }
 
+// Verificar limite da lista principal + suplentes quando configurado
+$max_participantes = (int)($jogo['max_participantes'] ?? 0);
+$entrara_como_suplente = false;
+if ($max_participantes > 0) {
+    $max_suplentes = 4;
+    $limite_total = $max_participantes + $max_suplentes;
+    $sql = "SELECT COUNT(*) AS total FROM grupo_jogo_participantes WHERE jogo_id = ?";
+    $stmt = executeQuery($pdo, $sql, [$jogo_id]);
+    $total_inscritos = $stmt ? (int)$stmt->fetch()['total'] : 0;
+    if ($total_inscritos >= $limite_total) {
+        echo json_encode(['success' => false, 'message' => "A lista já está cheia: {$max_participantes} titulares e {$max_suplentes} suplentes."]);
+        exit();
+    }
+    $entrara_como_suplente = $total_inscritos >= $max_participantes;
+}
+
 // Verificar se já está inscrito
 $sql = "SELECT id FROM grupo_jogo_participantes WHERE jogo_id = ? AND usuario_id = ?";
 $stmt = executeQuery($pdo, $sql, [$jogo_id, $usuario_id]);
@@ -99,7 +119,10 @@ $sql = "INSERT INTO grupo_jogo_participantes (jogo_id, usuario_id) VALUES (?, ?)
 $result = executeQuery($pdo, $sql, [$jogo_id, $usuario_id]);
 
 if ($result) {
-    echo json_encode(['success' => true, 'message' => 'Você entrou no jogo com sucesso!']);
+    $mensagem = $entrara_como_suplente
+        ? 'Participante adicionado como suplente.'
+        : 'Participante adicionado na lista principal.';
+    echo json_encode(['success' => true, 'message' => $mensagem, 'suplente' => $entrara_como_suplente]);
 } else {
     echo json_encode(['success' => false, 'message' => 'Erro ao entrar no jogo.']);
 }

@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) { echo json_encode(['success'=>false,'message'=>'Não autenticado']); exit(); }
@@ -18,6 +22,7 @@ if (!$jogo || (int)$jogo['criado_por'] !== (int)$_SESSION['user_id']) { echo jso
 
 // Rejeitar (marca Ausente ou remove?) Vamos apenas atualizar para 'Pendente'->'Ausente'
 $ok = executeQuery($pdo, "UPDATE confirmacoes_presenca SET status='Ausente' WHERE jogo_id = ? AND usuario_id = ?", [$jogo_id, $usuario_id]);
+if ($ok) { recalcularVagasJogo($pdo, $jogo_id); }
 
 echo json_encode(['success'=>(bool)$ok]);
 exit();

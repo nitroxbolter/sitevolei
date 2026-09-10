@@ -48,14 +48,19 @@ if ($_POST) {
 
     $acao = $_POST['acao'] ?? '';
     if ($acao === 'atualizar_grupo') {
-        $nome = trim($_POST['nome'] ?? '');
-        $local = trim($_POST['local_principal'] ?? '');
-        $descricao = trim($_POST['descricao'] ?? '');
-        $modalidade = trim($_POST['modalidade'] ?? '');
+        $nome = trim(strip_tags($_POST['nome'] ?? ''));
+        $local = trim(strip_tags($_POST['local_principal'] ?? ''));
+        $descricao = trim(strip_tags($_POST['descricao'] ?? ''));
+        $modalidade = trim(strip_tags($_POST['modalidade'] ?? ''));
         $logoCropped = $_POST['logo_cropped'] ?? '';
+        $modalidadesPermitidas = ['', 'Vôlei', 'Vôlei Quadra', 'Vôlei Areia', 'Beach Tênis'];
+        if (!in_array($modalidade, $modalidadesPermitidas, true)) { $modalidade = ''; }
 
         if ($nome === '' || $local === '') {
             $_SESSION['mensagem'] = 'Nome e Local são obrigatórios.';
+            $_SESSION['tipo_mensagem'] = 'danger';
+        } elseif (mb_strlen($nome) > 100 || mb_strlen($local) > 200 || mb_strlen($descricao) > 5000) {
+            $_SESSION['mensagem'] = 'Algum campo ultrapassou o tamanho permitido.';
             $_SESSION['tipo_mensagem'] = 'danger';
         } else {
             // Atualizar com modalidade se a coluna existir
@@ -226,6 +231,12 @@ if ($_POST) {
     }
     if ($acao === 'remover_membro') {
         $usuario_id = (int)($_POST['usuario_id'] ?? 0);
+        if ($usuario_id && $usuario_id === (int)($grupo['administrador_id'] ?? 0)) {
+            $_SESSION['mensagem'] = 'Não é possível remover o administrador do grupo.';
+            $_SESSION['tipo_mensagem'] = 'danger';
+            header('Location: grupo.php?id='.(int)$grupo_id);
+            exit();
+        }
         if ($usuario_id) {
             $sql = "DELETE FROM grupo_membros WHERE grupo_id = ? AND usuario_id = ?";
             if (executeQuery($pdo, $sql, [$grupo_id, $usuario_id])) {

@@ -835,6 +835,57 @@ function handleGroundReceive(scene) {
     });
 }
 
+function performPlayerFreeball(scene, receiver) {
+    state = 'FLYING';
+    gamePhase = 'RALLY';
+    lastTouch = 'PLAYER_HIT';
+    opponentReceiveAttemptedForPlayerHit = false;
+    lastPlayerAttackPower = 0.02;
+
+    ballBody.x = receiver.x;
+    ballBody.y = receiver.y - 18;
+    ballZ = Math.max(ballZ, 55);
+    ballVZ = 190;
+
+    const flightTime = 1.85;
+    const targetX = Phaser.Math.Clamp(receiver.x + Phaser.Math.Between(-70, 70), COURT.minX + 70, COURT.maxX - 70);
+    const targetY = NET.y - Phaser.Math.Between(105, 165);
+    const vx = (targetX - ballBody.x) / flightTime;
+    const vy = (targetY - ballBody.y) / flightTime;
+    ballBody.setVelocity(
+        Phaser.Math.Clamp(vx, -PHYS_CLAMP.maxVX, PHYS_CLAMP.maxVX),
+        Phaser.Math.Clamp(vy, -PHYS_CLAMP.maxVY, PHYS_CLAMP.maxVY)
+    );
+
+    beginShotLog('MANCHETE 3 TOQUE', 'JOGADOR', {
+        force: lastPlayerAttackPower.toFixed(2),
+        quality: controlledRole
+    });
+    setShotCalculations({
+        'modelo': 'bola de graca lenta no terceiro toque',
+        'origem': `x ${Math.round(ballBody.x)} y ${Math.round(ballBody.y)} z ${Math.round(ballZ)}`,
+        'alvo': `x ${Math.round(targetX)} y ${Math.round(targetY)}`,
+        'tempo voo': `${flightTime.toFixed(3)}s`,
+        'velocidade aplicada': `vx ${Math.round(ballBody.body.velocity.x)} vy ${Math.round(ballBody.body.velocity.y)} vz ${Math.round(ballVZ)}`
+    });
+    setShotVelocity(ballBody.body.velocity.x, ballBody.body.velocity.y, ballVZ);
+
+    playerHitPoseUntil = scene.time.now + 420;
+    scene.time.delayedCall(520, () => {
+        if (receiver.texture && receiver.texture.key === 'playerMachete') {
+            receiver.setTexture('playerBack');
+        }
+        playerHitPoseUntil = 0;
+        if (state === 'FLYING' && lastTouch === 'PLAYER_HIT') {
+            setControlledRole('RECEPTOR');
+        }
+    });
+
+    trail.start();
+    scene.cameras.main.shake(80, 0.003);
+    addHitEffect(scene, { shake: 0.002 });
+}
+
 function updateBallPhysics(scene) {
     if (state === 'READY' || state === 'POINT' || state === 'OPP_SERVE_WAIT') return;
 
@@ -1021,6 +1072,11 @@ function updateBallPhysics(scene) {
                     // ignore
                 } else {
                     lastPlayerPassMs = scene.time.now;
+                    if (lastTouch === 'PLAYER_SET') {
+                        performPlayerFreeball(scene, p);
+                        return;
+                    }
+
                     lastTouch = 'PLAYER_PASS';
                     lastContactMark = { x: ballBody.x, y: ballBody.y, t: scene.time.now };
                     // Força a bola a ir para o levantador (sem "quicar" no chão)

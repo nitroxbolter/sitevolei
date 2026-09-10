@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -159,13 +163,10 @@ try {
         $times = $stmt_times ? $stmt_times->fetchAll(PDO::FETCH_ASSOC) : [];
         
         // Log de debug
-        error_log("DEBUG - Grupo: $nome_grupo (ID: $grupo_id) - Times encontrados: " . count($times));
         foreach ($times as $t) {
-            error_log("DEBUG - Time no grupo $nome_grupo: " . $t['nome'] . " (ID: " . $t['time_id'] . ")");
         }
         
         if (count($times) < 2) {
-            error_log("DEBUG - Grupo $nome_grupo tem menos de 2 times, pulando...");
             continue; // Pular se não tiver pelo menos 2 times
         }
         
@@ -206,7 +207,6 @@ try {
                                            pontos_pro, pontos_contra, saldo_pontos, average, pontos_total, posicao)
                                           VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0, 0.00, 0, NULL)";
                 executeQuery($pdo, $sql_insert_class_2fase, [$torneio_id, $time_id, $grupo_id]);
-                error_log("DEBUG - Criado registro inicial em partidas_2fase_classificacao para time $time_id no grupo $grupo_id ($nome_grupo)");
             }
         }
         
@@ -362,7 +362,6 @@ try {
             $time2_id = $partida['time2_id'];
             
             // Log de debug
-            error_log("DEBUG - Criando partida no grupo $nome_grupo (Rodada $rodada): " . $partida['time1_nome'] . " vs " . $partida['time2_nome']);
             
             // Inserir na nova tabela partidas_2fase_torneio
             $sql_partida = "INSERT INTO partidas_2fase_torneio (torneio_id, time1_id, time2_id, grupo_id, rodada, quadra, status) 
@@ -379,7 +378,6 @@ try {
             $partidas_grupo++;
         }
         
-        error_log("DEBUG - Grupo $nome_grupo: $partidas_grupo partidas criadas");
     }
     
     // Criar grupos de classificação por série (Ouro, Prata, Bronze) para alimentar com os jogos da 2ª fase

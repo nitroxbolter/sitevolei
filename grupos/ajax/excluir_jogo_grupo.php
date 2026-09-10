@@ -3,6 +3,10 @@ session_start();
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    exigirCsrfToken();
+}
+
 header('Content-Type: application/json');
 
 if (!isLoggedIn()) {
@@ -74,7 +78,8 @@ try {
     echo json_encode(['success' => true, 'message' => 'Jogo excluído com sucesso!']);
 } catch (Exception $e) {
     $pdo->rollBack();
-    echo json_encode(['success' => false, 'message' => 'Erro ao excluir jogo: ' . $e->getMessage()]);
+    error_log('Erro ao excluir jogo do grupo: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Erro ao excluir jogo.']);
 }
 ?>
 

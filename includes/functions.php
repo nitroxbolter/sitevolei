@@ -331,6 +331,20 @@ function podeGerenciarTorneio($pdo, $torneio_id, $usuario_id) {
         || isAdmin($pdo, $usuario_id);
 }
 
+
+function recalcularVagasJogo($pdo, $jogo_id) {
+    $stmtJogo = executeQuery($pdo, "SELECT max_jogadores FROM jogos WHERE id = ?", [(int)$jogo_id]);
+    $jogo = $stmtJogo ? $stmtJogo->fetch() : false;
+    if (!$jogo) {
+        return false;
+    }
+
+    $stmtConfirmados = executeQuery($pdo, "SELECT COUNT(*) AS total FROM confirmacoes_presenca WHERE jogo_id = ? AND status = 'Confirmado'", [(int)$jogo_id]);
+    $confirmados = $stmtConfirmados ? (int)($stmtConfirmados->fetch()['total'] ?? 0) : 0;
+    $vagas = max(0, (int)$jogo['max_jogadores'] - $confirmados);
+    return executeQuery($pdo, "UPDATE jogos SET vagas_disponiveis = ? WHERE id = ?", [$vagas, (int)$jogo_id]);
+}
+
 function podeGerenciarJogo($pdo, $jogo_id, $usuario_id) {
     $sql = "SELECT j.criado_por, g.administrador_id
             FROM jogos j
@@ -346,6 +360,49 @@ function podeGerenciarJogo($pdo, $jogo_id, $usuario_id) {
     return (int)$jogo['criado_por'] === (int)$usuario_id
         || (!empty($jogo['administrador_id']) && (int)$jogo['administrador_id'] === (int)$usuario_id)
         || isAdmin($pdo, $usuario_id);
+}
+
+
+function normalizarDataHoraInput($valor) {
+    $valor = trim((string)$valor);
+    if ($valor === '') {
+        return '';
+    }
+
+    $formatos = ['Y-m-d\TH:i', 'Y-m-d\TH:i:s', 'Y-m-d H:i', 'Y-m-d H:i:s'];
+    foreach ($formatos as $formato) {
+        $dt = DateTime::createFromFormat($formato, $valor);
+        $erros = DateTime::getLastErrors();
+        $semErros = $erros === false || (($erros['warning_count'] ?? 0) === 0 && ($erros['error_count'] ?? 0) === 0);
+        if ($dt instanceof DateTime && $semErros) {
+            return $dt->format('Y-m-d H:i:s');
+        }
+    }
+
+    return '';
+}
+
+function normalizarModalidadeJogo($modalidade) {
+    $mapa = [
+        '' => '',
+        'Volei' => 'Volei',
+        'Vôlei' => 'Volei',
+        'Volei Quadra' => 'Volei Quadra',
+        'Vôlei Quadra' => 'Volei Quadra',
+        'Volei Areia' => 'Volei Areia',
+        'Vôlei Areia' => 'Volei Areia',
+        'Beach Tenis' => 'Beach Tenis',
+        'Beach Tênis' => 'Beach Tenis',
+    ];
+
+    $modalidade = trim((string)$modalidade);
+    return $mapa[$modalidade] ?? '';
+}
+
+function normalizarNivelJogo($nivel) {
+    $permitidos = ['', 'Iniciante', 'Intermediário', 'Avançado', 'Profissional'];
+    $nivel = trim((string)$nivel);
+    return in_array($nivel, $permitidos, true) ? $nivel : '';
 }
 
 // Função para exibir mensagens de erro/sucesso
