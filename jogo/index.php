@@ -1,11 +1,28 @@
 <?php
 session_start();
 require_once __DIR__ . '/../includes/db_connect.php';
+require_once __DIR__ . '/campaign_helpers.php';
 
 $voleiDebugAdmin = false;
+$campaignState = volleyballCampaignDefaultState(isLoggedIn());
 if (isLoggedIn()) {
     $voleiDebugUser = getUserById($pdo, (int) $_SESSION['user_id']);
     $voleiDebugAdmin = $voleiDebugUser && strcasecmp((string) ($voleiDebugUser['email'] ?? ''), 'admin@gmail.com') === 0;
+    if ($voleiDebugUser) {
+        try {
+            $campaignState = volleyballCampaignGetState(
+                $pdo,
+                (int) $_SESSION['user_id'],
+                volleyballCampaignDefaultTeamName($voleiDebugUser)
+            );
+        } catch (Throwable $error) {
+            error_log('Erro ao carregar campanha de volei: ' . $error->getMessage());
+        }
+    }
+}
+
+if (!isset($_SESSION['volei_campaign_csrf'])) {
+    $_SESSION['volei_campaign_csrf'] = bin2hex(random_bytes(32));
 }
 ?>
 <!DOCTYPE html>
@@ -26,15 +43,46 @@ if (isLoggedIn()) {
             <span>O jogo usa a tela deitada para mostrar todos os comandos.</span>
         </div>
     </div>
-    <div id="difficulty-modal" class="difficulty-modal" role="dialog" aria-modal="true" aria-labelledby="difficulty-title">
-        <div class="difficulty-dialog">
-            <span class="difficulty-kicker">NOVA PARTIDA</span>
-            <h2 id="difficulty-title">Escolha a dificuldade</h2>
-            <div class="difficulty-options" role="group" aria-label="Dificuldade da partida">
-                <button type="button" data-difficulty="easy">Fácil</button>
-                <button type="button" data-difficulty="medium">Médio</button>
-                <button type="button" data-difficulty="advanced">Avançado</button>
-            </div>
+    <div id="campaign-modal" class="campaign-modal" role="dialog" aria-modal="true" aria-labelledby="campaign-title">
+        <div class="campaign-dialog">
+            <section class="campaign-main">
+                <span class="campaign-kicker">CAMPANHA MUNDOVOLEI</span>
+                <h2 id="campaign-title">Próximo desafio</h2>
+
+                <div class="campaign-team-editor">
+                    <label for="player-team-name">Seu time</label>
+                    <div class="campaign-team-edit-row">
+                        <input id="player-team-name" type="text" minlength="2" maxlength="30" autocomplete="off"
+                               <?php echo $campaignState['loggedIn'] ? '' : 'readonly'; ?>>
+                        <?php if ($campaignState['loggedIn']): ?>
+                            <button id="save-team-name" type="button">Salvar</button>
+                        <?php endif; ?>
+                    </div>
+                    <?php if (!$campaignState['loggedIn']): ?>
+                        <small>Entre na sua conta para salvar o nome e o progresso.</small>
+                    <?php endif; ?>
+                    <p id="team-name-feedback" class="campaign-feedback" aria-live="polite"></p>
+                </div>
+
+                <div class="campaign-stats" aria-label="Estatísticas da campanha">
+                    <span><strong id="campaign-wins">0</strong> vitórias</span>
+                    <span><strong id="campaign-losses">0</strong> derrotas</span>
+                </div>
+
+                <div class="campaign-current-opponent">
+                    <span>Adversário atual</span>
+                    <strong id="campaign-opponent-name">México</strong>
+                    <em id="campaign-difficulty">Fácil</em>
+                </div>
+
+                <button id="start-campaign-match" class="campaign-start" type="button">Jogar contra México</button>
+                <p id="campaign-feedback" class="campaign-feedback" aria-live="polite"></p>
+            </section>
+
+            <section class="campaign-route" aria-labelledby="campaign-route-title">
+                <h3 id="campaign-route-title">Caminho dos adversários</h3>
+                <ol id="campaign-opponents"></ol>
+            </section>
         </div>
     </div>
     <div id="game-wrapper">
@@ -42,6 +90,11 @@ if (isLoggedIn()) {
             <a class="home-link" href="/" aria-label="Voltar para o site">‹</a>
             <h1>SPIKE VOLLEYBALL</h1>
             <div id="game-ui">
+                <div class="matchup-names" aria-label="Times da partida">
+                    <span id="player-team-label">Meu Time</span>
+                    <b>×</b>
+                    <span id="opponent-team-label">México</span>
+                </div>
                 <div class="score-container">
                     <div class="sets-container" aria-label="Sets">
                         <span>Sets</span>
@@ -88,6 +141,8 @@ if (isLoggedIn()) {
 
     <script>
         window.VOLEI_DEBUG_ADMIN = <?php echo $voleiDebugAdmin ? 'true' : 'false'; ?>;
+        window.VOLEI_CAMPAIGN = <?php echo json_encode($campaignState, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP); ?>;
+        window.VOLEI_CAMPAIGN_CSRF = <?php echo json_encode($_SESSION['volei_campaign_csrf'], JSON_HEX_TAG | JSON_HEX_AMP); ?>;
     </script>
     <script src="game.js?v=<?php echo time(); ?>"></script>
 </body>

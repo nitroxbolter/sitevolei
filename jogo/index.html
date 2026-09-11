@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edu voley - Browser Game</title>
+    <title>Spike Volleyball - O Jogo</title>
     <script>
         if (window.location.protocol === 'file:') {
             window.location.replace('http://127.0.0.1:8080/');
@@ -14,28 +14,55 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="difficulty-modal" class="difficulty-modal" role="dialog" aria-modal="true" aria-labelledby="difficulty-title">
-        <div class="difficulty-dialog">
-            <span class="difficulty-kicker">NOVA PARTIDA</span>
-            <h2 id="difficulty-title">Escolha a dificuldade</h2>
-            <div class="difficulty-options" role="group" aria-label="Dificuldade da partida">
-                <button type="button" data-difficulty="easy">Fácil</button>
-                <button type="button" data-difficulty="medium">Médio</button>
-                <button type="button" data-difficulty="advanced">Avançado</button>
-            </div>
+    <div id="campaign-modal" class="campaign-modal" role="dialog" aria-modal="true" aria-labelledby="campaign-title">
+        <div class="campaign-dialog">
+            <section class="campaign-main">
+                <span class="campaign-kicker">CAMPANHA MUNDOVOLEI</span>
+                <h2 id="campaign-title">Próximo desafio</h2>
+                <div class="campaign-team-editor">
+                    <label for="player-team-name">Seu time</label>
+                    <div class="campaign-team-edit-row">
+                        <input id="player-team-name" type="text" value="Meu Time" readonly>
+                    </div>
+                    <small>Entre na sua conta para salvar o nome e o progresso.</small>
+                    <p id="team-name-feedback" class="campaign-feedback" aria-live="polite"></p>
+                </div>
+                <div class="campaign-stats" aria-label="Estatísticas da campanha">
+                    <span><strong id="campaign-wins">0</strong> vitórias</span>
+                    <span><strong id="campaign-losses">0</strong> derrotas</span>
+                </div>
+                <div class="campaign-current-opponent">
+                    <span>Adversário atual</span>
+                    <strong id="campaign-opponent-name">México</strong>
+                    <em id="campaign-difficulty">Fácil</em>
+                </div>
+                <button id="start-campaign-match" class="campaign-start" type="button">Jogar contra México</button>
+                <p id="campaign-feedback" class="campaign-feedback" aria-live="polite"></p>
+            </section>
+            <section class="campaign-route" aria-labelledby="campaign-route-title">
+                <h3 id="campaign-route-title">Caminho dos adversários</h3>
+                <ol id="campaign-opponents"></ol>
+            </section>
         </div>
     </div>
     <div class="game-wrapper">
         <header>
             <a class="home-link" href="/" aria-label="Voltar para o site">‹</a>
-            <h1 class="logo">Edu voley</h1>
-            <div class="scoreboard">
-                <div class="sets-container" aria-label="Sets">
-                    <span>Sets</span>
-                    <strong><span id="player-sets">0</span> - <span id="opponent-sets">0</span></strong>
+            <h1 class="logo">SPIKE VOLLEYBALL</h1>
+            <div id="game-ui">
+                <div class="matchup-names" aria-label="Times da partida">
+                    <span id="player-team-label">Meu Time</span>
+                    <b>×</b>
+                    <span id="opponent-team-label">México</span>
                 </div>
-                <div class="points-container" aria-label="Pontos">
-                    <span id="player-score">0</span> - <span id="opponent-score">0</span>
+                <div class="scoreboard">
+                    <div class="sets-container" aria-label="Sets">
+                        <span>Sets</span>
+                        <strong><span id="player-sets">0</span> - <span id="opponent-sets">0</span></strong>
+                    </div>
+                    <div class="points-container" aria-label="Pontos">
+                        <span id="player-score">0</span> - <span id="opponent-score">0</span>
+                    </div>
                 </div>
             </div>
         </header>
@@ -53,6 +80,11 @@
         </div>
     </div>
 
-    <script src="game.js?v=20260601-quadrantes-vermelho"></script>
+    <script>
+        window.VOLEI_DEBUG_ADMIN = false;
+        window.VOLEI_CAMPAIGN = { loggedIn: false, teamName: 'Meu Time', opponentIndex: 0, wins: 0, losses: 0, campaignCompleted: false };
+        window.VOLEI_CAMPAIGN_CSRF = '';
+    </script>
+    <script src="game.js?v=20260911-campanha"></script>
 </body>
 </html>

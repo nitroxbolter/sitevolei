@@ -162,6 +162,7 @@ canvas {
     body {
         align-items: flex-start;
         overflow: auto;
+        overflow-x: hidden;
     }
 
     .game-wrapper {
@@ -221,6 +222,34 @@ canvas {
     display: flex;
     align-items: center;
     gap: 14px;
+}
+
+#game-ui {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.matchup-names {
+    display: grid;
+    grid-template-columns: minmax(70px, 1fr) auto minmax(70px, 1fr);
+    align-items: center;
+    gap: 7px;
+    max-width: 270px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.matchup-names span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.matchup-names b {
+    color: var(--accent);
 }
 
 .points-container {
@@ -288,7 +317,7 @@ canvas {
     display: none;
 }
 
-.difficulty-modal {
+.campaign-modal {
     position: fixed;
     inset: 0;
     z-index: 9000;
@@ -300,21 +329,34 @@ canvas {
     backdrop-filter: blur(8px);
 }
 
-.difficulty-modal.is-hidden {
+.campaign-modal.is-hidden {
     display: none;
 }
 
-.difficulty-dialog {
-    width: min(520px, calc(100vw - 32px));
-    padding: 28px;
+.campaign-dialog {
+    width: min(760px, calc(100vw - 32px));
+    max-height: min(680px, calc(100dvh - 28px));
+    display: grid;
+    grid-template-columns: minmax(0, 1.18fr) minmax(250px, 0.82fr);
+    overflow: auto;
     border: 1px solid rgba(255, 255, 255, 0.16);
     border-radius: 8px;
     background: #101722;
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
-    text-align: center;
 }
 
-.difficulty-kicker {
+.campaign-main,
+.campaign-route {
+    min-width: 0;
+    padding: 26px;
+}
+
+.campaign-route {
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    background: #0c131d;
+}
+
+.campaign-kicker {
     display: block;
     margin-bottom: 7px;
     color: var(--accent);
@@ -322,45 +364,187 @@ canvas {
     font-weight: 700;
 }
 
-.difficulty-dialog h2 {
-    margin: 0 0 22px;
+.campaign-dialog h2 {
+    margin: 0 0 20px;
     font-size: 1.6rem;
 }
 
-.difficulty-options {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+.campaign-dialog h3 {
+    margin: 0 0 14px;
+    font-size: 0.92rem;
 }
 
-.difficulty-options button {
+.campaign-team-editor label,
+.campaign-current-opponent > span {
+    display: block;
+    margin-bottom: 6px;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.campaign-team-edit-row {
+    display: flex;
+    gap: 8px;
+}
+
+.campaign-team-edit-row input {
     min-width: 0;
-    min-height: 48px;
+    flex: 1;
+    height: 42px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    background: #1a2533;
+    border-radius: 5px;
+    outline: none;
+    background: #182333;
     color: #fff;
-    font: 700 0.95rem/1 'Outfit', sans-serif;
+    padding: 0 11px;
+    font: 700 0.92rem/1 'Outfit', sans-serif;
+}
+
+.campaign-team-edit-row input:focus {
+    border-color: var(--accent);
+}
+
+.campaign-team-edit-row input[readonly] {
+    color: rgba(255, 255, 255, 0.62);
+}
+
+.campaign-team-edit-row button,
+.campaign-start {
+    min-width: 0;
+    border: 0;
+    border-radius: 5px;
+    font: 700 0.88rem/1 'Outfit', sans-serif;
     cursor: pointer;
 }
 
-.difficulty-options button:hover,
-.difficulty-options button:focus-visible {
-    border-color: var(--accent);
-    background: #26364a;
-    outline: none;
+.campaign-team-edit-row button {
+    padding: 0 14px;
+    background: #e5eaf2;
+    color: #101722;
 }
 
-.difficulty-options button[data-difficulty="easy"] {
-    border-bottom: 4px solid #35cf78;
+.campaign-team-editor small {
+    display: block;
+    margin-top: 7px;
+    color: rgba(255, 255, 255, 0.52);
+    font-size: 0.72rem;
 }
 
-.difficulty-options button[data-difficulty="medium"] {
-    border-bottom: 4px solid #ffd700;
+.campaign-feedback {
+    min-height: 18px;
+    margin-top: 6px;
+    color: #f4d768;
+    font-size: 0.74rem;
 }
 
-.difficulty-options button[data-difficulty="advanced"] {
-    border-bottom: 4px solid #ff4d4d;
+.campaign-stats {
+    display: flex;
+    gap: 18px;
+    margin: 8px 0 18px;
+    padding: 11px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.78rem;
+}
+
+.campaign-stats strong {
+    color: #fff;
+    font-size: 1rem;
+}
+
+.campaign-current-opponent {
+    position: relative;
+    padding-right: 90px;
+}
+
+.campaign-current-opponent strong {
+    display: block;
+    font-size: 1.65rem;
+}
+
+.campaign-current-opponent em {
+    position: absolute;
+    right: 0;
+    bottom: 3px;
+    padding: 6px 9px;
+    border-left: 4px solid var(--team-color, #ffd700);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 0.72rem;
+    font-style: normal;
+    font-weight: 700;
+}
+
+.campaign-start {
+    width: 100%;
+    min-height: 46px;
+    margin-top: 18px;
+    background: var(--accent);
+    color: #151000;
+}
+
+.campaign-start:hover,
+.campaign-team-edit-row button:hover {
+    filter: brightness(1.08);
+}
+
+.campaign-start:disabled,
+.campaign-team-edit-row button:disabled {
+    cursor: wait;
+    opacity: 0.58;
+}
+
+.campaign-route ol {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.campaign-route li {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    min-height: 38px;
+    padding: 0 7px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.82rem;
+}
+
+.campaign-route li i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--team-color);
+}
+
+.campaign-route li span {
+    font-weight: 700;
+}
+
+.campaign-route li em {
+    font-size: 0.67rem;
+    font-style: normal;
+}
+
+.campaign-route li.is-current {
+    color: #fff;
+    background: rgba(255, 215, 0, 0.09);
+}
+
+.campaign-route li.is-complete {
+    color: rgba(255, 255, 255, 0.76);
+}
+
+.campaign-route li.is-complete span::after {
+    content: " ✓";
+    color: #35cf78;
 }
 
 #fullscreen-button {
@@ -467,6 +651,15 @@ canvas {
 
     #game-ui {
         width: 100%;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .matchup-names {
+        width: 100%;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        gap: 4px;
+        font-size: 0.64rem;
     }
 
     .score-container {
@@ -642,18 +835,38 @@ canvas {
         grid-row: 2;
     }
 
-    .difficulty-dialog {
-        width: min(500px, calc(100vw - 48px));
-        padding: 18px;
+    .campaign-dialog {
+        width: min(700px, calc(100vw - 48px));
+        max-height: calc(100dvh - 18px);
     }
 
-    .difficulty-dialog h2 {
+    .campaign-main,
+    .campaign-route {
+        padding: 16px;
+    }
+
+    .campaign-dialog h2 {
         margin-bottom: 14px;
         font-size: 1.25rem;
     }
 
-    .difficulty-options button {
-        min-height: 44px;
+    .campaign-route li {
+        min-height: 33px;
+    }
+
+    .campaign-current-opponent strong {
+        font-size: 1.35rem;
+    }
+}
+
+@media (max-width: 520px) {
+    .campaign-dialog {
+        grid-template-columns: 1fr;
+    }
+
+    .campaign-route {
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        border-left: 0;
     }
 }
 

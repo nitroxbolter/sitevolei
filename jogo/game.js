@@ -30,7 +30,7 @@ function requestMobileFullscreenWhenPossible() {
 document.addEventListener("DOMContentLoaded", () => {
     requestMobileFullscreenWhenPossible();
     initAdminDebugLogModal();
-    initDifficultySelector();
+    initCampaignSelector();
 
     const fullscreenButton = document.getElementById("fullscreen-button");
     if (fullscreenButton) {
@@ -48,7 +48,10 @@ function isDesktopDebugUiAllowed() {
 function buildCurrentAdminDebugText() {
     if (!isAdminDebugEnabled()) return 'Debug disponivel somente para admin.';
 
-    const parts = [`dificuldade atual: ${getDifficultyProfile().label.toUpperCase()}`];
+    const parts = [
+        `adversario atual: ${getCurrentOpponent().name.toUpperCase()}`,
+        `dificuldade atual: ${getDifficultyProfile().label.toUpperCase()}`
+    ];
     if (adminDebugLogHistory.length) {
         parts.push(adminDebugLogHistory.join('\n\n================ HISTORICO =================\n\n'));
     }
@@ -304,6 +307,16 @@ const DIFFICULTIES = Object.freeze({
     }
 });
 
+const OPPONENT_TEAMS = Object.freeze([
+    { key: 'mexico', name: 'México', difficultyKey: 'easy', difficultyLabel: 'Fácil', skill: 0.88, color: '#35cf78' },
+    { key: 'canada', name: 'Canadá', difficultyKey: 'easy', difficultyLabel: 'Fácil +', skill: 1.04, color: '#55d98d' },
+    { key: 'spain', name: 'Espanha', difficultyKey: 'medium', difficultyLabel: 'Médio', skill: 0.92, color: '#ffd34d' },
+    { key: 'usa', name: 'EUA', difficultyKey: 'medium', difficultyLabel: 'Médio +', skill: 1.04, color: '#ffbd3f' },
+    { key: 'brazil', name: 'Brasil', difficultyKey: 'advanced', difficultyLabel: 'Avançado', skill: 0.96, color: '#ff786f' },
+    { key: 'poland', name: 'Polônia', difficultyKey: 'advanced', difficultyLabel: 'Avançado +', skill: 1.05, color: '#ff5e5e' },
+    { key: 'italy', name: 'Itália', difficultyKey: 'advanced', difficultyLabel: 'Elite', skill: 1.14, color: '#ff4040' }
+]);
+
 const PLAYER_HOME = {
     RECEPTOR: { x: COURT.playerStartX, y: COURT.playerStartY },
     SERVER: { x: COURT.centerX, y: 650 },
@@ -394,6 +407,18 @@ let ballVZ = 0;
 let state = 'READY';
 let difficultySelected = false;
 let currentDifficultyKey = 'medium';
+let difficultyProfileCache = null;
+let activeMatchToken = null;
+let matchResultSubmitting = false;
+let unsavedMatchResult = null;
+let campaignState = {
+    loggedIn: Boolean(window.VOLEI_CAMPAIGN && window.VOLEI_CAMPAIGN.loggedIn),
+    teamName: String(window.VOLEI_CAMPAIGN?.teamName || 'Meu Time'),
+    opponentIndex: Number(window.VOLEI_CAMPAIGN?.opponentIndex || 0),
+    wins: Number(window.VOLEI_CAMPAIGN?.wins || 0),
+    losses: Number(window.VOLEI_CAMPAIGN?.losses || 0),
+    campaignCompleted: Boolean(window.VOLEI_CAMPAIGN?.campaignCompleted)
+};
 let pointLocked = false;
 let nextServer = 'PLAYER'; // PLAYER | OPPONENT
 let gamePhase = 'SERVE'; // SERVE | RALLY
@@ -462,32 +487,232 @@ function isAdminDebugEnabled() {
 }
 
 function getDifficultyProfile() {
-    return DIFFICULTIES[currentDifficultyKey] || DIFFICULTIES.medium;
+    const opponent = getCurrentOpponent();
+    const base = DIFFICULTIES[opponent.difficultyKey] || DIFFICULTIES.medium;
+    if (difficultyProfileCache?.opponentKey === opponent.key) return difficultyProfileCache.profile;
+
+    const skill = opponent.skill;
+    const paceFactor = 1 + ((skill - 1) * 0.4);
+    const scaleChance = (value) => Phaser.Math.Clamp(value * skill, 0, 0.998);
+    const scaleReceive = (values) => ({
+        base: scaleChance(values.base),
+        powerPenalty: values.powerPenalty / skill,
+        distancePenalty: values.distancePenalty / skill,
+        min: scaleChance(values.min),
+        max: scaleChance(values.max),
+        closeMin: scaleChance(values.closeMin)
+    });
+
+    const profile = {
+        ...base,
+        label: opponent.difficultyLabel,
+        opponentName: opponent.name,
+        receiveRadius: Math.round(base.receiveRadius * paceFactor),
+        serveReceiveBonus: Math.round(base.serveReceiveBonus * paceFactor),
+        reactionDelayMs: Math.max(0, Math.round(base.reactionDelayMs / skill)),
+        trackRateServe: base.trackRateServe * paceFactor,
+        trackRateAttack: base.trackRateAttack * paceFactor,
+        lowServeSetterChance: scaleChance(base.lowServeSetterChance),
+        receive: {
+            serve: scaleReceive(base.receive.serve),
+            attack: scaleReceive(base.receive.attack)
+        },
+        receiveMissOutChance: {
+            serve: Phaser.Math.Clamp(base.receiveMissOutChance.serve / skill, 0.01, 0.95),
+            attack: Phaser.Math.Clamp(base.receiveMissOutChance.attack / skill, 0.01, 0.95)
+        },
+        passFlightTime: base.passFlightTime / paceFactor,
+        setFlightTime: base.setFlightTime / paceFactor,
+        serve: {
+            ...base.serve,
+            flightTime: base.serve.flightTime / paceFactor,
+            spreadX: base.serve.spreadX * paceFactor,
+            minBallZ: base.serve.minBallZ * paceFactor
+        },
+        attack: {
+            ...base.attack,
+            flightTime: base.attack.flightTime / paceFactor,
+            spreadX: base.attack.spreadX * paceFactor,
+            contactZ: base.attack.contactZ * paceFactor,
+            errorChance: Phaser.Math.Clamp(base.attack.errorChance / skill, 0.005, 0.5)
+        }
+    };
+
+    difficultyProfileCache = { opponentKey: opponent.key, profile };
+    currentDifficultyKey = opponent.difficultyKey;
+    return profile;
 }
 
-function initDifficultySelector() {
-    const modal = document.getElementById('difficulty-modal');
+function getCurrentOpponent() {
+    const index = Phaser.Math.Clamp(Math.trunc(campaignState.opponentIndex) || 0, 0, OPPONENT_TEAMS.length - 1);
+    return OPPONENT_TEAMS[index];
+}
+
+function applyCampaignState(nextState) {
+    campaignState = {
+        loggedIn: Boolean(nextState?.loggedIn ?? campaignState.loggedIn),
+        teamName: String(nextState?.teamName || campaignState.teamName || 'Meu Time'),
+        opponentIndex: Phaser.Math.Clamp(Number(nextState?.opponentIndex ?? campaignState.opponentIndex) || 0, 0, OPPONENT_TEAMS.length - 1),
+        wins: Math.max(0, Number(nextState?.wins ?? campaignState.wins) || 0),
+        losses: Math.max(0, Number(nextState?.losses ?? campaignState.losses) || 0),
+        campaignCompleted: Boolean(nextState?.campaignCompleted ?? campaignState.campaignCompleted)
+    };
+    difficultyProfileCache = null;
+    currentDifficultyKey = getCurrentOpponent().difficultyKey;
+    renderCampaign();
+}
+
+function initCampaignSelector() {
+    const modal = document.getElementById('campaign-modal');
     if (!modal) {
         difficultySelected = true;
         return;
     }
 
-    modal.querySelectorAll('[data-difficulty]').forEach((button) => {
-        button.addEventListener('click', () => {
-            const requested = button.dataset.difficulty;
-            if (!DIFFICULTIES[requested]) return;
+    if (!campaignState.loggedIn) restoreGuestCampaign();
+    applyCampaignState(campaignState);
 
-            currentDifficultyKey = requested;
-            difficultySelected = true;
-            modal.classList.add('is-hidden');
-            modal.setAttribute('aria-hidden', 'true');
-
-            nextServer = 'PLAYER';
-            resetMatchScore();
-            if (gameScene) resetServe();
-            updateAdminDebugLogModal();
-        });
+    document.getElementById('save-team-name')?.addEventListener('click', saveTeamName);
+    document.getElementById('player-team-name')?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') saveTeamName();
     });
+    document.getElementById('start-campaign-match')?.addEventListener('click', startCampaignMatch);
+}
+
+function renderCampaign() {
+    const opponent = getCurrentOpponent();
+    const teamInput = document.getElementById('player-team-name');
+    const opponentList = document.getElementById('campaign-opponents');
+    const startButton = document.getElementById('start-campaign-match');
+    const setText = (id, value) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = String(value);
+    };
+
+    if (teamInput && document.activeElement !== teamInput) teamInput.value = campaignState.teamName;
+    setText('campaign-wins', campaignState.wins);
+    setText('campaign-losses', campaignState.losses);
+    setText('campaign-opponent-name', opponent.name);
+    setText('campaign-difficulty', opponent.difficultyLabel);
+    setText('player-team-label', campaignState.teamName);
+    setText('opponent-team-label', opponent.name);
+
+    const difficultyBadge = document.getElementById('campaign-difficulty');
+    if (difficultyBadge) difficultyBadge.style.setProperty('--team-color', opponent.color);
+    if (startButton) {
+        startButton.textContent = campaignState.campaignCompleted
+            ? `Jogar novamente contra ${opponent.name}`
+            : `Jogar contra ${opponent.name}`;
+    }
+
+    if (opponentList) {
+        opponentList.replaceChildren(...OPPONENT_TEAMS.map((team, index) => {
+            const item = document.createElement('li');
+            const reached = index < campaignState.opponentIndex || campaignState.campaignCompleted;
+            const current = index === campaignState.opponentIndex && !campaignState.campaignCompleted;
+            item.className = reached ? 'is-complete' : current ? 'is-current' : 'is-locked';
+            item.innerHTML = `<i style="--team-color:${team.color}"></i><span>${team.name}</span><em>${team.difficultyLabel}</em>`;
+            return item;
+        }));
+    }
+}
+
+function restoreGuestCampaign() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('voleiGuestCampaign') || 'null');
+        if (saved && typeof saved === 'object') campaignState = { ...campaignState, ...saved, loggedIn: false, teamName: 'Meu Time' };
+    } catch (_error) {}
+}
+
+function saveGuestCampaign() {
+    try {
+        localStorage.setItem('voleiGuestCampaign', JSON.stringify({
+            opponentIndex: campaignState.opponentIndex,
+            wins: campaignState.wins,
+            losses: campaignState.losses,
+            campaignCompleted: campaignState.campaignCompleted
+        }));
+    } catch (_error) {}
+}
+
+async function postCampaign(action, payload = {}) {
+    const response = await fetch('campaign.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, csrf: window.VOLEI_CAMPAIGN_CSRF || '', ...payload })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    return result;
+}
+
+async function saveTeamName() {
+    if (!campaignState.loggedIn) return;
+    const input = document.getElementById('player-team-name');
+    const button = document.getElementById('save-team-name');
+    const feedback = document.getElementById('team-name-feedback');
+    const teamName = String(input?.value || '').trim();
+    if (teamName.length < 2 || teamName.length > 30) {
+        if (feedback) feedback.textContent = 'Use um nome entre 2 e 30 caracteres.';
+        return;
+    }
+
+    if (button) button.disabled = true;
+    if (feedback) feedback.textContent = 'Salvando...';
+    try {
+        const result = await postCampaign('rename', { teamName });
+        applyCampaignState(result.state);
+        if (feedback) feedback.textContent = 'Nome salvo.';
+    } catch (error) {
+        if (feedback) feedback.textContent = error.message || 'Não foi possível salvar.';
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+async function startCampaignMatch() {
+    const button = document.getElementById('start-campaign-match');
+    const feedback = document.getElementById('campaign-feedback');
+    if (button) button.disabled = true;
+    if (feedback) feedback.textContent = unsavedMatchResult ? 'Salvando o resultado anterior...' : 'Preparando partida...';
+
+    try {
+        if (unsavedMatchResult) await saveMatchResultToServer(unsavedMatchResult);
+
+        if (campaignState.loggedIn) {
+            const result = await postCampaign('start');
+            activeMatchToken = result.matchToken;
+            if (Number.isInteger(result.opponentIndex)) {
+                applyCampaignState({ ...campaignState, opponentIndex: result.opponentIndex });
+            }
+        } else {
+            activeMatchToken = `guest-${Date.now()}`;
+        }
+
+        difficultySelected = true;
+        document.getElementById('campaign-modal')?.classList.add('is-hidden');
+        document.getElementById('campaign-modal')?.setAttribute('aria-hidden', 'true');
+        if (feedback) feedback.textContent = '';
+        nextServer = 'PLAYER';
+        resetMatchScore();
+        if (gameScene) resetServe();
+        updateAdminDebugLogModal();
+    } catch (error) {
+        if (feedback) feedback.textContent = error.message || 'Não foi possível iniciar a partida.';
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+function openCampaignModal(message = '') {
+    difficultySelected = false;
+    renderCampaign();
+    const modal = document.getElementById('campaign-modal');
+    modal?.classList.remove('is-hidden');
+    modal?.setAttribute('aria-hidden', 'false');
+    const feedback = document.getElementById('campaign-feedback');
+    if (feedback) feedback.textContent = message;
 }
 
 function preload() {
@@ -1662,6 +1887,7 @@ function formatCourtDebugTable() {
     return [
         '| item | valor |',
         '| --- | --- |',
+        `| adversario | ${getCurrentOpponent().name.toUpperCase()} |`,
         `| dificuldade | ${difficulty.label.toUpperCase()} |`,
         `| quadra oficial | ${VOLLEYBALL_DIMENSIONS.courtLengthMeters} x ${VOLLEYBALL_DIMENSIONS.courtWidthMeters} m |`,
         `| meia quadra oficial | ${VOLLEYBALL_DIMENSIONS.halfCourtMeters} m |`,
@@ -1709,6 +1935,7 @@ function startRallyLog(server) {
             `inicio do jogo: ${new Date().toLocaleString('pt-BR')}`,
             `status: SAQUE`,
             `sacador: ${server}`,
+            `adversario: ${getCurrentOpponent().name.toUpperCase()}`,
             `dificuldade: ${getDifficultyProfile().label.toUpperCase()}`,
             '',
             'TABELA DA QUADRA',
@@ -1921,30 +2148,43 @@ async function saveDebugLogToServer(filename, text) {
     }
 }
 
-async function saveVictoryToServer(pointResult) {
-    if (!pointResult || pointResult.matchWinner !== 'PLAYER') return false;
-    if (window.location.protocol === 'file:') return false;
+async function saveMatchResultToServer(matchResult) {
+    if (!matchResult?.winner || matchResultSubmitting) return false;
+    matchResultSubmitting = true;
 
     try {
-        const response = await fetch('save_victory.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                winner: pointResult.matchWinner,
-                playerSets: score.playerSets,
-                opponentSets: score.opponentSets,
-                targetSets: MATCH.setsToWinMatch,
-                currentSetTargetPoints: getCurrentSetTargetPoints()
-            })
-        });
+        if (campaignState.loggedIn) {
+            if (!activeMatchToken) throw new Error('Partida sem identificação. Recarregue a página.');
+            const result = await postCampaign('result', {
+                winner: matchResult.winner,
+                playerSets: matchResult.playerSets,
+                opponentSets: matchResult.opponentSets,
+                matchToken: activeMatchToken
+            });
+            activeMatchToken = null;
+            applyCampaignState(result.state);
+        } else {
+            const playerWon = matchResult.winner === 'PLAYER';
+            const currentOpponent = campaignState.opponentIndex;
+            applyCampaignState({
+                ...campaignState,
+                wins: campaignState.wins + (playerWon ? 1 : 0),
+                losses: campaignState.losses + (playerWon ? 0 : 1),
+                opponentIndex: playerWon ? Math.min(OPPONENT_TEAMS.length - 1, currentOpponent + 1) : currentOpponent,
+                campaignCompleted: campaignState.campaignCompleted || (playerWon && currentOpponent === OPPONENT_TEAMS.length - 1)
+            });
+            activeMatchToken = null;
+            saveGuestCampaign();
+        }
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const result = await response.json();
-        if (!result.ok) throw new Error(result.error || 'falha ao salvar vitoria');
+        unsavedMatchResult = null;
         return true;
-    } catch (err) {
-        console.warn('Nao foi possivel salvar a pontuacao da vitoria:', err && err.message ? err.message : String(err));
-        return false;
+    } catch (error) {
+        unsavedMatchResult = matchResult;
+        console.warn('Nao foi possivel salvar o resultado da partida:', error?.message || String(error));
+        throw error;
+    } finally {
+        matchResultSubmitting = false;
     }
 }
 
@@ -2429,7 +2669,14 @@ function awardPoint(scene, playerScored, reason = 'point') {
     state = 'POINT';
     const pointResult = addPoint(playerScored);
     finalizeAndDownloadRallyLog(playerScored ? 'PLAYER' : 'OPPONENT');
-    if (pointResult.matchWinner === 'PLAYER') saveVictoryToServer(pointResult);
+    const completedMatch = pointResult.matchWinner ? {
+        winner: pointResult.matchWinner,
+        playerSets: score.playerSets,
+        opponentSets: score.opponentSets
+    } : null;
+    const saveResultPromise = completedMatch
+        ? saveMatchResultToServer(completedMatch).catch((error) => ({ error }))
+        : null;
     if (pointResult.matchWinner) {
         showStatusMessage(scene, pointResult.matchWinner === 'PLAYER' ? 'VITORIA' : 'DERROTA', 1800, pointResult.matchWinner === 'PLAYER' ? '#22ff88' : '#ff2626');
     } else if (pointResult.setWinner) {
@@ -2464,9 +2711,26 @@ function awardPoint(scene, playerScored, reason = 'point') {
     if (landingShadow) landingShadow.setVisible(false);
     if (scene) {
         const delay = pointResult.matchWinner ? 2600 : 1800;
-        scene.time.delayedCall(delay, () => {
-            if (pointResult.matchWinner) resetMatchScore();
-            else if (pointResult.setWinner) resetSetScore();
+        scene.time.delayedCall(delay, async () => {
+            if (pointResult.matchWinner) {
+                const saveResult = await saveResultPromise;
+                const playerWon = pointResult.matchWinner === 'PLAYER';
+                const saveError = saveResult && saveResult.error;
+                resetMatchScore();
+                resetServe();
+                if (saveError) {
+                    openCampaignModal(`Resultado pendente: ${saveError.message || 'tente novamente.'}`);
+                } else if (playerWon && campaignState.campaignCompleted) {
+                    openCampaignModal('Campanha concluída! Você venceu todas as seleções.');
+                } else if (playerWon) {
+                    openCampaignModal(`Vitória salva. Próximo desafio: ${getCurrentOpponent().name}.`);
+                } else {
+                    openCampaignModal(`Derrota salva. Tente novamente contra ${getCurrentOpponent().name}.`);
+                }
+                return;
+            }
+
+            if (pointResult.setWinner) resetSetScore();
             resetServe();
         });
     }
