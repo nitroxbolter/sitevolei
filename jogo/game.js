@@ -228,7 +228,13 @@ const OPPONENT_COURT = {
     // Approximate playable zone on the opponent side (in screen Y).
     // Values are tuned to the `quadra.png` perspective.
     minY: 78,
-    maxY: 304
+    maxY: 304,
+    backLineY: 144,
+    backMinX: 210,
+    backMaxX: 597,
+    netLineY: 320,
+    netMinX: 155,
+    netMaxX: 645
 };
 
 const OPPONENT_AI = {
@@ -445,6 +451,9 @@ let lastPlayerShotKind = 'ATTACK';
 let opponentReceiveAttemptedForPlayerHit = false;
 let opponentDefenseStartedAtMs = 0;
 let opponentLowServeDecision = null;
+let opponentLetOutDecision = null;
+let opponentLetOutPrediction = null;
+let opponentLetOutLogged = false;
 let opponentBack;
 let opponentFront;
 let opponentAttacker;
@@ -1309,6 +1318,7 @@ function performPlayerFreeball(scene, receiver) {
     opponentReceiveAttemptedForPlayerHit = false;
     opponentDefenseStartedAtMs = 0;
     opponentLowServeDecision = null;
+    resetOpponentLetOutDecision();
 
     ballBody.x = receiver.x;
     ballBody.y = receiver.y - 18;
@@ -1802,14 +1812,14 @@ function updateLandingShadow(scene) {
         return;
     }
 
-    const tToGround = estimateTimeToGround(ballZ, ballVZ, getGravityZForState());
-    if (!Number.isFinite(tToGround) || tToGround <= 0) {
+    const landing = getPredictedLandingPoint();
+    if (!landing) {
         landingShadow.setVisible(false);
         return;
     }
 
-    const predictedY = ballBody.y + ballBody.body.velocity.y * tToGround;
-    const predictedX = ballBody.x + ballBody.body.velocity.x * tToGround;
+    const predictedY = landing.y;
+    const predictedX = landing.x;
 
     const targetX = Phaser.Math.Clamp(predictedX, COURT.minX, COURT.maxX);
     const targetY = Phaser.Math.Clamp(predictedY, 0, COURT.height);
@@ -1823,8 +1833,8 @@ function updateLandingShadow(scene) {
     landingShadow.y = smoothedLandingY;
 
     // Tint to preview result: green inside opponent court, red when "out".
-    const insideOpponentY = predictedY >= OPPONENT_COURT.minY && predictedY <= OPPONENT_COURT.maxY;
-    landingShadow.setTint(insideOpponentY ? 0x22ff88 : 0xff2b2b);
+    const insideOpponentCourt = isLandingInsideOpponentCourt({ x: predictedX, y: predictedY });
+    landingShadow.setTint(insideOpponentCourt ? 0x22ff88 : 0xff2b2b);
 
     const zRatio = Phaser.Math.Clamp(ballZ / BALL.tossTargetZ, 0, 1);
     landingShadow.setScale(0.8 + (1 - zRatio) * 0.55);
@@ -2324,21 +2334,51 @@ function isBallInOpponentZone(zone) {
 function getPredictedLandingPoint() {
     if (!ballBody?.body) return null;
 
-    const tToGround = estimateTimeToGround(ballZ, ballVZ, getGravityZForState());
-    if (!Number.isFinite(tToGround) || tToGround <= 0) return null;
+    const stepTime = 1 / 120;
+    const maxFlightTime = 4;
+    let elapsed = 0;
+    let predictedX = ballBody.x;
+    let predictedY = ballBody.y;
+    let predictedZ = ballZ;
+    let predictedVZ = ballVZ;
+    const velocityX = ballBody.body.velocity.x;
+    const velocityY = ballBody.body.velocity.y;
 
+    while (elapsed < maxFlightTime) {
+        predictedX += velocityX * stepTime;
+        predictedY += velocityY * stepTime;
+        predictedZ += predictedVZ * stepTime;
+        predictedVZ += getFlightGravityAtY(predictedY) * stepTime;
+        elapsed += stepTime;
+
+        if (predictedZ <= 0) {
+            return { x: predictedX, y: predictedY, flightTime: elapsed };
+        }
+    }
+
+    return null;
+}
+
+function getOpponentCourtXBounds(screenY, margin = 0) {
+    const perspective = Phaser.Math.Clamp(
+        (screenY - OPPONENT_COURT.backLineY) /
+            (OPPONENT_COURT.netLineY - OPPONENT_COURT.backLineY),
+        0,
+        1
+    );
     return {
-        x: ballBody.x + ballBody.body.velocity.x * tToGround,
-        y: ballBody.y + ballBody.body.velocity.y * tToGround
+        minX: Phaser.Math.Linear(OPPONENT_COURT.backMinX, OPPONENT_COURT.netMinX, perspective) - margin,
+        maxX: Phaser.Math.Linear(OPPONENT_COURT.backMaxX, OPPONENT_COURT.netMaxX, perspective) + margin
     };
 }
 
 function isLandingInsideOpponentCourt(point, margin = 0) {
     if (!point) return true;
+    const bounds = getOpponentCourtXBounds(point.y, margin);
 
     return (
-        point.x >= COURT.minX - margin &&
-        point.x <= COURT.maxX + margin &&
+        point.x >= bounds.minX &&
+        point.x <= bounds.maxX &&
         point.y >= OPPONENT_COURT.minY - margin &&
         point.y <= OPPONENT_COURT.maxY + margin
     );
@@ -2346,23 +2386,35 @@ function isLandingInsideOpponentCourt(point, margin = 0) {
 
 function shouldOpponentLetPlayerShotOut() {
     if (lastTouch !== 'PLAYER_HIT') return false;
+    if (opponentLetOutDecision !== null) return opponentLetOutDecision;
 
     const landing = getPredictedLandingPoint();
     if (!landing) return false;
 
-    return !isLandingInsideOpponentCourt(landing, 8);
+    opponentLetOutPrediction = landing;
+    opponentLetOutDecision = !isLandingInsideOpponentCourt(landing, 8);
+    return opponentLetOutDecision;
 }
 
 function markOpponentLetOutPrediction() {
-    const landing = getPredictedLandingPoint();
-    if (!landing) return;
+    const landing = opponentLetOutPrediction || getPredictedLandingPoint();
+    if (!landing || opponentLetOutLogged) return;
+    const bounds = getOpponentCourtXBounds(landing.y, 8);
+    opponentLetOutLogged = true;
 
     setShotCalculations({
         ...(activeShotLog?.calculations || {}),
         'decisao defesa IA': 'deixou sair',
         'previsao queda IA': `x ${Math.round(landing.x)} y ${Math.round(landing.y)}`,
-        'limites quadra adversaria': `${OPPONENT_COURT.minY} ate ${OPPONENT_COURT.maxY}`
+        'limites laterais previstos': `x ${Math.round(bounds.minX)} ate ${Math.round(bounds.maxX)}`,
+        'limites profundidade': `y ${OPPONENT_COURT.minY} ate ${OPPONENT_COURT.maxY}`
     });
+}
+
+function resetOpponentLetOutDecision() {
+    opponentLetOutDecision = null;
+    opponentLetOutPrediction = null;
+    opponentLetOutLogged = false;
 }
 
 function canOpponentReceive(sprite, home) {
@@ -2651,13 +2703,7 @@ function isPlayerAttackOutOnOpponentCourt() {
     if (lastTouch !== 'PLAYER_HIT') return false;
     if (!ballBody) return false;
 
-    const marginX = 10;
-    return (
-        ballBody.y < OPPONENT_COURT.minY ||
-        ballBody.y > OPPONENT_COURT.maxY ||
-        ballBody.x < COURT.minX - marginX ||
-        ballBody.x > COURT.maxX + marginX
-    );
+    return !isLandingInsideOpponentCourt({ x: ballBody.x, y: ballBody.y }, 8);
 }
 
 function isOpponentAttackOutOnPlayerCourt() {
@@ -2849,6 +2895,7 @@ function performServeHitInstant(scene, power) {
     opponentReceiveAttemptedForPlayerHit = false;
     opponentDefenseStartedAtMs = 0;
     opponentLowServeDecision = null;
+    resetOpponentLetOutDecision();
 
     // Saque usa velocidade propria, mais forte que o ataque comum.
     const speedMult = Phaser.Math.Linear(0.84, 0.94, servePowerRatio);
@@ -2952,6 +2999,7 @@ function resetServe() {
     opponentReceiveAttemptedForPlayerHit = false;
     opponentDefenseStartedAtMs = 0;
     opponentLowServeDecision = null;
+    resetOpponentLetOutDecision();
     resetVirtualInput();
     resetPlayerFormation(nextServer === 'PLAYER');
     resetOpponentFormation();
@@ -3889,6 +3937,7 @@ function performRallyHit(scene) {
     opponentReceiveAttemptedForPlayerHit = false;
     opponentDefenseStartedAtMs = 0;
     opponentLowServeDecision = null;
+    resetOpponentLetOutDecision();
     const attackPower = Phaser.Math.Clamp((ballZ - 45) / 85, 0, 1);
     lastPlayerAttackPower = attackPower;
     lastPlayerShotKind = 'ATTACK';
