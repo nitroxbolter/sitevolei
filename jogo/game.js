@@ -620,13 +620,14 @@ function renderCampaign() {
 function restoreGuestCampaign() {
     try {
         const saved = JSON.parse(localStorage.getItem('voleiGuestCampaign') || 'null');
-        if (saved && typeof saved === 'object') campaignState = { ...campaignState, ...saved, loggedIn: false, teamName: 'Meu Time' };
+        if (saved && typeof saved === 'object') campaignState = { ...campaignState, ...saved, loggedIn: false };
     } catch (_error) {}
 }
 
 function saveGuestCampaign() {
     try {
         localStorage.setItem('voleiGuestCampaign', JSON.stringify({
+            teamName: campaignState.teamName,
             opponentIndex: campaignState.opponentIndex,
             wins: campaignState.wins,
             losses: campaignState.losses,
@@ -648,7 +649,6 @@ async function postCampaign(action, payload = {}) {
 }
 
 async function saveTeamName() {
-    if (!campaignState.loggedIn) return;
     const input = document.getElementById('player-team-name');
     const button = document.getElementById('save-team-name');
     const feedback = document.getElementById('team-name-feedback');
@@ -661,9 +661,15 @@ async function saveTeamName() {
     if (button) button.disabled = true;
     if (feedback) feedback.textContent = 'Salvando...';
     try {
-        const result = await postCampaign('rename', { teamName });
-        applyCampaignState(result.state);
-        if (feedback) feedback.textContent = 'Nome salvo.';
+        if (campaignState.loggedIn) {
+            const result = await postCampaign('rename', { teamName });
+            applyCampaignState(result.state);
+            if (feedback) feedback.textContent = 'Nome salvo na sua conta.';
+        } else {
+            applyCampaignState({ ...campaignState, teamName });
+            saveGuestCampaign();
+            if (feedback) feedback.textContent = 'Nome salvo neste navegador.';
+        }
     } catch (error) {
         if (feedback) feedback.textContent = error.message || 'Não foi possível salvar.';
     } finally {

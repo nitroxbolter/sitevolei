@@ -22,9 +22,10 @@
                 <div class="campaign-team-editor">
                     <label for="player-team-name">Seu time</label>
                     <div class="campaign-team-edit-row">
-                        <input id="player-team-name" type="text" value="Meu Time" readonly>
+                        <input id="player-team-name" type="text" value="Meu Time" minlength="2" maxlength="30" autocomplete="off">
+                        <button id="save-team-name" type="button">Salvar</button>
                     </div>
-                    <small>Entre na sua conta para salvar o nome e o progresso.</small>
+                    <small>Nome e progresso salvos provisoriamente neste navegador.</small>
                     <p id="team-name-feedback" class="campaign-feedback" aria-live="polite"></p>
                 </div>
                 <div class="campaign-stats" aria-label="Estatísticas da campanha">

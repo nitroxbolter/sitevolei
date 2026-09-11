@@ -52,14 +52,11 @@ if (!isset($_SESSION['volei_campaign_csrf'])) {
                 <div class="campaign-team-editor">
                     <label for="player-team-name">Seu time</label>
                     <div class="campaign-team-edit-row">
-                        <input id="player-team-name" type="text" minlength="2" maxlength="30" autocomplete="off"
-                               <?php echo $campaignState['loggedIn'] ? '' : 'readonly'; ?>>
-                        <?php if ($campaignState['loggedIn']): ?>
-                            <button id="save-team-name" type="button">Salvar</button>
-                        <?php endif; ?>
+                        <input id="player-team-name" type="text" minlength="2" maxlength="30" autocomplete="off">
+                        <button id="save-team-name" type="button">Salvar</button>
                     </div>
                     <?php if (!$campaignState['loggedIn']): ?>
-                        <small>Entre na sua conta para salvar o nome e o progresso.</small>
+                        <small>Nome e progresso salvos provisoriamente neste navegador.</small>
                     <?php endif; ?>
                     <p id="team-name-feedback" class="campaign-feedback" aria-live="polite"></p>
                 </div>
