@@ -572,11 +572,20 @@ function initCampaignSelector() {
     if (!campaignState.loggedIn) restoreGuestCampaign();
     applyCampaignState(campaignState);
 
+    const teamNameInput = document.getElementById('player-team-name');
     document.getElementById('save-team-name')?.addEventListener('click', saveTeamName);
-    document.getElementById('player-team-name')?.addEventListener('keydown', (event) => {
+    teamNameInput?.addEventListener('keydown', (event) => {
+        event.stopPropagation();
         if (event.key === 'Enter') saveTeamName();
     });
+    teamNameInput?.addEventListener('keyup', (event) => event.stopPropagation());
+    teamNameInput?.addEventListener('focus', () => setGameKeyboardEnabled(false));
+    teamNameInput?.addEventListener('blur', () => setGameKeyboardEnabled(true));
     document.getElementById('start-campaign-match')?.addEventListener('click', startCampaignMatch);
+}
+
+function setGameKeyboardEnabled(enabled) {
+    if (gameScene?.input?.keyboard) gameScene.input.keyboard.enabled = enabled;
 }
 
 function renderCampaign() {
@@ -872,6 +881,7 @@ function create() {
         CEDILLA: Phaser.Input.Keyboard.KeyCodes.SEMICOLON || 186,
         SPACE: Phaser.Input.Keyboard.KeyCodes.SPACE
     });
+    setGameKeyboardEnabled(document.activeElement?.id !== 'player-team-name');
 
     // Posições "fixas" da formação do time do jogador (para alternância consistente)
     homePos = {
