@@ -30,6 +30,7 @@ function requestMobileFullscreenWhenPossible() {
 document.addEventListener("DOMContentLoaded", () => {
     requestMobileFullscreenWhenPossible();
     initAdminDebugLogModal();
+    initDifficultySelector();
 
     const fullscreenButton = document.getElementById("fullscreen-button");
     if (fullscreenButton) {
@@ -47,7 +48,7 @@ function isDesktopDebugUiAllowed() {
 function buildCurrentAdminDebugText() {
     if (!isAdminDebugEnabled()) return 'Debug disponivel somente para admin.';
 
-    const parts = [];
+    const parts = [`dificuldade atual: ${getDifficultyProfile().label.toUpperCase()}`];
     if (adminDebugLogHistory.length) {
         parts.push(adminDebugLogHistory.join('\n\n================ HISTORICO =================\n\n'));
     }
@@ -228,10 +229,6 @@ const OPPONENT_COURT = {
 };
 
 const OPPONENT_AI = {
-    receiveRadius: 48,
-    receiveSuccessBase: 0.8,
-    receiveStrongAttackPenalty: 0.25,
-    receiveDistancePenalty: 0.15,
     setRadius: 62,
     attackRadius: 52,
     zoneSplitX: 400,
@@ -242,6 +239,70 @@ const OPPONENT_AI = {
     setterHome: { x: 400, y: 304 },
     serverHome: { x: 400, y: 176 }
 };
+
+const VOLLEYBALL_DIMENSIONS = {
+    courtLengthMeters: 18,
+    courtWidthMeters: 9,
+    halfCourtMeters: 9,
+    netHeightMeters: 2.43
+};
+
+const DIFFICULTIES = Object.freeze({
+    easy: {
+        label: 'Fácil',
+        receiveRadius: 38,
+        serveReceiveBonus: 10,
+        reactionDelayMs: 260,
+        trackRateServe: 5.4,
+        trackRateAttack: 4.2,
+        lowServeSetterChance: 0.3,
+        receive: {
+            serve: { base: 0.74, powerPenalty: 0.24, distancePenalty: 0.18, min: 0.38, max: 0.76, closeMin: 0.72 },
+            attack: { base: 0.48, powerPenalty: 0.42, distancePenalty: 0.28, min: 0.1, max: 0.5 }
+        },
+        receiveMissOutChance: { serve: 0.62, attack: 0.7 },
+        passFlightTime: 1.02,
+        setFlightTime: 1.62,
+        serve: { flightTime: 1.5, spreadX: 42, minDepth: 165, maxDepth: 205, minBallZ: 118 },
+        attack: { flightTime: 1.55, spreadX: 85, minDepth: 155, maxDepth: 205, contactZ: 100, errorChance: 0.28 }
+    },
+    medium: {
+        label: 'Médio',
+        receiveRadius: 48,
+        serveReceiveBonus: 18,
+        reactionDelayMs: 90,
+        trackRateServe: 14.9,
+        trackRateAttack: 7.7,
+        lowServeSetterChance: 0.75,
+        receive: {
+            serve: { base: 0.98, powerPenalty: 0.12, distancePenalty: 0.04, min: 0.82, max: 0.99, closeMin: 0.97 },
+            attack: { base: 0.62, powerPenalty: 0.38, distancePenalty: 0.18, min: 0.25, max: 0.78 }
+        },
+        receiveMissOutChance: { serve: 0.08, attack: 0.35 },
+        passFlightTime: 0.82,
+        setFlightTime: 1.45,
+        serve: { flightTime: 1.18, spreadX: 90, minDepth: 155, maxDepth: 235, minBallZ: 112 },
+        attack: { flightTime: 1.25, spreadX: 190, minDepth: 150, maxDepth: 240, contactZ: 112, errorChance: 0.08 }
+    },
+    advanced: {
+        label: 'Avançado',
+        receiveRadius: 60,
+        serveReceiveBonus: 24,
+        reactionDelayMs: 0,
+        trackRateServe: 21,
+        trackRateAttack: 15,
+        lowServeSetterChance: 1,
+        receive: {
+            serve: { base: 1, powerPenalty: 0.07, distancePenalty: 0.02, min: 0.91, max: 0.995, closeMin: 0.99 },
+            attack: { base: 0.94, powerPenalty: 0.2, distancePenalty: 0.1, min: 0.64, max: 0.95 }
+        },
+        receiveMissOutChance: { serve: 0.04, attack: 0.18 },
+        passFlightTime: 0.68,
+        setFlightTime: 1.18,
+        serve: { flightTime: 0.94, spreadX: 145, minDepth: 190, maxDepth: 242, minBallZ: 142 },
+        attack: { flightTime: 0.96, spreadX: 235, minDepth: 185, maxDepth: 245, contactZ: 128, errorChance: 0.01 }
+    }
+});
 
 const PLAYER_HOME = {
     RECEPTOR: { x: COURT.playerStartX, y: COURT.playerStartY },
@@ -331,6 +392,8 @@ let landingCloseToGround = false;
 let ballZ = 0;
 let ballVZ = 0;
 let state = 'READY';
+let difficultySelected = false;
+let currentDifficultyKey = 'medium';
 let pointLocked = false;
 let nextServer = 'PLAYER'; // PLAYER | OPPONENT
 let gamePhase = 'SERVE'; // SERVE | RALLY
@@ -355,7 +418,8 @@ let queuedServeHitAt = 0;
 let lastPlayerAttackPower = 0;
 let lastPlayerShotKind = 'ATTACK';
 let opponentReceiveAttemptedForPlayerHit = false;
-let lastAttack = '---';
+let opponentDefenseStartedAtMs = 0;
+let opponentLowServeDecision = null;
 let opponentBack;
 let opponentFront;
 let opponentAttacker;
@@ -372,7 +436,6 @@ let stepToggle = false;
 let rollDirY = 0;
 let rollEndY = 0;
 let jumpTween;
-let opponentBackTracking = false;
 let controlledRole = 'RECEPTOR'; // RECEPTOR | LEFT | RIGHT
 let desiredAttackRole = 'RIGHT'; // último atacante escolhido pelo levantamento: LEFT | RIGHT
 let homePos = null;
@@ -396,6 +459,35 @@ let adminDebugLogHistory = [];
 
 function isAdminDebugEnabled() {
     return Boolean(window.VOLEI_DEBUG_ADMIN);
+}
+
+function getDifficultyProfile() {
+    return DIFFICULTIES[currentDifficultyKey] || DIFFICULTIES.medium;
+}
+
+function initDifficultySelector() {
+    const modal = document.getElementById('difficulty-modal');
+    if (!modal) {
+        difficultySelected = true;
+        return;
+    }
+
+    modal.querySelectorAll('[data-difficulty]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const requested = button.dataset.difficulty;
+            if (!DIFFICULTIES[requested]) return;
+
+            currentDifficultyKey = requested;
+            difficultySelected = true;
+            modal.classList.add('is-hidden');
+            modal.setAttribute('aria-hidden', 'true');
+
+            nextServer = 'PLAYER';
+            resetMatchScore();
+            if (gameScene) resetServe();
+            updateAdminDebugLogModal();
+        });
+    });
 }
 
 function preload() {
@@ -572,6 +664,12 @@ function create() {
 }
 
 function update(_time, delta) {
+    if (!difficultySelected) {
+        updateDevOverlay(this);
+        updateDebugPanel(this);
+        return;
+    }
+
     handlePlayerRoleSwitch();
     handlePlayerMovement(delta);
     handleServeInput(this);
@@ -612,6 +710,7 @@ function updateDebugPanel(scene) {
         : 'oppAttackPlan: ---';
 
     debugPanelEl.textContent = [
+        `difficulty: ${getDifficultyProfile().label}`,
         `gamePhase: ${gamePhase}`,
         `state: ${state}`,
         `lastTouch: ${lastTouch}`,
@@ -967,6 +1066,8 @@ function performPlayerFreeball(scene, receiver) {
     lastPlayerShotKind = 'ATTACK';
     lastPlayerAttackPower = 0.02;
     opponentReceiveAttemptedForPlayerHit = false;
+    opponentDefenseStartedAtMs = 0;
+    opponentLowServeDecision = null;
 
     ballBody.x = receiver.x;
     ballBody.y = receiver.y - 18;
@@ -1090,24 +1191,33 @@ function updateBallPhysics(scene) {
             ballOnOpponentSide &&
             lastTouch !== 'OPP_HIT' &&
             (bolaVindoParaAdversario || lastTouch === 'OPP_PASS' || lastTouch === 'OPP_SET');
-        const depthNow = ballBody.y - NET.y; // 0 na rede; negativo no lado adversário
         const firstOpponentTouch = canOpponentPlayBall && bolaVindoParaAdversario && lastTouch !== 'OPP_PASS' && lastTouch !== 'OPP_SET';
-        if (firstOpponentTouch && canOpponentSetterTakeLowServe()) {
+        if (firstOpponentTouch && opponentDefenseStartedAtMs === 0) {
+            opponentDefenseStartedAtMs = scene.time.now;
+        }
+        const difficulty = getDifficultyProfile();
+        const opponentReactionReady = !firstOpponentTouch ||
+            scene.time.now - opponentDefenseStartedAtMs >= difficulty.reactionDelayMs;
+        if (firstOpponentTouch && opponentReactionReady && canOpponentSetterTakeLowServe()) {
             opponentSetterTakeLowServe(scene);
             return;
         }
 
         const opponentShouldLetOut = firstOpponentTouch && shouldOpponentLetPlayerShotOut();
-        const activeReceiver = firstOpponentTouch && !opponentShouldLetOut ? getOpponentReceiverForBall() : null;
+        const activeReceiver = firstOpponentTouch && opponentReactionReady && !opponentShouldLetOut
+            ? getOpponentReceiverForBall()
+            : null;
         if (firstOpponentTouch) {
-            const receiverTrackSpeed = lastPlayerShotKind === 'SERVE' ? 0.22 : 0.12;
-            moveOrReturnOpponentReceiver(opponentBack, OPPONENT_AI.backHome, activeReceiver === opponentBack, receiverTrackSpeed);
-            moveOrReturnOpponentReceiver(oppLeft, OPPONENT_AI.leftHome, activeReceiver === oppLeft, receiverTrackSpeed);
-            moveOrReturnOpponentReceiver(oppRight, OPPONENT_AI.rightHome, activeReceiver === oppRight, receiverTrackSpeed);
+            const receiverTrackRate = lastPlayerShotKind === 'SERVE'
+                ? difficulty.trackRateServe
+                : difficulty.trackRateAttack;
+            moveOrReturnOpponentReceiver(opponentBack, OPPONENT_AI.backHome, activeReceiver === opponentBack, receiverTrackRate, dtClamped);
+            moveOrReturnOpponentReceiver(oppLeft, OPPONENT_AI.leftHome, activeReceiver === oppLeft, receiverTrackRate, dtClamped);
+            moveOrReturnOpponentReceiver(oppRight, OPPONENT_AI.rightHome, activeReceiver === oppRight, receiverTrackRate, dtClamped);
         } else {
-            returnOpponentToHome(opponentBack, OPPONENT_AI.backHome, 0.04);
-            returnOpponentToHome(oppLeft, OPPONENT_AI.leftHome, 0.04);
-            returnOpponentToHome(oppRight, OPPONENT_AI.rightHome, 0.04);
+            returnOpponentToHome(opponentBack, OPPONENT_AI.backHome, 4, dtClamped);
+            returnOpponentToHome(oppLeft, OPPONENT_AI.leftHome, 4, dtClamped);
+            returnOpponentToHome(oppRight, OPPONENT_AI.rightHome, 4, dtClamped);
         }
 
         const receivers = [
@@ -1128,13 +1238,13 @@ function updateBallPhysics(scene) {
         }
 
         const dSetter = Phaser.Math.Distance.Between(ballBody.x, ballBody.y, opponentFront.x, opponentFront.y);
-        if (canOpponentPlayBall && lastTouch === 'OPP_PASS' && dSetter < OPPONENT_AI.setRadius && ballZ < 135 && ballZ > 10) {
+        if (canOpponentPlayBall && !opponentPassToSetterEvent && lastTouch === 'OPP_PASS' && dSetter < OPPONENT_AI.setRadius && ballZ < 135 && ballZ > 10) {
             opponentSetToAttacker(scene);
             return;
         }
 
         const dAttack = Phaser.Math.Distance.Between(ballBody.x, ballBody.y, opponentAttacker.x, opponentAttacker.y);
-        if (canOpponentPlayBall && lastTouch === 'OPP_SET' && dAttack < OPPONENT_AI.attackRadius && ballZ < 150 && ballZ > 25) {
+        if (canOpponentPlayBall && !opponentSetAttackEvent && lastTouch === 'OPP_SET' && dAttack < OPPONENT_AI.attackRadius && ballZ < 150 && ballZ > 25) {
             performOpponentAttack(scene, opponentAttacker);
             return;
         }
@@ -1290,6 +1400,9 @@ function updateBallPhysics(scene) {
             } else if (isPlayerAttackOutOnOpponentCourt()) {
                 finishShotLog('fora da quadra');
                 awardPoint(scene, false, 'out');
+            } else if (isOpponentAttackOutOnPlayerCourt()) {
+                finishShotLog('fora da quadra');
+                awardPoint(scene, true, 'out');
             } else {
                 finishShotLog('tocou no chao');
                 finishRally(scene);
@@ -1406,13 +1519,37 @@ function getGravityZForState() {
     if (state === 'OPP_SERVE_TOSS') return BALL.gravityZToss;
 
     if (state === 'FLYING' || state === 'BOUNCE_ROLL') {
-        // Smooth transition around the net to avoid a harsh curve kink.
-        // w=0 -> pre-net gravity, w=1 -> post-net gravity.
-        const t = Phaser.Math.Clamp((NET.y - ballBody.y) / 80, -1, 1);
-        const w = 0.5 + 0.5 * t;
-        return Phaser.Math.Linear(BALL.gravityZFlightPreNet, BALL.gravityZFlightPostNet, w);
+        return getFlightGravityAtY(ballBody.y);
     }
     return BALL.gravityZ;
+}
+
+function getFlightGravityAtY(screenY) {
+    // Smooth transition around the net to avoid a harsh curve kink.
+    // w=0 -> player side, w=1 -> opponent side.
+    const t = Phaser.Math.Clamp((NET.y - screenY) / 80, -1, 1);
+    const w = 0.5 + 0.5 * t;
+    return Phaser.Math.Linear(BALL.gravityZFlightPreNet, BALL.gravityZFlightPostNet, w);
+}
+
+function calculateLaunchVZForFlight(startZ, targetZ, startY, velocityY, flightTime) {
+    const steps = 48;
+    const stepTime = flightTime / steps;
+    let gravityVelocity = 0;
+    let gravityDisplacement = 0;
+
+    for (let index = 0; index < steps; index += 1) {
+        const middleTime = (index + 0.5) * stepTime;
+        const gravity = getFlightGravityAtY(startY + velocityY * middleTime);
+        gravityDisplacement += gravityVelocity * stepTime + 0.5 * gravity * stepTime * stepTime;
+        gravityVelocity += gravity * stepTime;
+    }
+
+    return Phaser.Math.Clamp(
+        (targetZ - startZ - gravityDisplacement) / flightTime,
+        PHYS_CLAMP.minVZ,
+        PHYS_CLAMP.maxVZ
+    );
 }
 
 function updateLandingShadow(scene) {
@@ -1515,6 +1652,7 @@ function isNetFaultByClosestCrossing() {
 }
 
 function formatCourtDebugTable() {
+    const difficulty = getDifficultyProfile();
     const quadrants = [
         ['ADVERSARIO_ESQUERDA', COURT.minX, COURT.centerX, OPPONENT_COURT.minY, OPPONENT_AI.zoneSplitY],
         ['ADVERSARIO_DIREITA', COURT.centerX, COURT.maxX, OPPONENT_COURT.minY, OPPONENT_AI.zoneSplitY],
@@ -1524,6 +1662,10 @@ function formatCourtDebugTable() {
     return [
         '| item | valor |',
         '| --- | --- |',
+        `| dificuldade | ${difficulty.label.toUpperCase()} |`,
+        `| quadra oficial | ${VOLLEYBALL_DIMENSIONS.courtLengthMeters} x ${VOLLEYBALL_DIMENSIONS.courtWidthMeters} m |`,
+        `| meia quadra oficial | ${VOLLEYBALL_DIMENSIONS.halfCourtMeters} m |`,
+        `| altura oficial da rede | ${VOLLEYBALL_DIMENSIONS.netHeightMeters.toFixed(2)} m |`,
         `| canvas | ${COURT.width} x ${COURT.height} px |`,
         `| largura jogavel X | ${COURT.minX} ate ${COURT.maxX} (${COURT.maxX - COURT.minX}px) |`,
         `| distancia total Y | ${OPPONENT_COURT.minY} ate ${COURT.maxY} (${COURT.maxY - OPPONENT_COURT.minY}px) |`,
@@ -1531,6 +1673,12 @@ function formatCourtDebugTable() {
         `| rede Y | ${NET.y} |`,
         `| altura da rede Z | ${NET.heightZ} |`,
         `| escala Z | ${BALL.zToPixels} px por Z |`,
+        `| gravidade saque jogador | ${BALL.gravityZFlightPreNet} Z/s2 |`,
+        `| gravidade lado adversario | ${BALL.gravityZFlightPostNet} Z/s2 |`,
+        `| raio recepcao IA | ${difficulty.receiveRadius} |`,
+        `| atraso reacao IA | ${difficulty.reactionDelayMs} ms |`,
+        `| tempo saque IA | ${difficulty.serve.flightTime.toFixed(2)} s |`,
+        `| tempo ataque IA | ${difficulty.attack.flightTime.toFixed(2)} s |`,
         `| lado adversario | Y ${OPPONENT_COURT.minY} ate ${OPPONENT_COURT.maxY} |`,
         `| lado jogador | Y ${NET.y} ate ${COURT.maxY} |`,
         '',
@@ -1561,6 +1709,7 @@ function startRallyLog(server) {
             `inicio do jogo: ${new Date().toLocaleString('pt-BR')}`,
             `status: SAQUE`,
             `sacador: ${server}`,
+            `dificuldade: ${getDifficultyProfile().label.toUpperCase()}`,
             '',
             'TABELA DA QUADRA',
             ...formatCourtDebugTable()
@@ -1820,7 +1969,11 @@ function estimateTimeToGround(z, vz, az) {
     return t > 0 ? t : Infinity;
 }
 
-function moveOpponentReceiver(sprite, home, speed) {
+function getFrameIndependentLerp(ratePerSecond, deltaSeconds) {
+    return 1 - Math.exp(-ratePerSecond * deltaSeconds);
+}
+
+function moveOpponentReceiver(sprite, home, ratePerSecond, deltaSeconds) {
     if (!sprite || !ballBody) return;
     const minX = Math.max(home.x - home.rangeX, home.zone?.minX ?? -Infinity);
     const maxX = Math.min(home.x + home.rangeX, home.zone?.maxX ?? Infinity);
@@ -1828,19 +1981,21 @@ function moveOpponentReceiver(sprite, home, speed) {
     const maxY = Math.min(home.y + home.rangeY, home.zone?.maxY ?? Infinity);
     const targetX = Phaser.Math.Clamp(ballBody.x, minX, maxX);
     const targetY = Phaser.Math.Clamp(ballBody.y, minY, maxY);
-    sprite.x += (targetX - sprite.x) * speed;
-    sprite.y += (targetY - sprite.y) * speed;
+    const amount = getFrameIndependentLerp(ratePerSecond, deltaSeconds);
+    sprite.x += (targetX - sprite.x) * amount;
+    sprite.y += (targetY - sprite.y) * amount;
 }
 
-function moveOrReturnOpponentReceiver(sprite, home, active, speed) {
-    if (active) moveOpponentReceiver(sprite, home, speed);
-    else returnOpponentToHome(sprite, home, 0.06);
+function moveOrReturnOpponentReceiver(sprite, home, active, ratePerSecond, deltaSeconds) {
+    if (active) moveOpponentReceiver(sprite, home, ratePerSecond, deltaSeconds);
+    else returnOpponentToHome(sprite, home, 4, deltaSeconds);
 }
 
-function returnOpponentToHome(sprite, home, speed) {
+function returnOpponentToHome(sprite, home, ratePerSecond, deltaSeconds) {
     if (!sprite) return;
-    sprite.x += (home.x - sprite.x) * speed;
-    sprite.y += (home.y - sprite.y) * speed;
+    const amount = getFrameIndependentLerp(ratePerSecond, deltaSeconds);
+    sprite.x += (home.x - sprite.x) * amount;
+    sprite.y += (home.y - sprite.y) * amount;
 }
 
 function canOpponentSetterTakeLowServe() {
@@ -1853,13 +2008,19 @@ function canOpponentSetterTakeLowServe() {
     const nearNetMinY = NET.y - 44;
     const nearNetMaxY = NET.y + 10;
 
-    return (
+    const inReach = (
         ballZ >= lowServeMinZ &&
         ballZ <= lowServeMaxZ &&
         ballBody.y >= nearNetMinY &&
         ballBody.y <= nearNetMaxY &&
         Math.abs(ballBody.x - opponentFront.x) <= OPPONENT_AI.setRadius + 34
     );
+    if (!inReach) return false;
+
+    if (opponentLowServeDecision === null) {
+        opponentLowServeDecision = Math.random() <= getDifficultyProfile().lowServeSetterChance;
+    }
+    return opponentLowServeDecision;
 }
 
 function opponentSetterTakeLowServe(scene) {
@@ -1878,7 +2039,10 @@ function opponentSetterTakeLowServe(scene) {
     });
 
     opponentFront.setTexture('oppLevantador');
-    scene.time.delayedCall(180, () => opponentSetToAttacker(scene));
+    opponentPassToSetterEvent = scene.time.delayedCall(180, () => {
+        opponentPassToSetterEvent = null;
+        if (state === 'FLYING' && lastTouch === 'OPP_PASS') opponentSetToAttacker(scene);
+    });
     scene.cameras.main.shake(70, 0.003);
     addHitEffect(scene, { shake: 0.002 });
 }
@@ -1947,13 +2111,16 @@ function markOpponentLetOutPrediction() {
 
 function canOpponentReceive(sprite, home) {
     if (!sprite || !ballBody) return false;
+    const difficulty = getDifficultyProfile();
     const insideRange =
         ballBody.x >= home.x - home.rangeX &&
         ballBody.x <= home.x + home.rangeX &&
         ballBody.y >= home.y - home.rangeY &&
         ballBody.y <= home.y + home.rangeY;
     const insideZone = isBallInOpponentZone(home.zone);
-    const receiveRadius = lastPlayerShotKind === 'SERVE' ? OPPONENT_AI.receiveRadius + 18 : OPPONENT_AI.receiveRadius;
+    const receiveRadius = lastPlayerShotKind === 'SERVE'
+        ? difficulty.receiveRadius + difficulty.serveReceiveBonus
+        : difficulty.receiveRadius;
     const maxReceiveZ = lastPlayerShotKind === 'SERVE' ? 145 : 130;
     const closeEnough = Phaser.Math.Distance.Between(ballBody.x, ballBody.y, sprite.x, sprite.y) < receiveRadius;
     return insideZone && insideRange && closeEnough && ballZ < maxReceiveZ && ballZ > 8;
@@ -1965,33 +2132,34 @@ function tryOpponentReceivePlayerAttack(scene, receiver) {
 
     opponentReceiveAttemptedForPlayerHit = true;
     const isServeReceive = lastPlayerShotKind === 'SERVE';
+    const difficulty = getDifficultyProfile();
     if (isServeReceive) {
-        receiver.x += (ballBody.x - receiver.x) * 0.45;
-        receiver.y += (ballBody.y - receiver.y) * 0.35;
+        const correction = currentDifficultyKey === 'easy' ? 0.12 : currentDifficultyKey === 'advanced' ? 0.58 : 0.45;
+        receiver.x += (ballBody.x - receiver.x) * correction;
+        receiver.y += (ballBody.y - receiver.y) * correction;
     }
 
     const dist = Phaser.Math.Distance.Between(ballBody.x, ballBody.y, receiver.x, receiver.y);
-    const receiveRadius = isServeReceive ? OPPONENT_AI.receiveRadius + 18 : OPPONENT_AI.receiveRadius;
+    const receiveRadius = isServeReceive
+        ? difficulty.receiveRadius + difficulty.serveReceiveBonus
+        : difficulty.receiveRadius;
     const distanceRatio = Phaser.Math.Clamp(dist / receiveRadius, 0, 1);
-    const baseChance = isServeReceive ? 0.98 : 0.62;
-    const powerPenalty = isServeReceive ? 0.12 : 0.38;
-    const distancePenalty = isServeReceive ? 0.04 : 0.18;
-    const minChance = isServeReceive ? 0.82 : 0.25;
-    const maxChance = isServeReceive ? 0.99 : 0.78;
+    const receiveTuning = isServeReceive ? difficulty.receive.serve : difficulty.receive.attack;
     let successChance = Phaser.Math.Clamp(
-        baseChance -
-        (lastPlayerAttackPower * powerPenalty) -
-        (distanceRatio * distancePenalty),
-        minChance,
-        maxChance
+        receiveTuning.base -
+        (lastPlayerAttackPower * receiveTuning.powerPenalty) -
+        (distanceRatio * receiveTuning.distancePenalty),
+        receiveTuning.min,
+        receiveTuning.max
     );
     if (isServeReceive && dist <= 28 && ballZ <= 145) {
-        successChance = Math.max(successChance, 0.97);
+        successChance = Math.max(successChance, receiveTuning.closeMin);
     }
 
     setShotCalculations({
         ...(activeShotLog?.calculations || {}),
         'chance defesa IA': `${Math.round(successChance * 100)}%`,
+        'dificuldade IA': difficulty.label,
         'tipo ataque jogador': lastPlayerShotKind,
         'forca ataque jogador': lastPlayerAttackPower.toFixed(2),
         'distancia defesa IA': Math.round(dist)
@@ -2007,7 +2175,9 @@ function tryOpponentReceivePlayerAttack(scene, receiver) {
         return true;
     }
 
-    const missedOutChance = isServeReceive ? 0.08 : 0.35;
+    const missedOutChance = isServeReceive
+        ? difficulty.receiveMissOutChance.serve
+        : difficulty.receiveMissOutChance.attack;
     const missedOut = Math.random() < missedOutChance;
     receiver.setTexture('oppMachete');
     scene.time.delayedCall(500, () => {
@@ -2059,21 +2229,23 @@ function tryOpponentReceivePlayerAttack(scene, receiver) {
 }
 
 function opponentPassToSetter(scene, receiver) {
+    const difficulty = getDifficultyProfile();
     recordOpponentReceiveDebug(receiver, 'MACHETE', {
-        receiveRadius: Math.round(OPPONENT_AI.receiveRadius),
+        receiveRadius: Math.round(difficulty.receiveRadius),
         successChance: '100%',
         receiveResult: 'passe para o levantador'
     });
     lastTouch = 'OPP_PASS';
     const targetX = opponentFront.x;
     const targetY = opponentFront.y;
-    const flightTime = 0.82;
+    const flightTime = difficulty.passFlightTime;
+    const targetContactZ = 58;
     ballBody.x = receiver.x;
     ballBody.y = receiver.y;
     ballZ = Math.max(ballZ, 34);
-    ballVZ = 260;
     const vx = (targetX - ballBody.x) / flightTime;
     const vy = (targetY - ballBody.y) / flightTime;
+    ballVZ = calculateLaunchVZForFlight(ballZ, targetContactZ, ballBody.y, vy, flightTime);
     ballBody.setVelocity(vx, vy);
 
     if (opponentPassToSetterEvent) {
@@ -2085,6 +2257,7 @@ function opponentPassToSetter(scene, receiver) {
         if (state !== 'FLYING' || lastTouch !== 'OPP_PASS') return;
         ballBody.x = opponentFront.x;
         ballBody.y = opponentFront.y;
+        ballZ = targetContactZ;
         ballBody.setVelocity(0);
         opponentSetToAttacker(scene);
     });
@@ -2098,6 +2271,7 @@ function opponentPassToSetter(scene, receiver) {
 }
 
 function opponentSetToAttacker(scene) {
+    const difficulty = getDifficultyProfile();
     if (opponentPassToSetterEvent) {
         opponentPassToSetterEvent.remove(false);
         opponentPassToSetterEvent = null;
@@ -2108,12 +2282,13 @@ function opponentSetToAttacker(scene) {
     }
     lastTouch = 'OPP_SET';
     opponentAttacker = chooseRandomOpponentAttacker();
-    ballVZ = 410;
-    const flightTime = 1.45;
+    const flightTime = difficulty.setFlightTime;
+    const targetContactZ = difficulty.attack.contactZ;
     const targetX = opponentAttacker.x;
     const targetY = opponentAttacker.y;
     const vx = (targetX - ballBody.x) / flightTime;
     const vy = (targetY - ballBody.y) / flightTime;
+    ballVZ = calculateLaunchVZForFlight(ballZ, targetContactZ, ballBody.y, vy, flightTime);
     ballBody.setVelocity(vx, vy);
 
     opponentFront.setTexture('oppLevantador');
@@ -2123,6 +2298,7 @@ function opponentSetToAttacker(scene) {
         if (state !== 'FLYING' || lastTouch !== 'OPP_SET') return;
         ballBody.x = opponentAttacker.x;
         ballBody.y = opponentAttacker.y;
+        ballZ = targetContactZ;
         performOpponentAttack(scene, opponentAttacker);
     });
     scene.cameras.main.shake(90, 0.004);
@@ -2141,37 +2317,45 @@ function performOpponentAttack(scene, attacker) {
     const startY = attacker.y;
     attacker.y -= 45;
 
-    ballZ = Math.max(ballZ, 95);
+    const difficulty = getDifficultyProfile();
+    const attackTuning = difficulty.attack;
+    ballZ = attackTuning.contactZ;
     lastTouch = 'OPP_HIT';
+    const attackError = Math.random() < attackTuning.errorChance;
     beginShotLog('ATAQUE', 'ADVERSARIO', {
-        force: 'ataque IA',
-        quality: 'terceiro toque'
+        force: difficulty.label,
+        quality: attackError ? 'erro de ataque' : 'terceiro toque'
     });
-    const flightTime = 1.25;
-    const targetX = Phaser.Math.Clamp(
-        attacker.x + Phaser.Math.Between(-190, 190),
-        COURT.minX + 30,
-        COURT.maxX - 30
-    );
+    const flightTime = attackTuning.flightTime;
+    const targetCenterX = currentDifficultyKey === 'easy'
+        ? playerBacker.x
+        : currentDifficultyKey === 'advanced'
+            ? (playerBacker.x < COURT.centerX ? COURT.maxX - 55 : COURT.minX + 55)
+            : attacker.x;
+    const targetX = attackError
+        ? (Phaser.Math.Between(0, 1) === 0 ? COURT.minX - 72 : COURT.maxX + 72)
+        : Phaser.Math.Clamp(
+            targetCenterX + Phaser.Math.Between(-attackTuning.spreadX, attackTuning.spreadX),
+            COURT.minX + 30,
+            COURT.maxX - 30
+        );
     const targetY = Phaser.Math.Clamp(
-        NET.y + Phaser.Math.Between(150, 240),
-        NET.y + 150,
-        NET.y + 250
+        NET.y + Phaser.Math.Between(attackTuning.minDepth, attackTuning.maxDepth),
+        NET.y + attackTuning.minDepth,
+        NET.y + attackTuning.maxDepth
     );
     const vx = (targetX - ballBody.x) / flightTime;
     const vy = (targetY - ballBody.y) / flightTime;
-    const attackGravityZ = BALL.gravityZFlightPostNet;
-    ballVZ = Phaser.Math.Clamp(
-        (0 - ballZ - 0.5 * attackGravityZ * flightTime * flightTime) / flightTime,
-        PHYS_CLAMP.minVZ,
-        PHYS_CLAMP.maxVZ
-    );
+    const attackGravityZ = getFlightGravityAtY(ballBody.y);
+    ballVZ = calculateLaunchVZForFlight(ballZ, 0, ballBody.y, vy, flightTime);
     ballBody.setVelocity(
         Phaser.Math.Clamp(vx, -520, 520),
-        Phaser.Math.Clamp(vy, 240, 720)
+        Phaser.Math.Clamp(vy, 80, 720)
     );
     setShotCalculations({
         'modelo': 'ataque IA',
+        'dificuldade IA': difficulty.label,
+        'erro sorteado': attackError ? 'SIM' : 'NAO',
         'origem': `x ${Math.round(ballBody.x)} y ${Math.round(ballBody.y)} z ${Math.round(ballZ)}`,
         'alvo': `x ${Math.round(targetX)} y ${Math.round(targetY)}`,
         'tempo voo': `${flightTime.toFixed(3)}s`,
@@ -2180,7 +2364,7 @@ function performOpponentAttack(scene, attacker) {
         'velocidade aplicada': `vx ${Math.round(ballBody.body.velocity.x)} vy ${Math.round(ballBody.body.velocity.y)} vz ${Math.round(ballVZ)}`,
         'velocidade total aplicada': Math.round(Math.hypot(ballBody.body.velocity.x, ballBody.body.velocity.y, ballVZ)),
         'gravidade voo': attackGravityZ,
-        'formula vz': `(0 - ${Math.round(ballZ)} - 0.5 * ${attackGravityZ} * ${flightTime.toFixed(3)}^2) / ${flightTime.toFixed(3)}`
+        'formula vz': `integracao da gravidade variavel por ${flightTime.toFixed(3)}s`
     });
     setShotVelocity(ballBody.body.velocity.x, ballBody.body.velocity.y, ballVZ);
     lastOppAttackPlan = {
@@ -2215,6 +2399,19 @@ function isPlayerAttackOutOnOpponentCourt() {
     return (
         ballBody.y < OPPONENT_COURT.minY ||
         ballBody.y > OPPONENT_COURT.maxY ||
+        ballBody.x < COURT.minX - marginX ||
+        ballBody.x > COURT.maxX + marginX
+    );
+}
+
+function isOpponentAttackOutOnPlayerCourt() {
+    if (lastTouch !== 'OPP_HIT') return false;
+    if (!ballBody) return false;
+
+    const marginX = 10;
+    return (
+        ballBody.y < NET.y ||
+        ballBody.y > COURT.maxY ||
         ballBody.x < COURT.minX - marginX ||
         ballBody.x > COURT.maxX + marginX
     );
@@ -2323,7 +2520,6 @@ function performServeHitInstant(scene, power) {
     const servePowerRatio = Phaser.Math.Clamp(Math.max(hitPowerRatio, ratio), 0.25, 1);
 
     state = 'FLYING';
-    lastAttack = power.label;
     debugShot.hit = {
         x: screenXToWidth(ballBody.x),
         y: screenYToDepth(ballBody.y),
@@ -2371,6 +2567,8 @@ function performServeHitInstant(scene, power) {
     lastPlayerShotKind = 'SERVE';
     lastPlayerAttackPower = servePowerRatio;
     opponentReceiveAttemptedForPlayerHit = false;
+    opponentDefenseStartedAtMs = 0;
+    opponentLowServeDecision = null;
 
     // Saque usa velocidade propria, mais forte que o ataque comum.
     const speedMult = Phaser.Math.Linear(0.84, 0.94, servePowerRatio);
@@ -2472,6 +2670,8 @@ function resetServe() {
     lastPlayerAttackPower = 0;
     lastPlayerShotKind = 'ATTACK';
     opponentReceiveAttemptedForPlayerHit = false;
+    opponentDefenseStartedAtMs = 0;
+    opponentLowServeDecision = null;
     resetVirtualInput();
     resetPlayerFormation(nextServer === 'PLAYER');
     resetOpponentFormation();
@@ -2500,6 +2700,8 @@ function resetServe() {
         playerPoseEvent = null;
     }
     getControlledPlayer().setTexture('playerBack');
+    if (!difficultySelected) return;
+
     showStatusMessage(gameScene, 'SAQUE', 900);
     startRallyLog(nextServer);
 
@@ -2624,36 +2826,40 @@ function startOpponentServe(scene) {
 }
 
 function performOpponentServeHit(scene, server) {
+    const difficulty = getDifficultyProfile();
+    const serveTuning = difficulty.serve;
     state = 'FLYING';
     gamePhase = 'RALLY';
     lastTouch = 'OPP_HIT';
     ball.clearTint();
     beginShotLog('SAQUE', 'ADVERSARIO', {
-        force: 'saque automatico',
-        quality: 'ataque'
+        force: difficulty.label,
+        quality: currentDifficultyKey === 'advanced' ? 'forte' : currentDifficultyKey === 'easy' ? 'leve' : 'normal'
     });
 
     const startX = ballBody.x;
     const startY = ballBody.y;
-    const targetX = Phaser.Math.Clamp(playerBacker.x + Phaser.Math.Between(-90, 90), COURT.minX + 30, COURT.maxX - 30);
-    const targetY = NET.y + Phaser.Math.Between(155, 235);
-    const flightTime = 1.18;
+    const targetX = Phaser.Math.Clamp(
+        playerBacker.x + Phaser.Math.Between(-serveTuning.spreadX, serveTuning.spreadX),
+        COURT.minX + 30,
+        COURT.maxX - 30
+    );
+    const targetY = NET.y + Phaser.Math.Between(serveTuning.minDepth, serveTuning.maxDepth);
+    const flightTime = serveTuning.flightTime;
     const vx = (targetX - startX) / flightTime;
     const vy = (targetY - startY) / flightTime;
-    const attackGravityZ = BALL.gravityZFlightPostNet;
+    const attackGravityZ = getFlightGravityAtY(startY);
 
-    ballZ = Math.max(ballZ, 112);
-    ballVZ = Phaser.Math.Clamp(
-        (0 - ballZ - 0.5 * attackGravityZ * flightTime * flightTime) / flightTime,
-        PHYS_CLAMP.minVZ,
-        PHYS_CLAMP.maxVZ
-    );
+    ballZ = Math.max(ballZ, serveTuning.minBallZ);
+    ballVZ = calculateLaunchVZForFlight(ballZ, 0, startY, vy, flightTime);
     ballBody.setVelocity(
         Phaser.Math.Clamp(vx, -420, 420),
-        Phaser.Math.Clamp(vy, 260, 680)
+        Phaser.Math.Clamp(vy, 100, 680)
     );
     setShotCalculations({
         'modelo': 'saque automatico IA',
+        'dificuldade IA': difficulty.label,
+        'forca saque': currentDifficultyKey === 'advanced' ? 'FORTE' : currentDifficultyKey === 'easy' ? 'LEVE' : 'NORMAL',
         'origem': `x ${Math.round(startX)} y ${Math.round(startY)} z ${Math.round(ballZ)}`,
         'alvo': `x ${Math.round(targetX)} y ${Math.round(targetY)}`,
         'tempo voo': `${flightTime.toFixed(3)}s`,
@@ -2662,7 +2868,7 @@ function performOpponentServeHit(scene, server) {
         'velocidade aplicada': `vx ${Math.round(ballBody.body.velocity.x)} vy ${Math.round(ballBody.body.velocity.y)} vz ${Math.round(ballVZ)}`,
         'velocidade total aplicada': Math.round(Math.hypot(ballBody.body.velocity.x, ballBody.body.velocity.y, ballVZ)),
         'gravidade voo': attackGravityZ,
-        'formula vz': `(0 - ${Math.round(ballZ)} - 0.5 * ${attackGravityZ} * ${flightTime.toFixed(3)}^2) / ${flightTime.toFixed(3)}`
+        'formula vz': `integracao da gravidade variavel por ${flightTime.toFixed(3)}s`
     });
     setShotVelocity(ballBody.body.velocity.x, ballBody.body.velocity.y, ballVZ);
 
@@ -3173,13 +3379,14 @@ function updatePlayerRadiusOverlay() {
     playerRadiusGraphics.clear();
 
     const controlled = getControlledPlayer();
+    const opponentReceiveRadius = getDifficultyProfile().receiveRadius;
     const items = [
         { sprite: playerBacker, radius: RECEIVE.radius, color: 0x22ff88, alpha: playerBacker === controlled ? 0.78 : 0.42 },
         { sprite: playerLeft, radius: RECEIVE.radius, color: 0x22ff88, alpha: playerLeft === controlled ? 0.78 : 0.42 },
         { sprite: playerRight, radius: RECEIVE.radius, color: 0x22ff88, alpha: playerRight === controlled ? 0.78 : 0.42 },
-        { sprite: opponentBack, radius: OPPONENT_AI.receiveRadius, color: 0xff5f6d, alpha: 0.36 },
-        { sprite: oppLeft, radius: OPPONENT_AI.receiveRadius, color: 0xff5f6d, alpha: 0.36 },
-        { sprite: oppRight, radius: OPPONENT_AI.receiveRadius, color: 0xff5f6d, alpha: 0.36 }
+        { sprite: opponentBack, radius: opponentReceiveRadius, color: 0xff5f6d, alpha: 0.36 },
+        { sprite: oppLeft, radius: opponentReceiveRadius, color: 0xff5f6d, alpha: 0.36 },
+        { sprite: oppRight, radius: opponentReceiveRadius, color: 0xff5f6d, alpha: 0.36 }
     ];
 
     items.forEach(({ sprite, radius, color, alpha }) => {
@@ -3400,6 +3607,8 @@ function performRallyHit(scene) {
     state = 'FLYING';
     lastTouch = 'PLAYER_HIT';
     opponentReceiveAttemptedForPlayerHit = false;
+    opponentDefenseStartedAtMs = 0;
+    opponentLowServeDecision = null;
     const attackPower = Phaser.Math.Clamp((ballZ - 45) / 85, 0, 1);
     lastPlayerAttackPower = attackPower;
     lastPlayerShotKind = 'ATTACK';

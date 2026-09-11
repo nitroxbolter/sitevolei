@@ -288,6 +288,81 @@ canvas {
     display: none;
 }
 
+.difficulty-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(3, 9, 17, 0.88);
+    backdrop-filter: blur(8px);
+}
+
+.difficulty-modal.is-hidden {
+    display: none;
+}
+
+.difficulty-dialog {
+    width: min(520px, calc(100vw - 32px));
+    padding: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    background: #101722;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+    text-align: center;
+}
+
+.difficulty-kicker {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--accent);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.difficulty-dialog h2 {
+    margin: 0 0 22px;
+    font-size: 1.6rem;
+}
+
+.difficulty-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.difficulty-options button {
+    min-width: 0;
+    min-height: 48px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    background: #1a2533;
+    color: #fff;
+    font: 700 0.95rem/1 'Outfit', sans-serif;
+    cursor: pointer;
+}
+
+.difficulty-options button:hover,
+.difficulty-options button:focus-visible {
+    border-color: var(--accent);
+    background: #26364a;
+    outline: none;
+}
+
+.difficulty-options button[data-difficulty="easy"] {
+    border-bottom: 4px solid #35cf78;
+}
+
+.difficulty-options button[data-difficulty="medium"] {
+    border-bottom: 4px solid #ffd700;
+}
+
+.difficulty-options button[data-difficulty="advanced"] {
+    border-bottom: 4px solid #ff4d4d;
+}
+
 #fullscreen-button {
     color: #000;
     background: var(--accent);
@@ -565,6 +640,20 @@ canvas {
     .mobile-action-btn[data-action="action"] {
         grid-column: 3;
         grid-row: 2;
+    }
+
+    .difficulty-dialog {
+        width: min(500px, calc(100vw - 48px));
+        padding: 18px;
+    }
+
+    .difficulty-dialog h2 {
+        margin-bottom: 14px;
+        font-size: 1.25rem;
+    }
+
+    .difficulty-options button {
+        min-height: 44px;
     }
 }
 

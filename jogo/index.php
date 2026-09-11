@@ -26,6 +26,17 @@ if (isLoggedIn()) {
             <span>O jogo usa a tela deitada para mostrar todos os comandos.</span>
         </div>
     </div>
+    <div id="difficulty-modal" class="difficulty-modal" role="dialog" aria-modal="true" aria-labelledby="difficulty-title">
+        <div class="difficulty-dialog">
+            <span class="difficulty-kicker">NOVA PARTIDA</span>
+            <h2 id="difficulty-title">Escolha a dificuldade</h2>
+            <div class="difficulty-options" role="group" aria-label="Dificuldade da partida">
+                <button type="button" data-difficulty="easy">Fácil</button>
+                <button type="button" data-difficulty="medium">Médio</button>
+                <button type="button" data-difficulty="advanced">Avançado</button>
+            </div>
+        </div>
+    </div>
     <div id="game-wrapper">
         <header>
             <a class="home-link" href="/" aria-label="Voltar para o site">‹</a>
